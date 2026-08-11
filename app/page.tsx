@@ -4,196 +4,34 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type Movie = {
   id: string;
+  source?: string;
   title: string;
-  description: string;
+  description?: string;
   poster: string;
   backdrop: string;
-  videoUrl: string;
-  duration: string;
-  durationSeconds: number;
-  year: number;
+  videoUrl?: string;
+  duration?: string;
+  durationSeconds?: number;
+  year?: number;
   genres: string[];
-  rating: string;
+  rating?: string;
   director?: string;
   cast?: string[];
   trailer?: string;
   progress?: number;
 };
 
-// ==========================================
-// ⚙️ CONFIGURAÇÕES DAS APIs
-// Atenção: Substitua a propriedade 'url' pelo "Request URL" exato do playground de cada API!
-// ==========================================
-const API_SOURCES = [
-  { 
-    name: "YTS", 
-    host: "yts-am-torrent.p.rapidapi.com", 
-    url: "https://yts-am-torrent.p.rapidapi.com/list_movies.json?limit=15&sort_by=download_count" 
-  },
-  { 
-    name: "EasyTorrents", 
-    host: "easytorrents1.p.rapidapi.com", 
-    url: "https://easytorrents1.p.rapidapi.com/search?q=movie" 
-  },
-  { 
-    name: "MovieTVMusic", 
-    host: "movie-tv-music-search-and-download.p.rapidapi.com", 
-    url: "https://movie-tv-music-search-and-download.p.rapidapi.com/search?q=movie" 
-  },
-  { 
-    name: "AmazonVideo", 
-    host: "amazon-video-mp4.p.rapidapi.com", 
-    url: "https://amazon-video-mp4.p.rapidapi.com/search?q=movie" 
-  },
-  { 
-    name: "MovieDatabase", 
-    host: "movie-database-api1.p.rapidapi.com", 
-    url: "https://movie-database-api1.p.rapidapi.com/movies" 
-  },
-  { 
-    name: "StreamMovies", 
-    host: "stream-movies.p.rapidapi.com", 
-    url: "https://stream-movies.p.rapidapi.com/movies" 
-  },
-  { 
-    name: "CineStream", 
-    host: "cinestream-api.p.rapidapi.com", 
-    url: "https://cinestream-api.p.rapidapi.com/movies" 
-  }
-];
+function movieMeta(movie: Movie) {
+  return [
+    movie.year,
+    movie.duration,
+    movie.genres.join(" / "),
+    movie.rating,
+  ].filter((item) => item != null && String(item).trim() !== "");
+}
 
-// Filmes originais salvos como plano B caso todas as APIs falhem
-const fallbackMovies: Movie[] = [
-  {
-    id: "noite-de-vidro",
-    title: "Noite de Vidro",
-    description:
-      "Uma restauradora de arquivos encontra imagens apagadas de um crime dentro do predio mais vigiado da cidade.",
-    poster:
-      "linear-gradient(160deg, rgba(8,12,16,.3), rgba(8,12,16,.76)), radial-gradient(circle at 62% 18%, rgba(226,244,255,.72), transparent 21%), linear-gradient(135deg, #0d1117 0%, #152b34 47%, #030506 100%)",
-    backdrop: "url('/assets/noite-de-vidro-backdrop.png')",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    duration: "1h 42min",
-    durationSeconds: 6120,
-    year: 2026,
-    genres: ["Suspense", "Drama"],
-    rating: "14",
-    director: "Lia Monte",
-    cast: ["Nina Reis", "Caio Varella", "Otto Prado"],
-    progress: 34,
-  },
-  {
-    id: "mare-zero",
-    title: "Mare Zero",
-    description:
-      "Depois que o mar desaparece por uma noite, uma equipe precisa atravessar a costa antes que tudo volte ao lugar.",
-    poster: "url('/assets/mare-zero-poster.png')",
-    backdrop:
-      "radial-gradient(circle at 44% 22%, rgba(202,233,255,.28), transparent 17%), linear-gradient(120deg, #03080d 0%, #14334a 50%, #020303 100%)",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    duration: "1h 58min",
-    durationSeconds: 7080,
-    year: 2025,
-    genres: ["Aventura", "Misterio"],
-    rating: "12",
-    director: "Bruno Sato",
-    cast: ["Maya Costa", "Theo Brandao"],
-    progress: 12,
-  },
-  {
-    id: "linha-final",
-    title: "Linha Final",
-    description:
-      "Um editor de som recebe a ultima gravacao de uma atriz desaparecida e percebe que cada corte muda a historia.",
-    poster:
-      "radial-gradient(circle at 51% 26%, rgba(255,226,168,.34), transparent 15%), linear-gradient(135deg, rgba(3,3,4,.18), rgba(3,3,4,.88)), linear-gradient(145deg, #1d1210 0%, #553826 52%, #070404 100%)",
-    backdrop:
-      "radial-gradient(circle at 61% 33%, rgba(255,224,164,.24), transparent 18%), linear-gradient(112deg, #050303 0%, #21100d 37%, #68442c 72%, #050303 100%)",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-    duration: "2h 04min",
-    durationSeconds: 7440,
-    year: 2024,
-    genres: ["Crime", "Suspense"],
-    rating: "16",
-    director: "Ari Lopes",
-    cast: ["Rafa Nunes", "Helena Diniz", "Ivo Lima"],
-  },
-  {
-    id: "orbita-17",
-    title: "Orbita 17",
-    description:
-      "A tripulacao de uma estacao esquecida decide transmitir o que viu antes que a Terra perca o sinal.",
-    poster:
-      "radial-gradient(circle at 48% 18%, rgba(232,244,255,.48), transparent 13%), radial-gradient(circle at 54% 47%, rgba(98,152,255,.22), transparent 19%), linear-gradient(150deg, #050710 0%, #121b33 54%, #020205 100%)",
-    backdrop:
-      "radial-gradient(circle at 62% 29%, rgba(216,236,255,.3), transparent 15%), radial-gradient(circle at 37% 52%, rgba(83,118,216,.24), transparent 20%), linear-gradient(118deg, #02030a 0%, #0d1530 62%, #010102 100%)",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-    duration: "1h 49min",
-    durationSeconds: 6540,
-    year: 2026,
-    genres: ["Ficcao", "Drama"],
-    rating: "12",
-    director: "Mila Araujo",
-    cast: ["Davi Rocha", "Clara Farias"],
-  },
-  {
-    id: "cidade-baixa",
-    title: "Cidade Baixa",
-    description:
-      "Durante uma madrugada de queda de energia, tres entregadores cruzam bairros que nunca deveriam se encontrar.",
-    poster:
-      "radial-gradient(circle at 34% 18%, rgba(251,108,69,.28), transparent 17%), linear-gradient(150deg, rgba(5,4,4,.2), rgba(5,4,4,.9)), linear-gradient(135deg, #120706 0%, #40221e 48%, #090304 100%)",
-    backdrop:
-      "radial-gradient(circle at 30% 34%, rgba(241,86,48,.22), transparent 20%), linear-gradient(112deg, #030202 0%, #1b0d0c 42%, #4a241d 76%, #030202 100%)",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    duration: "1h 31min",
-    durationSeconds: 5460,
-    year: 2023,
-    genres: ["Drama", "Urbano"],
-    rating: "14",
-    director: "Jonas Vale",
-    cast: ["Lara Mota", "Gus Martins"],
-    progress: 67,
-  },
-];
-
-// Função inteligente que tenta mapear qualquer resposta de API para o nosso tipo Movie
-function parseApiResponse(sourceName: string, data: any): Movie[] {
-  let items: any[] = [];
-  
-  // Tenta encontrar a array de filmes em diversas estruturas comuns
-  if (Array.isArray(data)) items = data;
-  else if (Array.isArray(data?.data?.movies)) items = data.data.movies;
-  else if (Array.isArray(data?.movies)) items = data.movies;
-  else if (Array.isArray(data?.results)) items = data.results;
-  else if (Array.isArray(data?.data)) items = data.data;
-
-  return items.slice(0, 10).map((m: any, index: number) => {
-    const rawImage = m.large_cover_image || m.poster_path || m.poster_url || m.poster || m.image;
-    const rawBackdrop = m.background_image_original || m.backdrop_path || m.backdrop_url || m.backdrop || rawImage;
-
-    return {
-      id: `${sourceName.toLowerCase()}-${m.id || m.imdb_id || index}`,
-      title: m.title || m.name || `Filme de ${sourceName}`,
-      description: m.summary || m.synopsis || m.overview || m.description_full || m.description || "Sem descrição disponível.",
-      poster: rawImage ? `url('${rawImage}')` : "none",
-      backdrop: rawBackdrop ? `url('${rawBackdrop}')` : "none",
-      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      duration: m.runtime ? `${Math.floor(m.runtime / 60)}h ${m.runtime % 60}min` : "2h 00min",
-      durationSeconds: m.runtime ? m.runtime * 60 : 7200,
-      year: m.year || (m.release_date ? new Date(m.release_date).getFullYear() : 2024),
-      genres: m.genres || [sourceName],
-      rating: String(m.rating || m.vote_average || "N/A"),
-      director: "Desconhecido",
-      cast: [],
-      progress: 0,
-    };
-  });
+function canWatch(movie: Movie) {
+  return Boolean(movie.videoUrl || movie.trailer);
 }
 
 function getStoredIds(key: string) {
@@ -224,7 +62,6 @@ function formatClock(seconds: number) {
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
-  const [apiErrors, setApiErrors] = useState<string[]>([]);
   const [scrolled, setScrolled] = useState(false);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -234,58 +71,23 @@ export default function Home() {
   const [savedProgress, setSavedProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    async function fetchAllApis() {
-      const rapidApiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY || "656bfca43amsh7408378f68fbc6ep1bbde0jsn06c38f0d1d28";
-      let fetchedMovies: Movie[] = [];
-      let tempErrors: string[] = [];
-
-      // Dispara requisições para todas as APIs em paralelo
-      const fetchPromises = API_SOURCES.map(async (api) => {
-        try {
-          const res = await fetch(api.url, {
-            method: "GET",
-            headers: {
-              "x-rapidapi-key": rapidApiKey,
-              "x-rapidapi-host": api.host,
-            },
-          });
-
-          if (!res.ok) {
-            tempErrors.push(`${api.name}: ${res.status}`);
-            return [];
-          }
-
-          const data = await res.json();
-          const parsedMovies = parseApiResponse(api.name, data);
-          
-          if (parsedMovies.length === 0) {
-            tempErrors.push(`${api.name}: Sem dados/Rota incorreta`);
-          }
-          
-          return parsedMovies;
-        } catch (error) {
-          tempErrors.push(`${api.name}: Falha Conexão`);
-          return [];
+    async function fetchCatalog() {
+      try {
+        const res = await fetch("/api/movies", { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
         }
-      });
 
-      // Aguarda todas as requisições terminarem
-      const results = await Promise.all(fetchPromises);
-      fetchedMovies = results.flat();
-
-      if (fetchedMovies.length > 0) {
-        setMovies(fetchedMovies);
-      } else {
-        // Se todas falharem, carrega os filmes de fallback
-        setMovies(fallbackMovies);
-        tempErrors.push("Exibindo catálogo offline.");
+        const data = (await res.json()) as { movies?: Movie[] };
+        setMovies(Array.isArray(data.movies) ? data.movies : []);
+      } catch {
+        setMovies([]);
+      } finally {
+        setLoading(false);
       }
-
-      setApiErrors(tempErrors);
-      setLoading(false);
     }
 
-    fetchAllApis();
+    fetchCatalog();
   }, []);
 
   useEffect(() => {
@@ -324,16 +126,19 @@ export default function Home() {
 
   const listMovies = movies.filter((movie) => listIds.includes(movie.id));
 
-  // Agrupa os filmes por suas respectivas APIs para montar as fileiras (rows)
+  const apiRows = Array.from(
+    new Set(movies.map((movie) => movie.source).filter((source): source is string => Boolean(source))),
+  ).map((source) => ({
+    title: `Catálogo ${source}`,
+    items: movies.filter((movie) => movie.source === source),
+  }));
+
   const rows = [
-    { title: "Lançamentos (Destaque)", items: movies.slice(0, 10) },
-    ...API_SOURCES.map(api => ({
-      title: `Catálogo ${api.name}`,
-      items: movies.filter(m => m.id.startsWith(api.name.toLowerCase()))
-    })).filter(row => row.items.length > 0),
+    { title: "Lançamentos Multi-Servidor", items: movies.slice(0, 12) },
+    ...apiRows,
     ...(continueMovies.length ? [{ title: "Continue assistindo", items: continueMovies }] : []),
     ...(listMovies.length ? [{ title: "Minha lista", items: listMovies }] : []),
-  ];
+  ].filter((row) => row.items.length > 0);
 
   const searchResults = movies.filter((movie) => {
     const value = `${movie.title} ${movie.genres.join(" ")}`.toLowerCase();
@@ -355,28 +160,15 @@ export default function Home() {
 
   if (loading) {
     return (
-      <main className="flixa-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "white" }}>
-        <p>Buscando catálogo de múltiplos servidores...</p>
-      </main>
-    );
-  }
-
-  if (!featuredMovie) {
-    return (
-      <main className="flixa-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "white" }}>
-        <p>Erro crasso. Nenhum filme disponível.</p>
+      <main className="flixa-shell" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "white" }}>
+        <p style={{ fontSize: "1.2rem", fontWeight: "bold" }}>Conectando aos servidores...</p>
+        <p style={{ fontSize: "0.9rem", color: "#888", marginTop: "8px" }}>Buscando filmes e notas. Pode levar alguns segundos.</p>
       </main>
     );
   }
 
   return (
     <main className="flixa-shell">
-      {apiErrors.length > 0 && (
-        <div style={{ background: '#eab308', color: '#000', padding: '10px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', zIndex: 9999, position: 'relative' }}>
-          Alertas de API: {apiErrors.join(" | ")}
-        </div>
-      )}
-
       <header className={`flixa-header ${scrolled ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" aria-label="Flixa inicio">
           <span className="brand-mark" />
@@ -433,9 +225,7 @@ export default function Home() {
                       <span className="mini-poster" style={{ background: movie.poster, backgroundSize: "cover", backgroundPosition: "center" }} />
                       <span>
                         <strong>{movie.title}</strong>
-                        <small>
-                          {movie.year} / {movie.genres[0]}
-                        </small>
+                        <small>{[movie.year, movie.genres[0]].filter(Boolean).join(" / ")}</small>
                       </span>
                     </button>
                   ))
@@ -445,40 +235,51 @@ export default function Home() {
         ) : null}
       </header>
 
-      <section
-        className="hero"
-        id="home"
-        style={{ "--hero-art": featuredMovie.backdrop, backgroundSize: "cover", backgroundPosition: "center" } as React.CSSProperties}
-      >
-        <div className="frame-strips" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="hero-content">
-          <p className="eyebrow">Em destaque na Flixa</p>
-          <h1>{featuredMovie.title}</h1>
-          <p className="hero-description">{featuredMovie.description}</p>
-          <div className="meta-line">
-            <span>{featuredMovie.year}</span>
-            <span>{featuredMovie.duration}</span>
-            <span>{featuredMovie.genres.join(" / ")}</span>
-            <span>{featuredMovie.rating}</span>
+      {featuredMovie ? (
+        <section
+          className="hero"
+          id="home"
+          style={{ "--hero-art": featuredMovie.backdrop, backgroundSize: "cover", backgroundPosition: "center" } as React.CSSProperties}
+        >
+          <div className="frame-strips" aria-hidden="true">
+            <span />
+            <span />
+            <span />
           </div>
-          <div className="hero-actions">
-            <button className="primary-action" type="button" onClick={() => openPlayer(featuredMovie)}>
-              Assistir
-            </button>
-            <button
-              className="secondary-action"
-              type="button"
-              onClick={() => toggleList(featuredMovie.id)}
-            >
-              {listIds.includes(featuredMovie.id) ? "Na Minha Lista" : "+ Minha Lista"}
-            </button>
+          <div className="hero-content">
+            <p className="eyebrow">Em destaque na Flixa</p>
+            <h1>{featuredMovie.title}</h1>
+            {featuredMovie.description ? <p className="hero-description">{featuredMovie.description}</p> : null}
+            <div className="meta-line">
+              {movieMeta(featuredMovie).map((item) => (
+                <span key={String(item)}>{item}</span>
+              ))}
+            </div>
+            <div className="hero-actions">
+              {canWatch(featuredMovie) ? (
+                <button className="primary-action" type="button" onClick={() => openPlayer(featuredMovie)}>
+                  Assistir
+                </button>
+              ) : null}
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => toggleList(featuredMovie.id)}
+              >
+                {listIds.includes(featuredMovie.id) ? "Na Minha Lista" : "+ Minha Lista"}
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="hero" id="home">
+          <div className="hero-content">
+            <p className="eyebrow">Catálogo Flixa</p>
+            <h1>Nenhum filme retornado</h1>
+            <p className="hero-description">As APIs não devolveram títulos neste momento.</p>
+          </div>
+        </section>
+      )}
 
       <section className="content-rows" id="filmes" aria-label="Catalogo de filmes">
         {rows.map((row) => (
@@ -584,9 +385,7 @@ function MovieCard({
       </span>
       <span className="card-meta">
         <strong>{movie.title}</strong>
-        <small>
-          {movie.duration} / {movie.genres[0]}
-        </small>
+        <small>{[movie.duration, movie.genres[0]].filter(Boolean).join(" / ")}</small>
       </span>
     </button>
   );
@@ -618,16 +417,17 @@ function MovieDetails({
             <p className="eyebrow">Filme Flixa</p>
             <h2>{movie.title}</h2>
             <div className="meta-line">
-              <span>{movie.year}</span>
-              <span>{movie.duration}</span>
-              <span>{movie.genres.join(" / ")}</span>
-              <span>{movie.rating}</span>
+              {movieMeta(movie).map((item) => (
+                <span key={String(item)}>{item}</span>
+              ))}
             </div>
-            <p>{movie.description}</p>
+            {movie.description ? <p>{movie.description}</p> : null}
             <div className="details-actions">
-              <button className="primary-action" type="button" onClick={onWatch}>
-                Assistir agora
-              </button>
+              {canWatch(movie) ? (
+                <button className="primary-action" type="button" onClick={onWatch}>
+                  Assistir agora
+                </button>
+              ) : null}
               <button className="secondary-action" type="button" onClick={onToggleList}>
                 {inList ? "Na Minha Lista" : "Minha Lista"}
               </button>
@@ -726,25 +526,39 @@ function MoviePlayer({
       onMouseMove={showControls}
       onTouchStart={showControls}
     >
-      <video
-        ref={videoRef}
-        className="video-stage"
-        src={movie.videoUrl}
-        preload="metadata"
-        onLoadedMetadata={(event) => {
-          const video = event.currentTarget;
-          setDuration(video.duration);
-          if (initialTime > 0 && initialTime < video.duration - 12) {
-            video.currentTime = initialTime;
-          }
-        }}
-        onTimeUpdate={(event) => {
-          const time = event.currentTarget.currentTime;
-          setCurrentTime(time);
-        }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-      />
+      {movie.videoUrl ? (
+        <video
+          ref={videoRef}
+          className="video-stage"
+          src={movie.videoUrl}
+          preload="metadata"
+          onLoadedMetadata={(event) => {
+            const video = event.currentTarget;
+            setDuration(video.duration);
+            if (initialTime > 0 && initialTime < video.duration - 12) {
+              video.currentTime = initialTime;
+            }
+          }}
+          onTimeUpdate={(event) => {
+            const time = event.currentTarget.currentTime;
+            setCurrentTime(time);
+          }}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+        />
+      ) : movie.trailer ? (
+        <iframe
+          className="video-stage"
+          src={movie.trailer}
+          title={movie.title}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <div className="video-stage" style={{ display: "grid", placeItems: "center", color: "white" }}>
+          <p>A API não enviou um vídeo para este título.</p>
+        </div>
+      )}
 
       <div className="player-shade" />
       <button className="back-button" type="button" onClick={closePlayer}>
