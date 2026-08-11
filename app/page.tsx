@@ -214,7 +214,6 @@ export default function Home() {
   const [browseLoading, setBrowseLoading] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
-  const [siteIntro, setSiteIntro] = useState(true);
   const toastTimer = useRef<number | null>(null);
   const lastCatalogHash = useRef("home");
   const playerMovieRef = useRef<Movie | null>(null);
@@ -612,21 +611,11 @@ export default function Home() {
     }
   }
 
-  if (siteIntro) {
-    return (
-      <main className="flixa-shell">
-        <div className="brand-intro-stage">
-          <BrandIntro onDone={() => setSiteIntro(false)} />
-        </div>
-      </main>
-    );
-  }
-
   if (loading) {
     return (
       <main className="flixa-shell">
         <div className="boot-screen">
-          <img className="brand-logo brand-logo-lg" src="/logo.png" alt="Flixa" width={72} height={72} />
+          <span className="brand-mark" />
           <p>Carregando o catálogo</p>
           <div className="skeleton-row" aria-hidden="true">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -642,7 +631,7 @@ export default function Home() {
     <main className="flixa-shell has-mobile-nav">
       <header className={`flixa-header ${scrolled || searchOpen || view !== "home" ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" onClick={() => goTo("home")} aria-label="Flixa início">
-          <img className="brand-logo" src="/logo.png" alt="" width={36} height={36} />
+          <span className="brand-mark" />
           <span>FLIXA</span>
         </a>
 
@@ -1095,34 +1084,6 @@ export default function Home() {
   );
 }
 
-function BrandIntro({ onDone }: { onDone: () => void }) {
-  const finished = useRef(false);
-
-  function finish() {
-    if (finished.current) return;
-    finished.current = true;
-    onDone();
-  }
-
-  return (
-    <div className="brand-intro" onClick={finish}>
-      <video
-        className="brand-intro-video"
-        src="/intro.mp4"
-        autoPlay
-        muted
-        playsInline
-        preload="auto"
-        onEnded={finish}
-        onError={finish}
-      />
-      <button className="brand-intro-skip" type="button" onClick={finish}>
-        Pular
-      </button>
-    </div>
-  );
-}
-
 function MovieThumb({ movie }: { movie: Movie }) {
   const src = imageSrc(movie.poster);
   return src ? (
@@ -1444,7 +1405,6 @@ function MoviePlayer({
   const movieId = tmdbId || imdbId;
   const path = mediaKind(movie) === "tv" ? "serie" : "filme";
   const [showBar, setShowBar] = useState(true);
-  const [introDone, setIntroDone] = useState(false);
   const hideBar = useRef<number | null>(null);
 
   useEffect(() => {
@@ -1503,9 +1463,7 @@ function MoviePlayer({
         <strong className="player-title">{movie.title}</strong>
       </div>
 
-      {!introDone ? (
-        <BrandIntro onDone={() => setIntroDone(true)} />
-      ) : movieId ? (
+      {movieId ? (
         <iframe
           className="video-stage"
           src={`https://superflixapi.fit/${path}/${movieId}#noLink`}

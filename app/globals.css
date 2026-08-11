@@ -98,19 +98,32 @@ img {
   letter-spacing: 0.18em;
 }
 
-.brand-logo {
-  display: block;
-  width: 2.15rem;
-  height: 2.15rem;
-  object-fit: contain;
-  border-radius: 0.35rem;
-  background: #000;
-  box-shadow: 0 0 18px rgba(140, 231, 242, 0.22);
+.brand-mark {
+  position: relative;
+  display: inline-block;
+  width: 2.05rem;
+  height: 1.3rem;
+  border: 1px solid rgba(140, 231, 242, 0.7);
+  border-radius: 0.18rem;
+  box-shadow: 0 0 20px rgba(140, 231, 242, 0.16);
 }
 
-.brand-logo-lg {
-  width: 4.5rem;
-  height: 4.5rem;
+.brand-mark::before,
+.brand-mark::after {
+  position: absolute;
+  top: 0.24rem;
+  bottom: 0.24rem;
+  width: 1px;
+  background: rgba(140, 231, 242, 0.7);
+  content: "";
+}
+
+.brand-mark::before {
+  left: 0.48rem;
+}
+
+.brand-mark::after {
+  right: 0.48rem;
 }
 
 .nav-links {
@@ -1081,46 +1094,6 @@ body.player-open > iframe:not(.video-stage) {
   color: #fff;
   padding: 0.8rem 1rem;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-}
-
-.brand-intro-stage {
-  position: relative;
-  min-height: 100dvh;
-  background: #000;
-}
-
-.brand-intro {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  background: #000;
-}
-
-.brand-intro-video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-}
-
-.brand-intro-skip {
-  position: absolute;
-  right: 1.1rem;
-  bottom: 1.1rem;
-  z-index: 6;
-  min-height: 2.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  background: rgba(8, 10, 14, 0.72);
-  color: #fff;
-  padding: 0 1rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.brand-intro-skip:hover {
-  background: rgba(255, 255, 255, 0.14);
 }
 
 .boot-screen {
