@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vinext build",
     "build:sites": "bash scripts/build-verified.sh",
-    "start": "vinext start",
+    "start": "node server.js",
+    "start:vinext": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
@@ -24,7 +25,8 @@
     "mysql2": "^3.23.3",
     "next": "16.2.6",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "vinext": "0.0.50"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -42,7 +44,6 @@
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
     "vite": "8.0.13",
     "wrangler": "4.92.0"
   },
