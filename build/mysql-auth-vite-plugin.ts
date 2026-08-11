@@ -149,7 +149,7 @@ export function mysqlAuth(): Plugin {
             error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code) : "";
           const dica =
             code === "ETIMEDOUT" || code === "ENOTFOUND" || /Failed query/i.test(message)
-              ? " Verifique Remote MySQL na Hostinger e reinicie o npm run dev."
+              ? " Confira MYSQL_HOST no .env.local e a conexão com o MySQL."
               : "";
           sendJson(res, 500, { erro: `${message}${dica}` });
         }
