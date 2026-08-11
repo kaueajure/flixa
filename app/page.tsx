@@ -27,6 +27,12 @@ type Movie = {
 
 type Genre = { id: number; name: string };
 type View = "home" | "filmes" | "series" | "lista" | "genero";
+type AuthUser = {
+  id: number;
+  nome: string;
+  email: string;
+  administrador: boolean;
+};
 
 const LIST_KEY = "flixa-saved-movies";
 const LEGACY_LIST_KEY = "flixa-list";
@@ -188,6 +194,8 @@ function useFocusTrap(active: boolean, ref: RefObject<HTMLElement | null>) {
 }
 
 export default function Home() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -226,6 +234,40 @@ export default function Home() {
 
   useFocusTrap(searchOpen, searchPanelRef);
 
+  useEffect(() => {
+    let ativo = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const data = (await res.json()) as { usuario?: AuthUser | null };
+        return data.usuario ?? null;
+      })
+      .then((usuario) => {
+        if (!ativo) return;
+        if (!usuario) {
+          window.location.href = "/login";
+          return;
+        }
+        setAuthUser(usuario);
+        setAuthChecking(false);
+      })
+      .catch(() => {
+        if (!ativo) return;
+        window.location.href = "/login";
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  }
+
   function showToast(message: string) {
     setToast(message);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -258,12 +300,16 @@ export default function Home() {
   }
 
   useEffect(() => {
+    if (authChecking || !authUser) return;
     const boot = window.setTimeout(() => fetchCatalog(), 0);
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/adblock-sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("/adblock-sw.js")
+        .then((reg) => reg.update())
+        .catch(() => {});
     }
     return () => window.clearTimeout(boot);
-  }, []);
+  }, [authChecking, authUser]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -611,12 +657,12 @@ export default function Home() {
     }
   }
 
-  if (loading) {
+  if (authChecking || loading) {
     return (
       <main className="flixa-shell">
         <div className="boot-screen">
           <span className="brand-mark" />
-          <p>Carregando o catálogo</p>
+          <p>{authChecking ? "Validando sessão" : "Carregando o catálogo"}</p>
           <div className="skeleton-row" aria-hidden="true">
             {Array.from({ length: 6 }).map((_, index) => (
               <span key={index} className="skeleton-poster" />
@@ -667,6 +713,17 @@ export default function Home() {
           >
             <span />
           </button>
+          {authUser ? (
+            <div className="header-user">
+              <span className="header-user-name" title={authUser.email}>
+                {authUser.nome}
+              </span>
+              {authUser.administrador ? <span className="header-user-badge">Admin</span> : null}
+              <button className="logout-button" type="button" onClick={() => void logout()}>
+                Sair
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -1355,28 +1412,52 @@ function MovieDetails({
   );
 }
 
+const PLAYER_UI_SELECTOR =
+  ".player-view, .player-bar, .player-server-menu, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell";
+
+function isAllowedPlayerFrame(src: string) {
+  return /cdn-embed\.com|superflixapi|warezcdn|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
+}
+
 function isOverlayAd(node: Element) {
   if (!(node instanceof HTMLElement)) return false;
-  if (node.closest(".player-bar, .flixa-header, .movie-card, .details-panel, .search-panel")) return false;
-  if (node.classList.contains("player-view") || node.classList.contains("video-stage") || node.classList.contains("flixa-shell")) {
+  if (node.closest(PLAYER_UI_SELECTOR)) return false;
+  if (
+    node.classList.contains("player-view") ||
+    node.classList.contains("video-stage") ||
+    node.classList.contains("flixa-shell")
+  ) {
     return false;
   }
 
+  const playerOpen = document.body.classList.contains("player-open");
+  const style = node.getAttribute("style") || "";
+  const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+
   if (node instanceof HTMLIFrameElement && !node.classList.contains("video-stage") && !node.classList.contains("trailer-frame")) {
     const src = `${node.src || ""} ${node.getAttribute("src") || ""}`.toLowerCase();
-    if (src && !src.includes("superflixapi") && !src.includes("themoviedb") && !src.includes("image.tmdb") && !src.includes("youtube")) {
-      if (document.body.classList.contains("player-open")) return true;
-      if (/aichouphaugn|popads|exoclick|juicyads|propeller|doubleclick|adsystem|adsterra/.test(src)) return true;
+    if (!src.trim() || src.includes("about:blank")) return playerOpen;
+    if (!isAllowedPlayerFrame(src)) {
+      if (playerOpen) return true;
+      if (/aichouphaugn|popads|exoclick|juicyads|propeller|doubleclick|adsystem|adsterra|tsyndicate|oumaxi|pushground|pushnami/.test(src)) {
+        return true;
+      }
     }
   }
 
-  const style = node.getAttribute("style") || "";
-  const text = (node.textContent || "").replace(/\s+/g, " ");
+  if (playerOpen && node.parentElement === document.body) {
+    if (node instanceof HTMLAnchorElement) return true;
+    if (node instanceof HTMLIFrameElement) return true;
+    if (/position:\s*(fixed|absolute)/i.test(style) || /z-index:\s*\d{3,}/i.test(style)) return true;
+  }
+
   if (node.matches("img[src*='aichouphaugn'], a[href*='aichouphaugn']")) return true;
   if (node.querySelector(":scope img[src*='aichouphaugn'], :scope a[href*='aichouphaugn']")) return true;
   if (style.includes("Roboto") && style.includes("translate(-50%") && style.includes("position: absolute")) return true;
   if (style.includes("max-width: 355px") && /\bAd\b|Continuar|Fechar|JACKPOT/i.test(text)) return true;
-  if (/Está com Sorte|Gira a Roda|JACKPOT|Ganhe agora|Claim now/i.test(text) && /position:\s*(absolute|fixed)/i.test(style)) return true;
+  if (/Está com Sorte|Gira a Roda|JACKPOT|Ganhe agora|Claim now|Congratulations|You won/i.test(text) && /position:\s*(absolute|fixed)/i.test(style)) {
+    return true;
+  }
   if (/z-index:\s*(9{3,}|\d{5,})/i.test(style) && /pointer-events:\s*all/i.test(style) && /position:\s*(absolute|fixed)/i.test(style)) {
     return true;
   }
@@ -1388,9 +1469,223 @@ function isOverlayAd(node: Element) {
 }
 
 function scrubOverlayAds(root: ParentNode = document) {
-  root.querySelectorAll("img, iframe, div").forEach((node) => {
+  root.querySelectorAll("img, iframe, div, a, section, aside").forEach((node) => {
     if (isOverlayAd(node)) node.remove();
   });
+}
+
+function installPlayerAdblock() {
+  const originalOpen = window.open.bind(window);
+  window.open = (() => null) as typeof window.open;
+
+  const blockEvent = (event: Event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(".player-bar, .player-server-menu, .back-button, .video-stage, .player-view")) return;
+
+    if (event instanceof MouseEvent && (event.button === 1 || event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    const anchor = target.closest("a");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href") || "";
+    const isExternal = /^(https?:|\/\/)/i.test(href) || anchor.target === "_blank";
+    if (!isExternal) return;
+    if (anchor.closest(".video-stage")) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  document.addEventListener("click", blockEvent, true);
+  document.addEventListener("auxclick", blockEvent, true);
+  document.addEventListener("mousedown", blockEvent, true);
+
+  scrubOverlayAds();
+  const observer = new MutationObserver(() => scrubOverlayAds());
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  const timer = window.setInterval(() => scrubOverlayAds(), 250);
+
+  return () => {
+    window.open = originalOpen;
+    document.removeEventListener("click", blockEvent, true);
+    document.removeEventListener("auxclick", blockEvent, true);
+    document.removeEventListener("mousedown", blockEvent, true);
+    observer.disconnect();
+    window.clearInterval(timer);
+  };
+}
+
+type PlayerSourceId = string;
+type PlayerTheme = "cyan" | "gold" | "violet" | "emerald" | "rose" | "sky";
+
+type PlayerSource = {
+  id: PlayerSourceId;
+  name: string;
+  hint: string;
+  theme: PlayerTheme;
+  src: string;
+};
+
+function buildPlayerSources(movie: Movie): PlayerSource[] {
+  const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
+  const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
+  const kind = mediaKind(movie);
+  const path = kind === "tv" ? "serie" : "filme";
+  const sources: PlayerSource[] = [];
+
+  if (tmdbId) {
+    sources.push({
+      id: "cdn-tmdb",
+      name: "CDN Brasil",
+      hint: "PT-BR · TMDB · rápido",
+      theme: "cyan",
+      src: `https://cdn-embed.com/${path}/${tmdbId}`,
+    });
+    sources.push({
+      id: "superflix-pro",
+      name: "SuperFlix",
+      hint: "PT-BR · dublado/legendado",
+      theme: "gold",
+      src: `https://superflixapi.pro/${path}/${tmdbId}#noLink`,
+    });
+    sources.push({
+      id: "superflix-help",
+      name: "SuperFlix Alt",
+      hint: "PT-BR · espelho oficial",
+      theme: "violet",
+      src: `https://superflixapi.help/${path}/${tmdbId}`,
+    });
+    sources.push({
+      id: "warez-tmdb",
+      name: "WarezCDN",
+      hint: "PT-BR · TMDB",
+      theme: "emerald",
+      src: `https://warezcdn.lat/${path}/${tmdbId}`,
+    });
+  }
+
+  if (imdbId) {
+    sources.push({
+      id: "cdn-imdb",
+      name: "CDN IMDb",
+      hint: "PT-BR · IMDb",
+      theme: "sky",
+      src: `https://cdn-embed.com/${path}/${imdbId}`,
+    });
+    sources.push({
+      id: "superflix-imdb",
+      name: "SuperFlix IMDb",
+      hint: "PT-BR · IMDb",
+      theme: "rose",
+      src: `https://superflixapi.pro/${path}/${imdbId}#noLink`,
+    });
+    sources.push({
+      id: "warez-imdb",
+      name: "WarezCDN IMDb",
+      hint: "PT-BR · IMDb",
+      theme: "emerald",
+      src: `https://warezcdn.lat/${path}/${imdbId}`,
+    });
+  }
+
+  const seen = new Set<string>();
+  return sources.filter((source) => {
+    if (!source.src || seen.has(source.src)) return false;
+    seen.add(source.src);
+    return true;
+  });
+}
+
+function PlayerServerMenu({
+  sources,
+  activeId,
+  onSelect,
+  onOpenChange,
+}: {
+  sources: PlayerSource[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const active = sources.find((source) => source.id === activeId) ?? sources[0];
+
+  function updateOpen(next: boolean) {
+    setOpen(next);
+    onOpenChange?.(next);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) updateOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") updateOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  useEffect(() => () => onOpenChange?.(false), [onOpenChange]);
+
+  if (!active || sources.length === 0) return null;
+
+  return (
+    <div className={`player-server-menu theme-${active.theme} ${open ? "is-open" : ""}`} ref={menuRef}>
+      <button
+        type="button"
+        className="player-server-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => updateOpen(!open)}
+      >
+        <span className="player-server-dot" aria-hidden="true" />
+        <span className="player-server-copy">
+          <strong>{active.name}</strong>
+          <small>{active.hint}</small>
+        </span>
+        <span className="player-server-chevron" aria-hidden="true" />
+      </button>
+
+      {open ? (
+        <div className="player-server-dropdown" role="listbox" aria-label="Servidores PT-BR">
+          <p className="player-server-heading">Servidores em português</p>
+          {sources.map((source) => {
+            const selected = source.id === active.id;
+            return (
+              <button
+                key={source.id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
+                onClick={() => {
+                  onSelect(source.id);
+                  updateOpen(false);
+                }}
+              >
+                <span className="player-server-dot" aria-hidden="true" />
+                <span className="player-server-copy">
+                  <strong>{source.name}</strong>
+                  <small>{source.hint}</small>
+                </span>
+                {selected ? <span className="player-server-check" aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function MoviePlayer({
@@ -1400,51 +1695,34 @@ function MoviePlayer({
   movie: Movie;
   onClose: () => void;
 }) {
-  const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
-  const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
-  const movieId = tmdbId || imdbId;
-  const path = mediaKind(movie) === "tv" ? "serie" : "filme";
+  const sources = buildPlayerSources(movie);
+  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "cdn-tmdb");
   const [showBar, setShowBar] = useState(true);
+  const [menuPinned, setMenuPinned] = useState(false);
   const hideBar = useRef<number | null>(null);
+  const activeSource = sources.find((source) => source.id === sourceId) ?? sources[0];
+  const controlsVisible = showBar || menuPinned;
+
+  useEffect(() => {
+    const nextSources = buildPlayerSources(movie);
+    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "cdn-tmdb")));
+  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind]);
 
   useEffect(() => {
     document.body.classList.add("player-open");
-    const originalOpen = window.open;
-    window.open = (() => null) as typeof window.open;
-
-    const onBlur = () => {
-      window.setTimeout(() => {
-        if (document.hidden) return;
-        window.focus();
-      }, 0);
-    };
-    const blockAuxClick = (event: MouseEvent) => {
-      if (event.button === 1) event.preventDefault();
-    };
-
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("auxclick", blockAuxClick);
-
-    scrubOverlayAds();
-    const observer = new MutationObserver(() => scrubOverlayAds());
-    observer.observe(document.body, { childList: true, subtree: true });
-    const timer = window.setInterval(() => scrubOverlayAds(), 400);
-
+    const cleanup = installPlayerAdblock();
     return () => {
       document.body.classList.remove("player-open");
-      window.open = originalOpen;
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("auxclick", blockAuxClick);
-      observer.disconnect();
-      window.clearInterval(timer);
+      cleanup();
     };
   }, []);
 
   useEffect(() => {
     const reveal = () => {
       setShowBar(true);
+      if (menuPinned) return;
       if (hideBar.current) window.clearTimeout(hideBar.current);
-      hideBar.current = window.setTimeout(() => setShowBar(false), 2200);
+      hideBar.current = window.setTimeout(() => setShowBar(false), 2400);
     };
     reveal();
     window.addEventListener("mousemove", reveal);
@@ -1452,24 +1730,37 @@ function MoviePlayer({
       window.removeEventListener("mousemove", reveal);
       if (hideBar.current) window.clearTimeout(hideBar.current);
     };
-  }, []);
+  }, [menuPinned]);
 
   return (
-    <div className={`player-view ${showBar ? "show-controls" : ""}`}>
+    <div className={`player-view ${controlsVisible ? "show-controls" : ""} ${activeSource ? `theme-${activeSource.theme}` : ""}`}>
       <div className="player-bar">
-        <button className="back-button" type="button" onClick={onClose}>
+        <button className="player-back" type="button" onClick={onClose}>
+          <span className="player-back-icon" aria-hidden="true" />
           Voltar
         </button>
-        <strong className="player-title">{movie.title}</strong>
+        <div className="player-heading">
+          <span className="player-kicker">{mediaKind(movie) === "tv" ? "Série" : "Filme"} · PT-BR</span>
+          <strong className="player-title">{movie.title}</strong>
+        </div>
+        <div className="player-toolbar">
+          <PlayerServerMenu
+            sources={sources}
+            activeId={activeSource?.id ?? ""}
+            onSelect={setSourceId}
+            onOpenChange={setMenuPinned}
+          />
+        </div>
       </div>
 
-      {movieId ? (
+      {activeSource ? (
         <iframe
+          key={activeSource.src}
           className="video-stage"
-          src={`https://superflixapi.fit/${path}/${movieId}#noLink`}
+          src={activeSource.src}
           allowFullScreen
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-          referrerPolicy="origin"
+          referrerPolicy="no-referrer"
           sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"
           title={movie.title}
         />

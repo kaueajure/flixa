@@ -1,5 +1,13 @@
 {
   "version": "7",
-  "dialect": "sqlite",
-  "entries": []
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786480000000,
+      "tag": "0000_flixa_inicial",
+      "breakpoints": true
+    }
+  ]
 }

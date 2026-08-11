@@ -1,6 +1,7 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
+import { mysqlAuth } from "./build/mysql-auth-vite-plugin";
 import { sites } from "./build/sites-vite-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -52,6 +53,7 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      mysqlAuth(),
       vinext(),
       sites(),
       cloudflare({
