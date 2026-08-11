@@ -11,7 +11,8 @@ export async function POST(request: Request) {
       {
         status: 200,
         headers: {
-          "Set-Cookie": montarCookieLogout(),
+          "Set-Cookie": montarCookieLogout(request),
+          "Cache-Control": "no-store",
         },
       },
     );

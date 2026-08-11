@@ -61,13 +61,35 @@ export function lerTokenCookie(cookieHeader: string | null) {
   return null;
 }
 
-export function montarCookieSessao(token: string, maxAgeSeconds = SESSAO_DIAS * 24 * 60 * 60) {
-  const seguro = process.env.NODE_ENV === "production" ? "; Secure" : "";
+export function cookieDeveSerSecure(request?: Request) {
+  if (process.env.FLIXA_COOKIE_SECURE === "1") return true;
+  if (process.env.FLIXA_COOKIE_SECURE === "0") return false;
+
+  const forwarded = request?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  if (forwarded === "https") return true;
+  if (forwarded === "http") return false;
+
+  try {
+    if (request && new URL(request.url).protocol === "https:") return true;
+  } catch {
+    // ignore
+  }
+
+  // Em produção atrás de proxy, Secure sem HTTPS real faz o browser descartar o cookie.
+  return false;
+}
+
+export function montarCookieSessao(
+  token: string,
+  maxAgeSeconds = SESSAO_DIAS * 24 * 60 * 60,
+  request?: Request,
+) {
+  const seguro = cookieDeveSerSecure(request) ? "; Secure" : "";
   return `${SESSAO_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${seguro}`;
 }
 
-export function montarCookieLogout() {
-  const seguro = process.env.NODE_ENV === "production" ? "; Secure" : "";
+export function montarCookieLogout(request?: Request) {
+  const seguro = cookieDeveSerSecure(request) ? "; Secure" : "";
   return `${SESSAO_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${seguro}`;
 }
 

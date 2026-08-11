@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       {
         status: 201,
         headers: {
-          "Set-Cookie": montarCookieSessao(token),
+          "Set-Cookie": montarCookieSessao(token, undefined, request),
+          "Cache-Control": "no-store",
         },
       },
     );

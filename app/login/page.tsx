@@ -28,7 +28,7 @@ export default function LoginPage() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
-    fetch("/api/auth/me", { cache: "no-store", signal: controller.signal })
+    fetch("/api/auth/me", { cache: "no-store", credentials: "include", signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) return null;
         const data = (await res.json()) as { usuario?: Usuario | null };
@@ -79,6 +79,8 @@ export default function LoginPage() {
     }
 
     setCarregando(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 20000);
     try {
       const endpoint = modo === "login" ? "/api/auth/login" : "/api/auth/register";
       const payload =
@@ -89,18 +91,40 @@ export default function LoginPage() {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        signal: controller.signal,
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { erro?: string; usuario?: Usuario };
+
+      const raw = await res.text();
+      let data: { erro?: string; usuario?: Usuario } = {};
+      try {
+        data = raw ? (JSON.parse(raw) as { erro?: string; usuario?: Usuario }) : {};
+      } catch {
+        setErro(
+          res.status >= 500
+            ? "Servidor indisponível no momento. Tente de novo."
+            : "Resposta inválida do servidor.",
+        );
+        return;
+      }
+
       if (!res.ok || !data.usuario) {
         setErro(data.erro || (modo === "login" ? "Não foi possível entrar." : "Não foi possível cadastrar."));
         return;
       }
-      router.replace("/");
-      router.refresh();
-    } catch {
-      setErro("Falha de conexão com o servidor.");
+
+      // Navegação full page para garantir que o cookie de sessão vá junto.
+      window.location.assign("/");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setErro("Demorou demais para responder. Confira o MySQL/env na Hostinger.");
+      } else {
+        setErro("Falha de conexão com o servidor.");
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setCarregando(false);
     }
   }

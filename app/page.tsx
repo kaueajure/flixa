@@ -239,7 +239,7 @@ export default function Home() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
-    fetch("/api/auth/me", { cache: "no-store", signal: controller.signal })
+    fetch("/api/auth/me", { cache: "no-store", credentials: "include", signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) return null;
         const data = (await res.json()) as { usuario?: AuthUser | null };
