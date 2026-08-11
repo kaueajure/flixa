@@ -1,13 +1,18 @@
 export const dynamic = "force-dynamic";
 
+type MediaKind = "movie" | "tv";
+
 type CatalogMovie = {
   id: string;
   source: string;
+  kind: MediaKind;
+  list?: string;
+  imdb_id?: string;
+  tmdb_id?: string;
   title: string;
   description?: string;
   poster: string;
   backdrop: string;
-  videoUrl?: string;
   duration?: string;
   durationSeconds?: number;
   year?: number;
@@ -18,16 +23,31 @@ type CatalogMovie = {
   trailer?: string;
 };
 
-const API_SOURCES = [
-  {
-    name: "YTS",
-    host: "yts-am-torrent.p.rapidapi.com",
-    url: "https://yts-am-torrent.p.rapidapi.com/list_movies.json?limit=20&sort_by=download_count&with_rt_ratings=true",
-  },
-];
+type Genre = { id: number; name: string };
 
-function getRapidApiKey() {
-  return process.env.RAPIDAPI_KEY || process.env.NEXT_PUBLIC_RAPIDAPI_KEY || "";
+const TMDB_API = "https://api.themoviedb.org/3";
+const TMDB_IMAGE = "https://image.tmdb.org/t/p";
+const TMDB_LANGUAGE = "pt-BR";
+
+const TMDB_LISTS = [
+  { id: "trending", name: "Em alta", path: "/trending/movie/week", kind: "movie" as const },
+  { id: "popular", name: "Populares", path: "/movie/popular", kind: "movie" as const },
+  { id: "now_playing", name: "Em cartaz", path: "/movie/now_playing", kind: "movie" as const },
+  { id: "top_rated", name: "Melhores", path: "/movie/top_rated", kind: "movie" as const },
+  { id: "tv_trending", name: "Séries em alta", path: "/trending/tv/week", kind: "tv" as const },
+  { id: "tv_popular", name: "Séries populares", path: "/tv/popular", kind: "tv" as const },
+  { id: "tv_on_the_air", name: "No ar", path: "/tv/on_the_air", kind: "tv" as const },
+  { id: "tv_top_rated", name: "Melhores séries", path: "/tv/top_rated", kind: "tv" as const },
+] as const;
+
+function getTmdbCredentials() {
+  return {
+    token:
+      process.env.TMDB_ACCESS_TOKEN ||
+      process.env.TMDB_READ_ACCESS_TOKEN ||
+      "",
+    apiKey: process.env.TMDB_API_KEY || "",
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -59,9 +79,9 @@ function looksLikeMovie(value: unknown): value is Record<string, unknown> {
     item.title ||
       item.name ||
       item.original_title ||
+      item.original_name ||
       item.movie_title ||
-      item.Title ||
-      item.movieName,
+      item.Title,
   );
 }
 
@@ -81,30 +101,11 @@ function findMovieItems(data: unknown, depth = 0): Record<string, unknown>[] {
   const obj = asRecord(data);
   if (!obj) return [];
 
-  const preferred = [
-    "movies",
-    "results",
-    "Search",
-    "films",
-    "items",
-    "data",
-    "result",
-    "hits",
-    "rows",
-    "list",
-    "records",
-  ];
-
-  for (const key of preferred) {
+  for (const key of ["movies", "results", "items", "data", "result"]) {
     if (key in obj) {
       const found = findMovieItems(obj[key], depth + 1);
       if (found.length > 0) return found;
     }
-  }
-
-  for (const value of Object.values(obj)) {
-    const found = findMovieItems(value, depth + 1);
-    if (found.length > 0) return found;
   }
 
   return [];
@@ -113,12 +114,7 @@ function findMovieItems(data: unknown, depth = 0): Record<string, unknown>[] {
 function extractApiMessage(data: unknown): string | null {
   const obj = asRecord(data);
   if (!obj) return null;
-  return (
-    asString(obj.message) ||
-    asString(obj.error) ||
-    asString(obj.status_message) ||
-    null
-  );
+  return asString(obj.message) || asString(obj.error) || asString(obj.status_message) || null;
 }
 
 function firstString(...values: unknown[]): string | null {
@@ -127,23 +123,6 @@ function firstString(...values: unknown[]): string | null {
     if (text) return text;
   }
   return null;
-}
-
-function asImageUrl(value: unknown): string | null {
-  const text = asString(value);
-  if (text) {
-    if (text.startsWith("http://") || text.startsWith("https://")) return text;
-    if (text.startsWith("//")) return `https:${text}`;
-    if (text.startsWith("/")) return `https://image.tmdb.org/t/p/w500${text}`;
-  }
-
-  const obj = asRecord(value);
-  if (!obj) return null;
-  return asImageUrl(obj.url || obj.src || obj.large || obj.medium || obj.original || obj.path);
-}
-
-function cssImage(url: string | null) {
-  return url ? `url('${url.replace(/'/g, "%27")}')` : "linear-gradient(135deg, #121b33 0%, #020205 100%)";
 }
 
 function asGenres(value: unknown): string[] {
@@ -158,100 +137,25 @@ function asGenres(value: unknown): string[] {
   }
 
   const text = asString(value);
-  if (text) {
-    return text.split(/[,|/]/).map((item) => item.trim()).filter(Boolean);
-  }
-
+  if (text) return text.split(/[,|/]/).map((item) => item.trim()).filter(Boolean);
   return [];
 }
 
-function isPlayableVideoUrl(value: string) {
-  if (!/^https?:\/\//i.test(value)) return false;
-  if (/magnet:|\.torrent(\?|$)/i.test(value)) return false;
-  return /\.(mp4|webm|ogg|ogv|m3u8|mpd)(\?|$)/i.test(value);
-}
-
-function asVideoUrl(movie: Record<string, unknown>): string | undefined {
-  const candidates = [
-    movie.video_url,
-    movie.stream_url,
-    movie.streamUrl,
-    movie.mp4,
-    movie.video,
-    movie.videoUrl,
-    movie.playback_url,
-    movie.hls,
-    movie.hlsUrl,
-  ];
-
-  for (const candidate of candidates) {
-    const url = asString(candidate);
-    if (url && isPlayableVideoUrl(url)) return url;
-  }
-
-  return undefined;
-}
-
-function asTrailer(movie: Record<string, unknown>): string | undefined {
-  const trailerUrl = firstString(movie.trailer, movie.trailer_url, movie.trailerUrl);
-  if (trailerUrl) {
-    if (/youtube\.com|youtu\.be/i.test(trailerUrl)) {
-      const id = trailerUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/)?.[1];
-      return id ? `https://www.youtube.com/embed/${id}` : trailerUrl;
-    }
-    if (isPlayableVideoUrl(trailerUrl) || trailerUrl.startsWith("https://")) return trailerUrl;
-  }
-
-  const youtubeId = firstString(movie.yt_trailer_code, movie.youtube_id, movie.youtubeId);
-  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}`;
-
-  return undefined;
-}
-
 function asRating(movie: Record<string, unknown>): string | undefined {
-  const direct = [
-    movie.rating,
-    movie.vote_average,
-    movie.imdb_rating,
-    movie.imdbRating,
-    movie.imdb,
-    movie.rt_rating,
-    movie.tomatoes,
-    movie.score,
-    movie.Rated,
-  ];
-
-  for (const value of direct) {
-    const numeric = asNumber(value);
-    if (numeric != null) return String(numeric);
-    const text = asString(value);
-    if (text) return text;
-  }
-
-  const list = movie.ratings ?? movie.Ratings;
-  if (Array.isArray(list)) {
-    const parts = list
-      .map((entry) => {
-        if (typeof entry === "string") return entry;
-        const obj = asRecord(entry);
-        if (!obj) return null;
-        const source = firstString(obj.Source, obj.source, obj.name);
-        const score = firstString(obj.Value, obj.value, obj.rating, obj.score);
-        if (source && score) return `${source}: ${score}`;
-        return score;
-      })
-      .filter((item): item is string => Boolean(item));
-    if (parts.length > 0) return parts.join(" · ");
-  }
-
-  return undefined;
+  const numeric = asNumber(movie.vote_average) ?? asNumber(movie.rating);
+  return numeric != null ? String(numeric) : firstString(movie.rating) ?? undefined;
 }
 
-function asYear(movie: Record<string, unknown>): number | undefined {
-  const year = asNumber(movie.year) ?? asNumber(movie.Year);
+function asYear(movie: Record<string, unknown>, kind: MediaKind): number | undefined {
+  const year = asNumber(movie.year);
   if (year && year > 1800 && year < 3000) return Math.round(year);
 
-  const released = firstString(movie.release_date, movie.released, movie.Released, movie.date);
+  const released = firstString(
+    kind === "tv" ? movie.first_air_date : movie.release_date,
+    movie.first_air_date,
+    movie.release_date,
+    movie.released,
+  );
   if (released) {
     const parsed = new Date(released).getFullYear();
     if (Number.isFinite(parsed) && parsed > 1800) return parsed;
@@ -261,83 +165,17 @@ function asYear(movie: Record<string, unknown>): number | undefined {
 }
 
 function asDuration(runtime: unknown): { duration?: string; durationSeconds?: number } {
-  const text = asString(runtime);
-  if (text && /h|min|hr/i.test(text)) {
-    const hours = Number(text.match(/(\d+)\s*h/i)?.[1] ?? 0);
-    const minutes = Number(text.match(/(\d+)\s*min/i)?.[1] ?? 0);
-    const total = hours * 60 + minutes;
-    if (total > 0) {
-      return { duration: text, durationSeconds: total * 60 };
-    }
-  }
-
   const numeric = asNumber(runtime);
   if (numeric && numeric > 0) {
     const minutes = numeric > 1000 ? Math.round(numeric / 60) : Math.round(numeric);
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
     return {
-      duration: `${hours}h ${String(rest).padStart(2, "0")}min`,
+      duration: hours > 0 ? `${hours}h ${String(rest).padStart(2, "0")}min` : `${rest}min`,
       durationSeconds: minutes * 60,
     };
   }
-
   return {};
-}
-
-function parseApiResponse(sourceName: string, data: unknown): CatalogMovie[] {
-  return findMovieItems(data).flatMap((movie, index) => {
-    const title = firstString(movie.title, movie.name, movie.original_title, movie.Title, movie.movie_title);
-    if (!title) return [];
-
-    const poster = asImageUrl(
-      movie.large_cover_image ||
-        movie.medium_cover_image ||
-        movie.poster_path ||
-        movie.poster_url ||
-        movie.Poster ||
-        movie.poster ||
-        movie.image ||
-        movie.cover ||
-        movie.thumbnail,
-    );
-    const backdrop = asImageUrl(
-      movie.background_image_original ||
-        movie.background_image ||
-        movie.backdrop_path ||
-        movie.backdrop_url ||
-        movie.backdrop ||
-        poster,
-    );
-    const { duration, durationSeconds } = asDuration(movie.runtime ?? movie.Runtime ?? movie.duration);
-    const idValue = firstString(movie.id, movie.imdb_id, movie.imdbID) ?? String(index);
-    const cast = asGenres(movie.cast ?? movie.actors ?? movie.Actors);
-
-    return [{
-      id: `${sourceName.toLowerCase().replace(/\s+/g, "-")}-${idValue}`,
-      source: sourceName,
-      title,
-      description: firstString(
-        movie.summary,
-        movie.synopsis,
-        movie.overview,
-        movie.description_full,
-        movie.description,
-        movie.Plot,
-      ) ?? undefined,
-      poster: cssImage(poster),
-      backdrop: cssImage(backdrop),
-      videoUrl: asVideoUrl(movie),
-      duration,
-      durationSeconds,
-      year: asYear(movie),
-      genres: asGenres(movie.genres ?? movie.genre ?? movie.Genre),
-      rating: asRating(movie),
-      director: firstString(movie.director, movie.Director) ?? undefined,
-      cast: cast.length > 0 ? cast : undefined,
-      trailer: asTrailer(movie),
-    }];
-  });
 }
 
 function describeFetchError(error: unknown) {
@@ -348,89 +186,472 @@ function describeFetchError(error: unknown) {
   return message;
 }
 
-async function fetchSource(api: (typeof API_SOURCES)[number], rapidApiKey: string) {
+function tmdbImageUrl(path: unknown, size: "w342" | "w780" | "w1280") {
+  const text = asString(path);
+  if (!text) return null;
+  if (text.startsWith("http://") || text.startsWith("https://")) return text;
+  if (text.startsWith("//")) return `https:${text}`;
+  return `${TMDB_IMAGE}/${size}${text.startsWith("/") ? text : `/${text}`}`;
+}
+
+function tmdbGenreNames(movie: Record<string, unknown>, genreMap: Map<number, string>) {
+  const named = asGenres(movie.genres);
+  if (named.length > 0) return named;
+
+  const ids = movie.genre_ids;
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((id) => genreMap.get(Number(id)))
+    .filter((name): name is string => Boolean(name));
+}
+
+function tmdbCredits(movie: Record<string, unknown>, kind: MediaKind) {
+  const credits = asRecord(movie.credits);
+  const crew = Array.isArray(credits?.crew) ? credits.crew : [];
+  const cast = Array.isArray(credits?.cast) ? credits.cast : [];
+  const created = Array.isArray(movie.created_by) ? movie.created_by : [];
+
+  const director = crew
+    .map((item) => asRecord(item))
+    .find((item) => item && asString(item.job) === "Director");
+
+  const creator = created
+    .map((item) => asRecord(item))
+    .map((item) => firstString(item?.name))
+    .find(Boolean);
+
+  const names = cast
+    .map((item) => firstString(asRecord(item)?.name))
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 5);
+
+  return {
+    director: firstString(director?.name) ?? (kind === "tv" ? creator : null) ?? undefined,
+    cast: names.length > 0 ? names : undefined,
+  };
+}
+
+function tmdbTrailer(movie: Record<string, unknown>) {
+  const videos = asRecord(movie.videos);
+  const results = Array.isArray(videos?.results) ? videos.results : [];
+  const trailer = results
+    .map((item) => asRecord(item))
+    .find((item) => {
+      if (!item || asString(item.site) !== "YouTube") return false;
+      const type = asString(item.type);
+      return type === "Trailer" || type === "Teaser";
+    });
+
+  const key = firstString(trailer?.key);
+  return key ? `https://www.youtube.com/embed/${key}` : undefined;
+}
+
+function detectKind(movie: Record<string, unknown>, fallback: MediaKind): MediaKind {
+  const raw = firstString(movie.media_type);
+  if (raw === "tv" || raw === "movie") return raw;
+  if (movie.first_air_date && !movie.release_date) return "tv";
+  if (movie.name && !movie.title) return "tv";
+  return fallback;
+}
+
+function mapTmdbMovie(
+  movie: Record<string, unknown>,
+  sourceName: string,
+  genreMap: Map<number, string>,
+  fallbackKind: MediaKind,
+  listId?: string,
+): CatalogMovie | null {
+  if (movie.adult === true) return null;
+
+  const kind = detectKind(movie, fallbackKind);
+  const title = firstString(
+    kind === "tv" ? movie.name : movie.title,
+    movie.title,
+    movie.name,
+    movie.original_title,
+    movie.original_name,
+  );
+  const tmdbId = firstString(movie.id != null ? String(movie.id) : null);
+  if (!title || !tmdbId) return null;
+
+  const poster = tmdbImageUrl(movie.poster_path, "w342");
+  const backdrop = tmdbImageUrl(movie.backdrop_path, "w780") || poster;
+  const seasons = asNumber(movie.number_of_seasons);
+  const episodeRuntime = Array.isArray(movie.episode_run_time)
+    ? asNumber(movie.episode_run_time[0])
+    : null;
+  const { duration, durationSeconds } =
+    kind === "tv" && seasons
+      ? { duration: `${seasons} ${seasons === 1 ? "temp." : "temps."}`, durationSeconds: undefined }
+      : asDuration(movie.runtime ?? episodeRuntime);
+  const { director, cast } = tmdbCredits(movie, kind);
+
+  return {
+    id: `${kind}-${tmdbId}`,
+    source: sourceName,
+    kind,
+    list: listId,
+    tmdb_id: tmdbId,
+    imdb_id: firstString(movie.imdb_id, asRecord(movie.external_ids)?.imdb_id) ?? undefined,
+    title,
+    description: firstString(movie.overview, movie.tagline) ?? undefined,
+    poster: poster ?? "",
+    backdrop: backdrop ?? poster ?? "",
+    duration,
+    durationSeconds,
+    year: asYear(movie, kind),
+    genres: tmdbGenreNames(movie, genreMap),
+    rating: asRating(movie),
+    director,
+    cast,
+    trailer: tmdbTrailer(movie),
+  };
+}
+
+async function tmdbRequest(path: string, params: Record<string, string> = {}) {
+  const { token, apiKey } = getTmdbCredentials();
+  if (!token && !apiKey) {
+    throw new Error("chave TMDB ausente");
+  }
+
+  const url = new URL(`${TMDB_API}${path}`);
+  url.searchParams.set("language", TMDB_LANGUAGE);
+  url.searchParams.set("include_image_language", "pt-BR,pt,null");
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  if (!token && apiKey) {
+    url.searchParams.set("api_key", apiKey);
+  }
+
   const headers: HeadersInit = {
     Accept: "application/json",
     "User-Agent": "Flixa/1.0",
   };
-
-  if (api.host) {
-    if (!rapidApiKey) {
-      return { movies: [] as CatalogMovie[], error: `${api.name}: chave RapidAPI ausente` };
-    }
-    headers["x-rapidapi-key"] = rapidApiKey;
-    headers["x-rapidapi-host"] = api.host;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
-  let res: Response;
-  try {
-    res = await fetch(api.url, {
-      method: "GET",
-      headers,
-      cache: "no-store",
-      signal: AbortSignal.timeout(15000),
-    });
-  } catch (error) {
-    return { movies: [] as CatalogMovie[], error: `${api.name}: ${describeFetchError(error)}` };
-  }
+  const res = await fetch(url, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
 
   const payload = await res.text();
   let data: unknown = null;
   try {
     data = payload ? JSON.parse(payload) : null;
   } catch {
-    return { movies: [] as CatalogMovie[], error: `${api.name}: resposta inválida (${res.status})` };
+    throw new Error(`resposta inválida (${res.status})`);
   }
 
   if (!res.ok) {
     const message = extractApiMessage(data);
+    throw new Error(`${res.status}${message ? ` (${message})` : ""}`);
+  }
+
+  return data;
+}
+
+async function fetchTmdbGenreMap(kind: MediaKind) {
+  const data = asRecord(await tmdbRequest(`/genre/${kind}/list`));
+  const genres = Array.isArray(data?.genres) ? data.genres : [];
+  const map = new Map<number, string>();
+  const list: Genre[] = [];
+
+  for (const item of genres) {
+    const genre = asRecord(item);
+    const id = asNumber(genre?.id);
+    const name = firstString(genre?.name);
+    if (id != null && name) {
+      map.set(id, name);
+      list.push({ id, name });
+    }
+  }
+
+  return { map, list };
+}
+
+function findList(listId: string) {
+  return TMDB_LISTS.find((list) => list.id === listId) ?? null;
+}
+
+async function fetchTmdbList(
+  list: (typeof TMDB_LISTS)[number],
+  genreMap: Map<number, string>,
+  page = 1,
+) {
+  const data = await tmdbRequest(list.path, { page: String(page) });
+  return findMovieItems(data)
+    .map((movie) => mapTmdbMovie(movie, list.name, genreMap, list.kind, list.id))
+    .filter((movie): movie is CatalogMovie => Boolean(movie));
+}
+
+async function fetchTmdbCatalog() {
+  const { token, apiKey } = getTmdbCredentials();
+  if (!token && !apiKey) {
     return {
       movies: [] as CatalogMovie[],
-      error: `${api.name}: ${res.status}${message ? ` (${message})` : ""}`,
+      genres: [] as Genre[],
+      error: "TMDB: chave ausente (TMDB_ACCESS_TOKEN ou TMDB_API_KEY)",
     };
   }
 
-  const movies = parseApiResponse(api.name, data);
-  if (movies.length === 0) {
-    const message = extractApiMessage(data);
+  try {
+    const [movieGenres, tvGenres] = await Promise.all([
+      fetchTmdbGenreMap("movie"),
+      fetchTmdbGenreMap("tv"),
+    ]);
+    const lists = await Promise.allSettled(
+      TMDB_LISTS.map((list) => fetchTmdbList(list, list.kind === "tv" ? tvGenres.map : movieGenres.map)),
+    );
+
+    const movies: CatalogMovie[] = [];
+    const errors: string[] = [];
+
+    lists.forEach((result, index) => {
+      const name = TMDB_LISTS[index].name;
+      if (result.status === "fulfilled") {
+        if (result.value.length === 0) {
+          errors.push(`${name}: Sem resultados`);
+          return;
+        }
+        movies.push(...result.value);
+        return;
+      }
+      errors.push(`${name}: ${describeFetchError(result.reason)}`);
+    });
+
     return {
       movies,
-      error: `${api.name}: ${message ?? "Sem resultados"}`,
+      genres: movieGenres.list,
+      error: errors.length > 0 ? errors.join(" · ") : null,
+    };
+  } catch (error) {
+    return {
+      movies: [] as CatalogMovie[],
+      genres: [] as Genre[],
+      error: `TMDB: ${describeFetchError(error)}`,
     };
   }
+}
 
-  return { movies, error: null as string | null };
+async function searchTmdb(query: string) {
+  const { token, apiKey } = getTmdbCredentials();
+  if (!token && !apiKey) {
+    return { movies: [] as CatalogMovie[], errors: ["TMDB: chave ausente (TMDB_ACCESS_TOKEN ou TMDB_API_KEY)"] };
+  }
+
+  try {
+    const [movieGenres, tvGenres, movieData, tvData] = await Promise.all([
+      fetchTmdbGenreMap("movie"),
+      fetchTmdbGenreMap("tv"),
+      tmdbRequest("/search/movie", { query, include_adult: "false", page: "1" }),
+      tmdbRequest("/search/tv", { query, include_adult: "false", page: "1" }),
+    ]);
+
+    const movies = [
+      ...findMovieItems(movieData).map((movie) =>
+        mapTmdbMovie(movie, "Busca", movieGenres.map, "movie"),
+      ),
+      ...findMovieItems(tvData).map((movie) =>
+        mapTmdbMovie(movie, "Busca", tvGenres.map, "tv"),
+      ),
+    ].filter((movie): movie is CatalogMovie => Boolean(movie));
+
+    return {
+      movies,
+      errors: movies.length === 0 ? ["TMDB: Sem resultados"] : [],
+    };
+  } catch (error) {
+    return { movies: [] as CatalogMovie[], errors: [`TMDB: ${describeFetchError(error)}`] };
+  }
+}
+
+function parseTmdbId(movieId: string) {
+  return movieId.replace(/^(tmdb-)?(movie-|tv-)?/i, "");
+}
+
+async function getTmdbDetails(movieId: string, kind: MediaKind) {
+  const { token, apiKey } = getTmdbCredentials();
+  if (!token && !apiKey) {
+    return { movie: null, similar: [] as CatalogMovie[], error: "TMDB: chave ausente (TMDB_ACCESS_TOKEN ou TMDB_API_KEY)" };
+  }
+
+  const id = parseTmdbId(movieId);
+  if (!/^\d+$/.test(id)) {
+    return { movie: null, similar: [] as CatalogMovie[], error: "TMDB: id inválido" };
+  }
+
+  try {
+    const path = kind === "tv" ? `/tv/${id}` : `/movie/${id}`;
+    const data = asRecord(
+      await tmdbRequest(path, { append_to_response: "credits,videos,external_ids,similar" }),
+    );
+    if (!data) {
+      return { movie: null, similar: [] as CatalogMovie[], error: "TMDB: Sem resultados" };
+    }
+
+    const genreMap = new Map<number, string>();
+    const movie = mapTmdbMovie(data, kind === "tv" ? "Série" : "Filme", genreMap, kind);
+    const similar = findMovieItems(asRecord(data.similar))
+      .map((item) => mapTmdbMovie(item, "Semelhantes", genreMap, kind))
+      .filter((item): item is CatalogMovie => Boolean(item))
+      .slice(0, 12);
+
+    return movie
+      ? { movie, similar, error: null as string | null }
+      : { movie: null, similar: [] as CatalogMovie[], error: "TMDB: Sem resultados" };
+  } catch (error) {
+    return { movie: null, similar: [] as CatalogMovie[], error: `TMDB: ${describeFetchError(error)}` };
+  }
+}
+
+async function fetchListPage(listId: string, page: number) {
+  const list = findList(listId);
+  if (!list) {
+    return { movies: [] as CatalogMovie[], page, totalPages: 0, error: "Lista inválida" };
+  }
+
+  try {
+    const { map } = await fetchTmdbGenreMap(list.kind);
+    const movies = await fetchTmdbList(list, map, page);
+    return { movies, page, totalPages: page + (movies.length > 0 ? 1 : 0), error: null as string | null };
+  } catch (error) {
+    return { movies: [] as CatalogMovie[], page, totalPages: page, error: describeFetchError(error) };
+  }
+}
+
+const BROWSE_PAGE_SIZE = 50;
+const TMDB_PAGE_SIZE = 20;
+const TMDB_DISCOVER_CAP = 10000;
+
+async function browseCatalog(kind: MediaKind, page: number) {
+  const start = (page - 1) * BROWSE_PAGE_SIZE;
+  const firstTmdbPage = Math.floor(start / TMDB_PAGE_SIZE) + 1;
+  const lastTmdbPage = Math.ceil((start + BROWSE_PAGE_SIZE) / TMDB_PAGE_SIZE);
+  const path = kind === "tv" ? "/discover/tv" : "/discover/movie";
+  const params: Record<string, string> = {
+    include_adult: "false",
+    sort_by: "popularity.desc",
+    "vote_count.gte": "300",
+    "vote_average.gte": "6",
+  };
+
+  try {
+    const { map } = await fetchTmdbGenreMap(kind);
+    const results = await Promise.all(
+      Array.from({ length: lastTmdbPage - firstTmdbPage + 1 }, (_, index) =>
+        tmdbRequest(path, {
+          ...params,
+          page: String(firstTmdbPage + index),
+        }),
+      ),
+    );
+
+    const totalResults = Math.min(asNumber(asRecord(results[0])?.total_results) ?? 0, TMDB_DISCOVER_CAP);
+    const movies = results.flatMap((data) =>
+      findMovieItems(data)
+        .map((item) => mapTmdbMovie(item, kind === "tv" ? "Séries" : "Filmes", map, kind))
+        .filter((item): item is CatalogMovie => Boolean(item?.poster)),
+    );
+    const offset = start - (firstTmdbPage - 1) * TMDB_PAGE_SIZE;
+    const slice = movies.slice(offset, offset + BROWSE_PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(totalResults / BROWSE_PAGE_SIZE));
+
+    return {
+      movies: slice,
+      page,
+      totalPages,
+      totalResults,
+      error: slice.length === 0 ? "Sem resultados" : null,
+    };
+  } catch (error) {
+    return {
+      movies: [] as CatalogMovie[],
+      page,
+      totalPages: page,
+      totalResults: 0,
+      error: describeFetchError(error),
+    };
+  }
+}
+
+async function discoverByGenre(genreId: string, kind: MediaKind, page: number) {
+  if (!/^\d+$/.test(genreId)) {
+    return { movies: [] as CatalogMovie[], page, totalPages: 0, error: "Gênero inválido" };
+  }
+
+  try {
+    const { map } = await fetchTmdbGenreMap(kind);
+    const path = kind === "tv" ? "/discover/tv" : "/discover/movie";
+    const data = asRecord(
+      await tmdbRequest(path, {
+        with_genres: genreId,
+        page: String(page),
+        sort_by: "popularity.desc",
+        include_adult: "false",
+      }),
+    );
+    const movies = findMovieItems(data)
+      .map((movie) => mapTmdbMovie(movie, map.get(Number(genreId)) || "Gênero", map, kind, `genre-${kind}-${genreId}`))
+      .filter((movie): movie is CatalogMovie => Boolean(movie));
+    const totalPages = asNumber(data?.total_pages) ?? page;
+
+    return { movies, page, totalPages, error: movies.length === 0 ? "Sem resultados" : null };
+  } catch (error) {
+    return { movies: [] as CatalogMovie[], page, totalPages: page, error: describeFetchError(error) };
+  }
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
-let catalogCache: { expiresAt: number; payload: { movies: CatalogMovie[]; errors: string[] } } | null = null;
+let catalogCache: {
+  expiresAt: number;
+  payload: { movies: CatalogMovie[]; genres: Genre[]; errors: string[] };
+} | null = null;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("q")?.trim() ?? "";
+  const movieId = searchParams.get("id")?.trim() ?? "";
+  const listId = searchParams.get("list")?.trim() ?? "";
+  const genreId = searchParams.get("genre")?.trim() ?? "";
+  const browse = searchParams.get("browse")?.trim() ?? "";
+  const kind = searchParams.get("kind") === "tv" ? "tv" : "movie";
+  const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
+
+  if (movieId) {
+    return Response.json(await getTmdbDetails(movieId, kind));
+  }
+
+  if (query) {
+    return Response.json(await searchTmdb(query));
+  }
+
+  if (browse === "1" || browse === "az") {
+    return Response.json(await browseCatalog(kind, page));
+  }
+
+  if (listId) {
+    return Response.json(await fetchListPage(listId, page));
+  }
+
+  if (genreId) {
+    return Response.json(await discoverByGenre(genreId, kind, page));
+  }
+
   if (catalogCache && catalogCache.expiresAt > Date.now()) {
     return Response.json(catalogCache.payload);
   }
 
-  const rapidApiKey = getRapidApiKey();
-  const results = await Promise.allSettled(
-    API_SOURCES.map((api) => fetchSource(api, rapidApiKey)),
-  );
-
-  const movies: CatalogMovie[] = [];
-  const errors: string[] = [];
-
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      movies.push(...result.value.movies);
-      if (result.value.error) errors.push(result.value.error);
-      return;
-    }
-
-    errors.push(`${API_SOURCES[index].name}: ${describeFetchError(result.reason)}`);
-  });
-
-  movies.sort(() => Math.random() - 0.5);
-
-  const payload = { movies, errors };
+  const result = await fetchTmdbCatalog();
+  const payload = {
+    movies: result.movies,
+    genres: result.genres,
+    errors: result.error ? [result.error] : [],
+  };
   catalogCache = { expiresAt: Date.now() + CACHE_TTL_MS, payload };
   return Response.json(payload);
 }
