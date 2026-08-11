@@ -61,6 +61,19 @@ export function mysqlAuth(): Plugin {
             });
           };
 
+          const runRegister = async (nome: string, email: string, senha: string) => {
+            const resultado = await auth.cadastrarUsuario({ nome, email, senha });
+            if (!resultado.usuario) {
+              sendJson(res, 400, { erro: resultado.erro || "Não foi possível cadastrar." });
+              return;
+            }
+
+            const token = await auth.criarSessao(resultado.usuario.id);
+            sendJson(res, 201, { usuario: auth.paraUsuarioPublico(resultado.usuario) }, {
+              "Set-Cookie": auth.montarCookieSessao(token),
+            });
+          };
+
           if (url === "/api/auth/login" && req.method === "POST") {
             const raw = await readBody(req);
             const body = raw ? (JSON.parse(raw) as { email?: string; senha?: string }) : {};
@@ -76,6 +89,26 @@ export function mysqlAuth(): Plugin {
             } catch {
               await closeDb();
               await runLogin(email, senha);
+            }
+            return;
+          }
+
+          if (url === "/api/auth/register" && req.method === "POST") {
+            const raw = await readBody(req);
+            const body = raw ? (JSON.parse(raw) as { nome?: string; email?: string; senha?: string }) : {};
+            const nome = String(body.nome || "");
+            const email = String(body.email || "").trim().toLowerCase();
+            const senha = String(body.senha || "");
+            if (!nome || !email || !senha) {
+              sendJson(res, 400, { erro: "Informe nome, e-mail e senha." });
+              return;
+            }
+
+            try {
+              await runRegister(nome, email, senha);
+            } catch {
+              await closeDb();
+              await runRegister(nome, email, senha);
             }
             return;
           }

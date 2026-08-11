@@ -10,10 +10,15 @@ type Usuario = {
   administrador: boolean;
 };
 
+type ModoAuth = "login" | "cadastro";
+
 export default function LoginPage() {
   const router = useRouter();
+  const [modo, setModo] = useState<ModoAuth>("login");
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [checandoSessao, setChecandoSessao] = useState(true);
@@ -39,19 +44,48 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  function trocarModo(proximo: ModoAuth) {
+    setModo(proximo);
+    setErro("");
+    setSenha("");
+    setConfirmarSenha("");
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
+
+    if (modo === "cadastro") {
+      if (nome.trim().length < 2) {
+        setErro("Informe um nome com pelo menos 2 caracteres.");
+        return;
+      }
+      if (senha.length < 6) {
+        setErro("A senha deve ter pelo menos 6 caracteres.");
+        return;
+      }
+      if (senha !== confirmarSenha) {
+        setErro("As senhas não coincidem.");
+        return;
+      }
+    }
+
     setCarregando(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const endpoint = modo === "login" ? "/api/auth/login" : "/api/auth/register";
+      const payload =
+        modo === "login"
+          ? { email, senha }
+          : { nome: nome.trim(), email, senha };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
+        body: JSON.stringify(payload),
       });
       const data = (await res.json()) as { erro?: string; usuario?: Usuario };
       if (!res.ok || !data.usuario) {
-        setErro(data.erro || "Não foi possível entrar.");
+        setErro(data.erro || (modo === "login" ? "Não foi possível entrar." : "Não foi possível cadastrar."));
         return;
       }
       router.replace("/");
@@ -80,10 +114,49 @@ export default function LoginPage() {
         <div className="login-brand">
           <span className="brand-mark" />
           <h1>FLIXA</h1>
-          <p>Entre para acessar o catálogo em português.</p>
+          <p>
+            {modo === "login"
+              ? "Entre para acessar o catálogo em português."
+              : "Crie sua conta para salvar lista e histórico."}
+          </p>
+        </div>
+
+        <div className="login-tabs" role="tablist" aria-label="Autenticação">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={modo === "login"}
+            className={modo === "login" ? "is-active" : ""}
+            onClick={() => trocarModo("login")}
+          >
+            Entrar
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={modo === "cadastro"}
+            className={modo === "cadastro" ? "is-active" : ""}
+            onClick={() => trocarModo("cadastro")}
+          >
+            Criar conta
+          </button>
         </div>
 
         <form className="login-form" onSubmit={onSubmit}>
+          {modo === "cadastro" ? (
+            <label>
+              <span>Nome</span>
+              <input
+                type="text"
+                autoComplete="name"
+                value={nome}
+                onChange={(event) => setNome(event.target.value)}
+                placeholder="Seu nome"
+                required
+              />
+            </label>
+          ) : null}
+
           <label>
             <span>E-mail</span>
             <input
@@ -100,18 +173,40 @@ export default function LoginPage() {
             <span>Senha</span>
             <input
               type="password"
-              autoComplete="current-password"
+              autoComplete={modo === "login" ? "current-password" : "new-password"}
               value={senha}
               onChange={(event) => setSenha(event.target.value)}
               placeholder="••••••••"
               required
+              minLength={modo === "cadastro" ? 6 : undefined}
             />
           </label>
+
+          {modo === "cadastro" ? (
+            <label>
+              <span>Confirmar senha</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={confirmarSenha}
+                onChange={(event) => setConfirmarSenha(event.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </label>
+          ) : null}
 
           {erro ? <p className="login-error">{erro}</p> : null}
 
           <button className="login-submit" type="submit" disabled={carregando}>
-            {carregando ? "Entrando…" : "Entrar"}
+            {carregando
+              ? modo === "login"
+                ? "Entrando…"
+                : "Criando conta…"
+              : modo === "login"
+                ? "Entrar"
+                : "Criar conta"}
           </button>
         </form>
       </section>

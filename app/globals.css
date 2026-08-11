@@ -1554,6 +1554,30 @@ body.player-open > a[href^="http"] {
   color: var(--muted);
 }
 
+.login-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.login-tabs button {
+  min-height: 2.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(244, 241, 234, 0.72);
+  font-weight: 600;
+}
+
+.login-tabs button.is-active {
+  background: rgba(140, 231, 242, 0.16);
+  color: #fff;
+}
+
 .login-form {
   display: grid;
   gap: 0.9rem;

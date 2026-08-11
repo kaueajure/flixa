@@ -81,6 +81,46 @@ export async function autenticarUsuario(email: string, senha: string) {
   return usuario;
 }
 
+export async function cadastrarUsuario(input: { nome: string; email: string; senha: string }) {
+  const nome = input.nome.trim().replace(/\s+/g, " ");
+  const email = input.email.trim().toLowerCase();
+  const senha = input.senha;
+
+  if (nome.length < 2) {
+    return { erro: "Informe um nome com pelo menos 2 caracteres.", usuario: null as Usuario | null };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { erro: "Informe um e-mail válido.", usuario: null as Usuario | null };
+  }
+  if (senha.length < 6) {
+    return { erro: "A senha precisa ter pelo menos 6 caracteres.", usuario: null as Usuario | null };
+  }
+
+  const db = await getDb();
+  const existentes = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.email, email)).limit(1);
+  if (existentes[0]) {
+    return { erro: "Este e-mail já está cadastrado.", usuario: null as Usuario | null };
+  }
+
+  const agora = agoraSql();
+  await db.insert(usuarios).values({
+    nome,
+    email,
+    senha: hashSenha(senha),
+    administrador: 0,
+    criado_em: agora,
+    atualizado_em: agora,
+  });
+
+  const criados = await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1);
+  const usuario = criados[0] ?? null;
+  if (!usuario) {
+    return { erro: "Não foi possível concluir o cadastro.", usuario: null as Usuario | null };
+  }
+
+  return { erro: null as string | null, usuario };
+}
+
 export async function criarSessao(usuarioId: number) {
   const db = await getDb();
   const token = gerarTokenSessao();
