@@ -25,7 +25,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     let ativo = true;
-    fetch("/api/auth/me", { cache: "no-store" })
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+
+    fetch("/api/auth/me", { cache: "no-store", signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) return null;
         const data = (await res.json()) as { usuario?: Usuario | null };
@@ -38,9 +41,14 @@ export default function LoginPage() {
       })
       .catch(() => {
         if (ativo) setChecandoSessao(false);
+      })
+      .finally(() => {
+        window.clearTimeout(timeoutId);
       });
     return () => {
       ativo = false;
+      controller.abort();
+      window.clearTimeout(timeoutId);
     };
   }, [router]);
 

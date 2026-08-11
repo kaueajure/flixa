@@ -29,7 +29,8 @@ export function getMysqlPool() {
     enableKeepAlive: true,
     timezone: "Z",
     dateStrings: true,
-    connectTimeout: 20000,
+    // Na Hostinger, use MYSQL_HOST=localhost (não o hostname público srv….hstgr.io).
+    connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || "8000"),
   });
 
   return pool;
