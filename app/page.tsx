@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Movie = {
   id: string;
@@ -22,10 +16,54 @@ type Movie = {
   rating: string;
   director?: string;
   cast?: string[];
+  trailer?: string;
   progress?: number;
 };
 
-const movies: Movie[] = [
+// ==========================================
+// ⚙️ CONFIGURAÇÕES DAS APIs
+// Atenção: Substitua a propriedade 'url' pelo "Request URL" exato do playground de cada API!
+// ==========================================
+const API_SOURCES = [
+  { 
+    name: "YTS", 
+    host: "yts-am-torrent.p.rapidapi.com", 
+    url: "https://yts-am-torrent.p.rapidapi.com/list_movies.json?limit=15&sort_by=download_count" 
+  },
+  { 
+    name: "EasyTorrents", 
+    host: "easytorrents1.p.rapidapi.com", 
+    url: "https://easytorrents1.p.rapidapi.com/search?q=movie" 
+  },
+  { 
+    name: "MovieTVMusic", 
+    host: "movie-tv-music-search-and-download.p.rapidapi.com", 
+    url: "https://movie-tv-music-search-and-download.p.rapidapi.com/search?q=movie" 
+  },
+  { 
+    name: "AmazonVideo", 
+    host: "amazon-video-mp4.p.rapidapi.com", 
+    url: "https://amazon-video-mp4.p.rapidapi.com/search?q=movie" 
+  },
+  { 
+    name: "MovieDatabase", 
+    host: "movie-database-api1.p.rapidapi.com", 
+    url: "https://movie-database-api1.p.rapidapi.com/movies" 
+  },
+  { 
+    name: "StreamMovies", 
+    host: "stream-movies.p.rapidapi.com", 
+    url: "https://stream-movies.p.rapidapi.com/movies" 
+  },
+  { 
+    name: "CineStream", 
+    host: "cinestream-api.p.rapidapi.com", 
+    url: "https://cinestream-api.p.rapidapi.com/movies" 
+  }
+];
+
+// Filmes originais salvos como plano B caso todas as APIs falhem
+const fallbackMovies: Movie[] = [
   {
     id: "noite-de-vidro",
     title: "Noite de Vidro",
@@ -122,51 +160,44 @@ const movies: Movie[] = [
     cast: ["Lara Mota", "Gus Martins"],
     progress: 67,
   },
-  {
-    id: "sala-nove",
-    title: "Sala Nove",
-    description:
-      "Uma professora encontra uma turma vazia repetindo a mesma aula em uma fita perdida da escola.",
-    poster:
-      "radial-gradient(circle at 54% 20%, rgba(222,255,206,.26), transparent 14%), linear-gradient(145deg, rgba(2,5,3,.16), rgba(2,5,3,.9)), linear-gradient(145deg, #040705 0%, #17291c 54%, #010201 100%)",
-    backdrop:
-      "radial-gradient(circle at 57% 31%, rgba(210,255,209,.18), transparent 18%), linear-gradient(113deg, #010201 0%, #0e1c13 48%, #223b27 76%, #010201 100%)",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    duration: "1h 36min",
-    durationSeconds: 5760,
-    year: 2025,
-    genres: ["Misterio", "Terror"],
-    rating: "16",
-    director: "Bia Valente",
-    cast: ["Elisa Fontes", "Nando Gil"],
-  },
-  {
-    id: "eco-curto",
-    title: "Eco Curto",
-    description:
-      "Um musico sem memoria descobre que cada melodia gravada guarda uma versao diferente dele mesmo.",
-    poster:
-      "radial-gradient(circle at 56% 21%, rgba(255,255,255,.34), transparent 14%), linear-gradient(150deg, rgba(4,4,9,.12), rgba(4,4,9,.9)), linear-gradient(145deg, #080815 0%, #2a2554 54%, #030304 100%)",
-    backdrop:
-      "radial-gradient(circle at 52% 29%, rgba(232,228,255,.22), transparent 19%), linear-gradient(112deg, #030306 0%, #171431 45%, #342d63 78%, #030306 100%)",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-    duration: "1h 27min",
-    durationSeconds: 5220,
-    year: 2024,
-    genres: ["Musical", "Drama"],
-    rating: "10",
-    director: "Tom Freire",
-    cast: ["Sofia Maia", "Ian Torres"],
-  },
 ];
 
-const featuredMovie = movies[0];
+// Função inteligente que tenta mapear qualquer resposta de API para o nosso tipo Movie
+function parseApiResponse(sourceName: string, data: any): Movie[] {
+  let items: any[] = [];
+  
+  // Tenta encontrar a array de filmes em diversas estruturas comuns
+  if (Array.isArray(data)) items = data;
+  else if (Array.isArray(data?.data?.movies)) items = data.data.movies;
+  else if (Array.isArray(data?.movies)) items = data.movies;
+  else if (Array.isArray(data?.results)) items = data.results;
+  else if (Array.isArray(data?.data)) items = data.data;
+
+  return items.slice(0, 10).map((m: any, index: number) => {
+    const rawImage = m.large_cover_image || m.poster_path || m.poster_url || m.poster || m.image;
+    const rawBackdrop = m.background_image_original || m.backdrop_path || m.backdrop_url || m.backdrop || rawImage;
+
+    return {
+      id: `${sourceName.toLowerCase()}-${m.id || m.imdb_id || index}`,
+      title: m.title || m.name || `Filme de ${sourceName}`,
+      description: m.summary || m.synopsis || m.overview || m.description_full || m.description || "Sem descrição disponível.",
+      poster: rawImage ? `url('${rawImage}')` : "none",
+      backdrop: rawBackdrop ? `url('${rawBackdrop}')` : "none",
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      duration: m.runtime ? `${Math.floor(m.runtime / 60)}h ${m.runtime % 60}min` : "2h 00min",
+      durationSeconds: m.runtime ? m.runtime * 60 : 7200,
+      year: m.year || (m.release_date ? new Date(m.release_date).getFullYear() : 2024),
+      genres: m.genres || [sourceName],
+      rating: String(m.rating || m.vote_average || "N/A"),
+      director: "Desconhecido",
+      cast: [],
+      progress: 0,
+    };
+  });
+}
 
 function getStoredIds(key: string) {
   if (typeof window === "undefined") return [];
-
   try {
     return JSON.parse(window.localStorage.getItem(key) ?? "[]") as string[];
   } catch {
@@ -174,10 +205,9 @@ function getStoredIds(key: string) {
   }
 }
 
-function getStoredProgress() {
+function getStoredProgress(moviesList: Movie[]) {
   if (typeof window === "undefined") return {};
-
-  return movies.reduce<Record<string, number>>((acc, movie) => {
+  return moviesList.reduce<Record<string, number>>((acc, movie) => {
     const value = Number(window.localStorage.getItem(`flixa-progress-${movie.id}`));
     if (Number.isFinite(value) && value > 0) acc[movie.id] = value;
     return acc;
@@ -186,24 +216,15 @@ function getStoredProgress() {
 
 function formatClock(seconds: number) {
   if (!Number.isFinite(seconds)) return "0:00";
-
   const minutes = Math.floor(seconds / 60);
-  const rest = Math.floor(seconds % 60)
-    .toString()
-    .padStart(2, "0");
-
+  const rest = Math.floor(seconds % 60).toString().padStart(2, "0");
   return `${minutes}:${rest}`;
 }
 
-function progressPercent(movie: Movie, savedSeconds?: number) {
-  if (savedSeconds && savedSeconds > 0 && movie.durationSeconds > 0) {
-    return Math.min(100, Math.round((savedSeconds / movie.durationSeconds) * 100));
-  }
-
-  return movie.progress ?? 0;
-}
-
 export default function Home() {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [apiErrors, setApiErrors] = useState<string[]>([]);
   const [scrolled, setScrolled] = useState(false);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -211,16 +232,66 @@ export default function Home() {
   const [playerMovie, setPlayerMovie] = useState<Movie | null>(null);
   const [listIds, setListIds] = useState<string[]>([]);
   const [savedProgress, setSavedProgress] = useState<Record<string, number>>({});
-  const [storageReady, setStorageReady] = useState(false);
+
+  useEffect(() => {
+    async function fetchAllApis() {
+      const rapidApiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY || "656bfca43amsh7408378f68fbc6ep1bbde0jsn06c38f0d1d28";
+      let fetchedMovies: Movie[] = [];
+      let tempErrors: string[] = [];
+
+      // Dispara requisições para todas as APIs em paralelo
+      const fetchPromises = API_SOURCES.map(async (api) => {
+        try {
+          const res = await fetch(api.url, {
+            method: "GET",
+            headers: {
+              "x-rapidapi-key": rapidApiKey,
+              "x-rapidapi-host": api.host,
+            },
+          });
+
+          if (!res.ok) {
+            tempErrors.push(`${api.name}: ${res.status}`);
+            return [];
+          }
+
+          const data = await res.json();
+          const parsedMovies = parseApiResponse(api.name, data);
+          
+          if (parsedMovies.length === 0) {
+            tempErrors.push(`${api.name}: Sem dados/Rota incorreta`);
+          }
+          
+          return parsedMovies;
+        } catch (error) {
+          tempErrors.push(`${api.name}: Falha Conexão`);
+          return [];
+        }
+      });
+
+      // Aguarda todas as requisições terminarem
+      const results = await Promise.all(fetchPromises);
+      fetchedMovies = results.flat();
+
+      if (fetchedMovies.length > 0) {
+        setMovies(fetchedMovies);
+      } else {
+        // Se todas falharem, carrega os filmes de fallback
+        setMovies(fallbackMovies);
+        tempErrors.push("Exibindo catálogo offline.");
+      }
+
+      setApiErrors(tempErrors);
+      setLoading(false);
+    }
+
+    fetchAllApis();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll);
-
-    setListIds(getStoredIds("flixa-list"));
-    setSavedProgress(getStoredProgress());
-    setStorageReady(true);
 
     return () => {
       window.removeEventListener("scroll", onScroll);
@@ -228,27 +299,39 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!storageReady) return;
-    window.localStorage.setItem("flixa-list", JSON.stringify(listIds));
-  }, [listIds, storageReady]);
+    if (movies.length > 0) {
+      setListIds(getStoredIds("flixa-list"));
+      setSavedProgress(getStoredProgress(movies));
+    }
+  }, [movies]);
+
+  useEffect(() => {
+    if (!loading) {
+      window.localStorage.setItem("flixa-list", JSON.stringify(listIds));
+    }
+  }, [listIds, loading]);
+
+  const featuredMovie = movies.length > 0 ? movies[0] : null;
 
   const continueMovies = useMemo(
     () =>
       movies.filter((movie) => {
         const stored = savedProgress[movie.id];
-        return Boolean(movie.progress) || (stored !== undefined && stored > 0);
+        return movie.progress || (stored && stored > 0);
       }),
-    [savedProgress],
+    [movies, savedProgress],
   );
 
   const listMovies = movies.filter((movie) => listIds.includes(movie.id));
 
+  // Agrupa os filmes por suas respectivas APIs para montar as fileiras (rows)
   const rows = [
-    { title: "Adicionados recentemente", items: movies.slice(0, 5) },
-    { title: "Filmes em destaque", items: [movies[3], movies[1], movies[4], movies[2]] },
-    ...(continueMovies.length
-      ? [{ title: "Continue assistindo", items: continueMovies }]
-      : []),
+    { title: "Lançamentos (Destaque)", items: movies.slice(0, 10) },
+    ...API_SOURCES.map(api => ({
+      title: `Catálogo ${api.name}`,
+      items: movies.filter(m => m.id.startsWith(api.name.toLowerCase()))
+    })).filter(row => row.items.length > 0),
+    ...(continueMovies.length ? [{ title: "Continue assistindo", items: continueMovies }] : []),
     ...(listMovies.length ? [{ title: "Minha lista", items: listMovies }] : []),
   ];
 
@@ -270,8 +353,30 @@ export default function Home() {
     setPlayerMovie(movie);
   };
 
+  if (loading) {
+    return (
+      <main className="flixa-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "white" }}>
+        <p>Buscando catálogo de múltiplos servidores...</p>
+      </main>
+    );
+  }
+
+  if (!featuredMovie) {
+    return (
+      <main className="flixa-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "white" }}>
+        <p>Erro crasso. Nenhum filme disponível.</p>
+      </main>
+    );
+  }
+
   return (
     <main className="flixa-shell">
+      {apiErrors.length > 0 && (
+        <div style={{ background: '#eab308', color: '#000', padding: '10px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', zIndex: 9999, position: 'relative' }}>
+          Alertas de API: {apiErrors.join(" | ")}
+        </div>
+      )}
+
       <header className={`flixa-header ${scrolled ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" aria-label="Flixa inicio">
           <span className="brand-mark" />
@@ -325,7 +430,7 @@ export default function Home() {
                         setSearchOpen(false);
                       }}
                     >
-                      <span className="mini-poster" style={{ background: movie.poster }} />
+                      <span className="mini-poster" style={{ background: movie.poster, backgroundSize: "cover", backgroundPosition: "center" }} />
                       <span>
                         <strong>{movie.title}</strong>
                         <small>
@@ -343,7 +448,7 @@ export default function Home() {
       <section
         className="hero"
         id="home"
-        style={{ "--hero-art": featuredMovie.backdrop } as CSSProperties}
+        style={{ "--hero-art": featuredMovie.backdrop, backgroundSize: "cover", backgroundPosition: "center" } as React.CSSProperties}
       >
         <div className="frame-strips" aria-hidden="true">
           <span />
@@ -394,7 +499,7 @@ export default function Home() {
                 <MovieCard
                   key={movie.id}
                   movie={movie}
-                  progress={progressPercent(movie, savedProgress[movie.id])}
+                  progress={savedProgress[movie.id] || movie.progress || 0}
                   onOpen={setSelectedMovie}
                 />
               ))}
@@ -452,7 +557,7 @@ function MovieRow({
           <MovieCard
             key={movie.id}
             movie={movie}
-            progress={progressPercent(movie, progress[movie.id])}
+            progress={progress[movie.id] || movie.progress || 0}
             onOpen={onOpen}
           />
         ))}
@@ -472,7 +577,7 @@ function MovieCard({
 }) {
   return (
     <button className="movie-card" type="button" onClick={() => onOpen(movie)}>
-      <span className="poster-art" style={{ background: movie.poster }}>
+      <span className="poster-art" style={{ background: movie.poster, backgroundSize: "cover", backgroundPosition: "center" }}>
         <span className="poster-grain" />
         <span className="poster-title">{movie.title}</span>
         {progress ? <span className="progress-bar" style={{ width: `${progress}%` }} /> : null}
@@ -506,9 +611,9 @@ function MovieDetails({
         <button className="close-button" type="button" onClick={onClose} aria-label="Fechar">
           x
         </button>
-        <div className="details-art" style={{ background: movie.backdrop }} />
+        <div className="details-art" style={{ background: movie.backdrop, backgroundSize: "cover", backgroundPosition: "center" }} />
         <div className="details-body">
-          <div className="details-poster" style={{ background: movie.poster }} />
+          <div className="details-poster" style={{ background: movie.poster, backgroundSize: "cover", backgroundPosition: "center" }} />
           <div className="details-copy">
             <p className="eyebrow">Filme Flixa</p>
             <h2>{movie.title}</h2>
@@ -564,7 +669,7 @@ function MoviePlayer({
   const [volume, setVolume] = useState(0.84);
   const [speed, setSpeed] = useState(1);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const timelinePercent = duration ? (currentTime / duration) * 100 : 0;
+  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
 
   const showControls = () => {
     setControlsVisible(true);
@@ -636,7 +741,6 @@ function MoviePlayer({
         onTimeUpdate={(event) => {
           const time = event.currentTarget.currentTime;
           setCurrentTime(time);
-          window.localStorage.setItem(`flixa-progress-${movie.id}`, String(time));
         }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
@@ -659,7 +763,7 @@ function MoviePlayer({
           min="0"
           max={duration || 0}
           value={currentTime}
-          style={{ "--progress": `${timelinePercent}%` } as CSSProperties}
+          style={{ "--progress": `${progressPercent}%` } as React.CSSProperties}
           onChange={(event) => {
             const value = Number(event.target.value);
             if (videoRef.current) videoRef.current.currentTime = value;
