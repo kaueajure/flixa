@@ -23,6 +23,9 @@ type Movie = {
   cast?: string[];
   trailer?: string;
   progress?: number;
+  season?: number;
+  episode?: number;
+  positionSeconds?: number;
 };
 
 type Genre = { id: number; name: string };
@@ -34,9 +37,24 @@ type AuthUser = {
   administrador: boolean;
 };
 
+type TvSeasonInfo = {
+  season_number: number;
+  episode_count: number;
+  name: string;
+  air_date?: string;
+};
+
+type TvEpisodeInfo = {
+  episode_number: number;
+  name: string;
+  overview?: string;
+  still?: string;
+  runtime?: number;
+  air_date?: string;
+};
+
 const LIST_KEY = "flixa-saved-movies";
 const LEGACY_LIST_KEY = "flixa-list";
-const RECENT_KEY = "flixa-recent";
 
 function mediaKind(movie: Movie): MediaKind {
   return movie.kind === "tv" ? "tv" : "movie";
@@ -49,6 +67,12 @@ function movieKey(movie: Movie) {
 
 function titleId(movie: Movie) {
   return movie.tmdb_id || movie.id.replace(/^(movie-|tv-)/, "");
+}
+
+function asMovieList(value: unknown): Movie[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is Movie => Boolean(item && typeof item === "object" && "id" in item && "title" in item))
+    : [];
 }
 
 function imageSrc(value?: string, size?: "w342" | "w780" | "w1280") {
@@ -98,10 +122,6 @@ function readJsonList(key: string): Movie[] {
   } catch {
     return [];
   }
-}
-
-function writeJsonList(key: string, movies: Movie[]) {
-  window.localStorage.setItem(key, JSON.stringify(movies));
 }
 
 function isListed(list: Movie[], movie: Movie) {
@@ -205,8 +225,9 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [playerMovie, setPlayerMovie] = useState<Movie | null>(null);
-  const [listMovies, setListMovies] = useState<Movie[]>(() => readJsonList(LIST_KEY));
-  const [recentMovies, setRecentMovies] = useState<Movie[]>(() => readJsonList(RECENT_KEY));
+  const [listMovies, setListMovies] = useState<Movie[]>([]);
+  const [recentMovies, setRecentMovies] = useState<Movie[]>([]);
+  const [continueMovies, setContinueMovies] = useState<Movie[]>([]);
   const [remoteResults, setRemoteResults] = useState<Movie[]>([]);
   const [searching, setSearching] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -245,7 +266,7 @@ export default function Home() {
         const data = (await res.json()) as { usuario?: AuthUser | null };
         return data.usuario ?? null;
       })
-      .then((usuario) => {
+      .then(async (usuario) => {
         if (!ativo) return;
         if (!usuario) {
           window.location.href = "/login";
@@ -253,6 +274,47 @@ export default function Home() {
         }
         setAuthUser(usuario);
         setAuthChecking(false);
+
+        const [listaRes, historicoRes, progressoRes] = await Promise.all([
+          fetch("/api/lista", { cache: "no-store", credentials: "include" }),
+          fetch("/api/historico", { cache: "no-store", credentials: "include" }),
+          fetch("/api/progresso", { cache: "no-store", credentials: "include" }),
+        ]);
+        if (!ativo) return;
+
+        const listaData = listaRes.ok ? ((await listaRes.json()) as { itens?: Movie[] }) : { itens: [] };
+        const historicoData = historicoRes.ok ? ((await historicoRes.json()) as { itens?: Movie[] }) : { itens: [] };
+        const progressoData = progressoRes.ok ? ((await progressoRes.json()) as { itens?: Movie[] }) : { itens: [] };
+
+        let lista = asMovieList(listaData.itens);
+        const historico = asMovieList(historicoData.itens);
+        const progresso = asMovieList(progressoData.itens);
+
+        // Migra lista local (formato completo) uma vez para o MySQL.
+        const localLista = dedupeMovies(readJsonList(LIST_KEY));
+        if (lista.length === 0 && localLista.length > 0) {
+          await Promise.all(
+            localLista.map((movie) =>
+              fetch("/api/lista", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ movie }),
+              }).catch(() => null),
+            ),
+          );
+          const again = await fetch("/api/lista", { cache: "no-store", credentials: "include" });
+          if (again.ok) {
+            const againData = (await again.json()) as { itens?: Movie[] };
+            lista = asMovieList(againData.itens);
+            if (lista.length > 0) window.localStorage.removeItem(LIST_KEY);
+          }
+        }
+
+        if (!ativo) return;
+        setListMovies(lista);
+        setRecentMovies(historico);
+        setContinueMovies(progresso.filter((item) => Number(item.progress || 0) > 0).slice(0, 16));
       })
       .catch(() => {
         if (!ativo) return;
@@ -390,7 +452,7 @@ export default function Home() {
   }, [movies]);
 
   useEffect(() => {
-    if (movies.length === 0 || readJsonList(LIST_KEY).length > 0) return;
+    if (movies.length === 0 || listMovies.length > 0) return;
     try {
       if (window.localStorage.getItem("flixa-list-migrated")) return;
       const legacy = JSON.parse(window.localStorage.getItem(LEGACY_LIST_KEY) ?? "[]") as string[];
@@ -399,13 +461,24 @@ export default function Home() {
       const recovered = dedupeMovies(movies.filter((movie) => legacy.includes(movie.id)));
       if (recovered.length === 0) return;
       queueMicrotask(() => {
-        setListMovies(recovered);
-        writeJsonList(LIST_KEY, recovered);
+        void (async () => {
+          await Promise.all(
+            recovered.map((movie) =>
+              fetch("/api/lista", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ movie }),
+              }).catch(() => null),
+            ),
+          );
+          setListMovies((current) => dedupeMovies([...recovered, ...current]));
+        })();
       });
     } catch {
       /* ignore */
     }
-  }, [movies]);
+  }, [movies, listMovies.length]);
 
   useEffect(() => {
     const value = query.trim();
@@ -541,15 +614,34 @@ export default function Home() {
   }, [uniqueMovies, uniqueSeries, query, remoteResults]);
 
   const toggleList = (movie: Movie) => {
+    const exists = isListed(listMovies, movie);
     setListMovies((current) => {
-      const exists = isListed(current, movie);
       const next = exists
         ? current.filter((item) => movieKey(item) !== movieKey(movie))
         : [movie, ...current.filter((item) => movieKey(item) !== movieKey(movie))];
-      writeJsonList(LIST_KEY, next);
-      showToast(exists ? `${movie.title} saiu da lista` : `${movie.title} entrou na lista`);
       return next;
     });
+    showToast(exists ? `${movie.title} saiu da lista` : `${movie.title} entrou na lista`);
+
+    void (async () => {
+      try {
+        if (exists) {
+          await fetch(`/api/lista?chave=${encodeURIComponent(movieKey(movie))}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+        } else {
+          await fetch("/api/lista", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ movie }),
+          });
+        }
+      } catch {
+        showToast("Não foi possível sincronizar a lista");
+      }
+    })();
   };
 
   function goTo(hash: string) {
@@ -571,18 +663,70 @@ export default function Home() {
   }, []);
 
   function rememberWatch(movie: Movie) {
-    setRecentMovies((current) => {
-      const next = dedupeMovies([movie, ...current]).slice(0, 16);
-      writeJsonList(RECENT_KEY, next);
-      return next;
-    });
+    setRecentMovies((current) => dedupeMovies([movie, ...current]).slice(0, 16));
+    void fetch("/api/historico", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movie }),
+    }).catch(() => null);
   }
+
+  const saveProgress = useCallback(
+    (
+      movie: Movie,
+      patch: { progresso?: number; posicao_segundos?: number; temporada?: number | null; episodio?: number | null },
+    ) => {
+      const nextMovie: Movie = {
+        ...movie,
+        progress: patch.progresso ?? movie.progress,
+        positionSeconds: patch.posicao_segundos ?? movie.positionSeconds,
+        season: patch.temporada ?? movie.season,
+        episode: patch.episodio ?? movie.episode,
+      };
+      setContinueMovies((current) =>
+        dedupeMovies([{ ...nextMovie, progress: Math.max(1, Number(nextMovie.progress || 1)) }, ...current]).slice(0, 16),
+      );
+      void fetch("/api/progresso", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          movie: nextMovie,
+          progresso: patch.progresso,
+          posicao_segundos: patch.posicao_segundos,
+          temporada: patch.temporada,
+          episodio: patch.episodio,
+        }),
+      }).catch(() => null);
+    },
+    [],
+  );
+
+  const handlePlayerProgress = useCallback(
+    (patch: {
+      progresso?: number;
+      posicao_segundos?: number;
+      temporada?: number | null;
+      episodio?: number | null;
+    }) => {
+      const current = playerMovieRef.current;
+      if (current) saveProgress(current, patch);
+    },
+    [saveProgress],
+  );
 
   function openPlayer(movie: Movie) {
     setSearchOpen(false);
     setSelectedMovie(null);
     setPlayerMovie(movie);
     rememberWatch(movie);
+    saveProgress(movie, {
+      progresso: Math.max(Number(movie.progress || 0), 5),
+      posicao_segundos: movie.positionSeconds || 0,
+      temporada: movie.season ?? (mediaKind(movie) === "tv" ? 1 : null),
+      episodio: movie.episode ?? (mediaKind(movie) === "tv" ? 1 : null),
+    });
     goTo(playerHash(movie));
   }
 
@@ -636,13 +780,22 @@ export default function Home() {
   function importList(file: File) {
     file
       .text()
-      .then((text) => {
+      .then(async (text) => {
         const parsed = JSON.parse(text) as Movie[];
         if (!Array.isArray(parsed)) throw new Error("invalid");
         const incoming = parsed.filter((item) => item?.id && item?.title);
         const next = dedupeMovies([...incoming, ...listMovies]);
         setListMovies(next);
-        writeJsonList(LIST_KEY, next);
+        await Promise.all(
+          incoming.map((movie) =>
+            fetch("/api/lista", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ movie }),
+            }).catch(() => null),
+          ),
+        );
         showToast(`${incoming.length} títulos importados`);
       })
       .catch(() => showToast("Arquivo de lista inválido"));
@@ -726,7 +879,11 @@ export default function Home() {
               <span className="header-user-name" title={authUser.email}>
                 {authUser.nome}
               </span>
-              {authUser.administrador ? <span className="header-user-badge">Admin</span> : null}
+              {authUser.administrador ? (
+                <a className="header-user-badge" href="/admin">
+                  Admin
+                </a>
+              ) : null}
               <button className="logout-button" type="button" onClick={() => void logout()}>
                 Sair
               </button>
@@ -794,8 +951,8 @@ export default function Home() {
               <h1>Minha Lista</h1>
               <p className="hero-description">
                 {listMovies.length
-                  ? `${listMovies.length} ${listMovies.length === 1 ? "título salvo" : "títulos salvos"} neste aparelho.`
-                  : "Salve títulos do catálogo para assistir depois. A lista fica gravada neste navegador."}
+                  ? `${listMovies.length} ${listMovies.length === 1 ? "título salvo" : "títulos salvos"} na sua conta.`
+                  : "Salve títulos do catálogo para assistir depois. A lista sincroniza com sua conta."}
               </p>
             </div>
             <div className="list-tools">
@@ -1071,9 +1228,17 @@ export default function Home() {
               </section>
             ) : null}
 
-            {recentMovies.length ? (
+            {continueMovies.length ? (
               <MovieRow
                 title="Continuar assistindo"
+                items={continueMovies}
+                listed={listMovies}
+                onOpen={(movie) => openPlayer(movie)}
+                onToggleList={toggleList}
+              />
+            ) : recentMovies.length ? (
+              <MovieRow
+                title="Assistidos recentemente"
                 items={recentMovies}
                 listed={listMovies}
                 onOpen={openDetails}
@@ -1125,7 +1290,11 @@ export default function Home() {
       ) : null}
 
       {playerMovie ? (
-        <MoviePlayer movie={playerMovie} onClose={closePlayer} />
+        <MoviePlayer
+          movie={playerMovie}
+          onClose={closePlayer}
+          onProgress={handlePlayerProgress}
+        />
       ) : null}
 
       {toast ? <div className="toast" role="status">{toast}</div> : null}
@@ -1537,11 +1706,13 @@ type PlayerSource = {
   src: string;
 };
 
-function buildPlayerSources(movie: Movie): PlayerSource[] {
+function buildPlayerSources(movie: Movie, season?: number, episode?: number): PlayerSource[] {
   const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
   const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
   const kind = mediaKind(movie);
   const path = kind === "tv" ? "serie" : "filme";
+  const episodeSuffix =
+    kind === "tv" && season && episode ? `/${season}/${episode}` : "";
   const sources: PlayerSource[] = [];
 
   if (tmdbId) {
@@ -1550,28 +1721,28 @@ function buildPlayerSources(movie: Movie): PlayerSource[] {
       name: "CDN Brasil",
       hint: "PT-BR · TMDB · rápido",
       theme: "cyan",
-      src: `https://cdn-embed.com/${path}/${tmdbId}`,
+      src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
     });
     sources.push({
       id: "superflix-pro",
       name: "SuperFlix",
       hint: "PT-BR · dublado/legendado",
       theme: "gold",
-      src: `https://superflixapi.pro/${path}/${tmdbId}#noLink`,
+      src: `https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}#noLink`,
     });
     sources.push({
       id: "superflix-help",
       name: "SuperFlix Alt",
       hint: "PT-BR · espelho oficial",
       theme: "violet",
-      src: `https://superflixapi.help/${path}/${tmdbId}`,
+      src: `https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`,
     });
     sources.push({
       id: "warez-tmdb",
       name: "WarezCDN",
       hint: "PT-BR · TMDB",
       theme: "emerald",
-      src: `https://warezcdn.lat/${path}/${tmdbId}`,
+      src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
     });
   }
 
@@ -1581,21 +1752,21 @@ function buildPlayerSources(movie: Movie): PlayerSource[] {
       name: "CDN IMDb",
       hint: "PT-BR · IMDb",
       theme: "sky",
-      src: `https://cdn-embed.com/${path}/${imdbId}`,
+      src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
     });
     sources.push({
       id: "superflix-imdb",
       name: "SuperFlix IMDb",
       hint: "PT-BR · IMDb",
       theme: "rose",
-      src: `https://superflixapi.pro/${path}/${imdbId}#noLink`,
+      src: `https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}#noLink`,
     });
     sources.push({
       id: "warez-imdb",
       name: "WarezCDN IMDb",
       hint: "PT-BR · IMDb",
       theme: "emerald",
-      src: `https://warezcdn.lat/${path}/${imdbId}`,
+      src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
     });
   }
 
@@ -1699,22 +1870,85 @@ function PlayerServerMenu({
 function MoviePlayer({
   movie,
   onClose,
+  onProgress,
 }: {
   movie: Movie;
   onClose: () => void;
+  onProgress: (patch: {
+    progresso?: number;
+    posicao_segundos?: number;
+    temporada?: number | null;
+    episodio?: number | null;
+  }) => void;
 }) {
-  const sources = buildPlayerSources(movie);
+  const isTv = mediaKind(movie) === "tv";
+  const [season, setSeason] = useState(Math.max(1, movie.season || 1));
+  const [episode, setEpisode] = useState(Math.max(1, movie.episode || 1));
+  const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
+  const [episodes, setEpisodes] = useState<TvEpisodeInfo[]>([]);
+  const [seasonLoading, setSeasonLoading] = useState(false);
+  const sources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
   const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "cdn-tmdb");
   const [showBar, setShowBar] = useState(true);
   const [menuPinned, setMenuPinned] = useState(false);
   const hideBar = useRef<number | null>(null);
+  const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
   const activeSource = sources.find((source) => source.id === sourceId) ?? sources[0];
   const controlsVisible = showBar || menuPinned;
+  const episodeLabel = isTv
+    ? `T${season} E${episode}${episodes.find((item) => item.episode_number === episode)?.name ? ` · ${episodes.find((item) => item.episode_number === episode)?.name}` : ""}`
+    : null;
 
   useEffect(() => {
-    const nextSources = buildPlayerSources(movie);
+    const nextSources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
     setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "cdn-tmdb")));
-  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind]);
+  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv]);
+
+  useEffect(() => {
+    if (!isTv) return;
+    const controller = new AbortController();
+    fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { seasons?: TvSeasonInfo[] } | null) => {
+        const list = Array.isArray(data?.seasons) ? data.seasons.filter((item) => item.season_number > 0) : [];
+        setSeasons(list);
+        if (list.length > 0 && !list.some((item) => item.season_number === season)) {
+          setSeason(list[0].season_number);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSeasons([]);
+      });
+    return () => controller.abort();
+  }, [isTv, movie.id, movie.tmdb_id]);
+
+  useEffect(() => {
+    if (!isTv) return;
+    const controller = new AbortController();
+    setSeasonLoading(true);
+    fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv&season=${season}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { episodes?: TvEpisodeInfo[] } | null) => {
+        const list = Array.isArray(data?.episodes) ? data.episodes.filter((item) => item.episode_number > 0) : [];
+        setEpisodes(list);
+        if (list.length > 0 && !list.some((item) => item.episode_number === episode)) {
+          setEpisode(list[0].episode_number);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setEpisodes([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSeasonLoading(false);
+      });
+    return () => controller.abort();
+  }, [isTv, movie.id, movie.tmdb_id, season]);
 
   useEffect(() => {
     document.body.classList.add("player-open");
@@ -1740,6 +1974,39 @@ function MoviePlayer({
     };
   }, [menuPinned]);
 
+  useEffect(() => {
+    // Embeds de terceiros não expõem currentTime; estimamos progresso enquanto o player fica aberto.
+    const timer = window.setInterval(() => {
+      progressRef.current = Math.min(95, progressRef.current + 2);
+      onProgress({
+        progresso: progressRef.current,
+        posicao_segundos: Math.round(progressRef.current * 60),
+        temporada: isTv ? season : null,
+        episodio: isTv ? episode : null,
+      });
+    }, 45000);
+    onProgress({
+      progresso: progressRef.current,
+      posicao_segundos: movie.positionSeconds || 0,
+      temporada: isTv ? season : null,
+      episodio: isTv ? episode : null,
+    });
+    return () => window.clearInterval(timer);
+  }, [episode, isTv, movie.positionSeconds, onProgress, season]);
+
+  function selectSeason(next: number) {
+    setSeason(next);
+    setEpisode(1);
+    progressRef.current = Math.max(progressRef.current, 8);
+    onProgress({ progresso: progressRef.current, temporada: next, episodio: 1 });
+  }
+
+  function selectEpisode(next: number) {
+    setEpisode(next);
+    progressRef.current = Math.max(progressRef.current, 10);
+    onProgress({ progresso: progressRef.current, temporada: season, episodio: next });
+  }
+
   return (
     <div className={`player-view ${controlsVisible ? "show-controls" : ""} ${activeSource ? `theme-${activeSource.theme}` : ""}`}>
       <div className="player-bar">
@@ -1748,10 +2015,49 @@ function MoviePlayer({
           Voltar
         </button>
         <div className="player-heading">
-          <span className="player-kicker">{mediaKind(movie) === "tv" ? "Série" : "Filme"} · PT-BR</span>
+          <span className="player-kicker">{isTv ? "Série" : "Filme"} · PT-BR</span>
           <strong className="player-title">{movie.title}</strong>
+          {episodeLabel ? <small className="player-episode-label">{episodeLabel}</small> : null}
         </div>
         <div className="player-toolbar">
+          {isTv ? (
+            <div className="player-episode-controls">
+              <label>
+                <span>Temp.</span>
+                <select
+                  value={season}
+                  onChange={(event) => selectSeason(Number(event.target.value))}
+                  aria-label="Temporada"
+                >
+                  {(seasons.length ? seasons : [{ season_number: season, name: `Temporada ${season}`, episode_count: 0 }]).map(
+                    (item) => (
+                      <option key={item.season_number} value={item.season_number}>
+                        T{item.season_number}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label>
+                <span>Ep.</span>
+                <select
+                  value={episode}
+                  onChange={(event) => selectEpisode(Number(event.target.value))}
+                  aria-label="Episódio"
+                  disabled={seasonLoading}
+                >
+                  {(episodes.length
+                    ? episodes
+                    : [{ episode_number: episode, name: `Episódio ${episode}` }]
+                  ).map((item) => (
+                    <option key={item.episode_number} value={item.episode_number}>
+                      E{item.episode_number}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : null}
           <PlayerServerMenu
             sources={sources}
             activeId={activeSource?.id ?? ""}

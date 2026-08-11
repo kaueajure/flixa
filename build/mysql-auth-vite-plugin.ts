@@ -10,24 +10,79 @@ async function readBody(req: IncomingMessage) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function sendJson(res: ServerResponse, status: number, payload: unknown, headers: Record<string, string> = {}) {
-  const body = JSON.stringify(payload);
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  for (const [key, value] of Object.entries(headers)) {
-    res.setHeader(key, value);
-  }
-  res.end(body);
-}
-
-function authPath(url?: string) {
+function requestPath(url?: string) {
   if (!url) return "";
   return url.split("?")[0] || "";
 }
 
+function isMysqlApiPath(pathname: string) {
+  return (
+    pathname.startsWith("/api/auth/") ||
+    pathname === "/api/lista" ||
+    pathname === "/api/historico" ||
+    pathname === "/api/progresso" ||
+    pathname === "/api/admin/usuarios"
+  );
+}
+
+async function toWebRequest(req: IncomingMessage): Promise<Request> {
+  const host = req.headers.host || "localhost";
+  const url = `http://${host}${req.url || "/"}`;
+  const method = (req.method || "GET").toUpperCase();
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value == null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) headers.append(key, item);
+    } else {
+      headers.set(key, value);
+    }
+  }
+
+  if (method === "GET" || method === "HEAD") {
+    return new Request(url, { method, headers });
+  }
+
+  const raw = await readBody(req);
+  return new Request(url, {
+    method,
+    headers,
+    body: raw || null,
+  });
+}
+
+async function sendWebResponse(res: ServerResponse, response: Response) {
+  res.statusCode = response.status;
+  const cookies = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
+  response.headers.forEach((value, key) => {
+    if (key.toLowerCase() === "set-cookie") return;
+    res.setHeader(key, value);
+  });
+  for (const cookie of cookies) {
+    res.appendHeader("Set-Cookie", cookie);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  res.end(buffer);
+}
+
+type RouteModule = Partial<
+  Record<"GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE", (request: Request) => Promise<Response> | Response>
+>;
+
+async function loadRouteModule(pathname: string): Promise<RouteModule | null> {
+  if (pathname === "/api/auth/login") return import("../app/api/auth/login/route");
+  if (pathname === "/api/auth/register") return import("../app/api/auth/register/route");
+  if (pathname === "/api/auth/logout") return import("../app/api/auth/logout/route");
+  if (pathname === "/api/auth/me") return import("../app/api/auth/me/route");
+  if (pathname === "/api/lista") return import("../app/api/lista/route");
+  if (pathname === "/api/historico") return import("../app/api/historico/route");
+  if (pathname === "/api/progresso") return import("../app/api/progresso/route");
+  if (pathname === "/api/admin/usuarios") return import("../app/api/admin/usuarios/route");
+  return null;
+}
+
 /**
- * Atende /api/auth/* no Node do Vite (fora do Worker),
- * porque o MySQL da Hostinger usa TCP e não roda no workerd.
+ * Atende rotas MySQL no Node do Vite (fora do Worker).
  */
 export function mysqlAuth(): Plugin {
   return {
@@ -38,124 +93,40 @@ export function mysqlAuth(): Plugin {
       loadEnv({ path: ".env", override: false });
 
       const handler: Connect.NextHandleFunction = async (req, res, next) => {
-        const url = authPath(req.url);
-        if (!url.startsWith("/api/auth/")) {
+        const pathname = requestPath(req.url);
+        if (!isMysqlApiPath(pathname)) {
           next();
           return;
         }
 
         try {
-          const auth = await import("../db/auth");
-          const { closeDb } = await import("../db/index");
-
-          const runLogin = async (email: string, senha: string) => {
-            const usuario = await auth.autenticarUsuario(email, senha);
-            if (!usuario) {
-              sendJson(res, 401, { erro: "E-mail ou senha inválidos." });
-              return;
-            }
-
-            const token = await auth.criarSessao(usuario.id);
-            sendJson(res, 200, { usuario: auth.paraUsuarioPublico(usuario) }, {
-              "Set-Cookie": auth.montarCookieSessao(token),
-            });
-          };
-
-          const runRegister = async (nome: string, email: string, senha: string) => {
-            const resultado = await auth.cadastrarUsuario({ nome, email, senha });
-            if (!resultado.usuario) {
-              sendJson(res, 400, { erro: resultado.erro || "Não foi possível cadastrar." });
-              return;
-            }
-
-            const token = await auth.criarSessao(resultado.usuario.id);
-            sendJson(res, 201, { usuario: auth.paraUsuarioPublico(resultado.usuario) }, {
-              "Set-Cookie": auth.montarCookieSessao(token),
-            });
-          };
-
-          if (url === "/api/auth/login" && req.method === "POST") {
-            const raw = await readBody(req);
-            const body = raw ? (JSON.parse(raw) as { email?: string; senha?: string }) : {};
-            const email = String(body.email || "").trim().toLowerCase();
-            const senha = String(body.senha || "");
-            if (!email || !senha) {
-              sendJson(res, 400, { erro: "Informe e-mail e senha." });
-              return;
-            }
-
-            try {
-              await runLogin(email, senha);
-            } catch {
-              await closeDb();
-              await runLogin(email, senha);
-            }
+          const mod = await loadRouteModule(pathname);
+          const method = (req.method || "GET").toUpperCase() as keyof RouteModule;
+          const runner = mod?.[method] || (method === "HEAD" ? mod?.GET : undefined);
+          if (!mod || !runner) {
+            res.statusCode = 405;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify({ erro: "Método não permitido." }));
             return;
           }
 
-          if (url === "/api/auth/register" && req.method === "POST") {
-            const raw = await readBody(req);
-            const body = raw ? (JSON.parse(raw) as { nome?: string; email?: string; senha?: string }) : {};
-            const nome = String(body.nome || "");
-            const email = String(body.email || "").trim().toLowerCase();
-            const senha = String(body.senha || "");
-            if (!nome || !email || !senha) {
-              sendJson(res, 400, { erro: "Informe nome, e-mail e senha." });
-              return;
-            }
-
-            try {
-              await runRegister(nome, email, senha);
-            } catch {
-              await closeDb();
-              await runRegister(nome, email, senha);
-            }
-            return;
-          }
-
-          if (url === "/api/auth/logout" && req.method === "POST") {
-            const token = auth.lerTokenCookie(req.headers.cookie || null);
-            try {
-              await auth.encerrarSessao(token);
-            } catch {
-              await closeDb();
-              await auth.encerrarSessao(token);
-            }
-            sendJson(res, 200, { ok: true }, { "Set-Cookie": auth.montarCookieLogout() });
-            return;
-          }
-
-          if (url === "/api/auth/me" && (req.method === "GET" || req.method === "HEAD")) {
-            const token = auth.lerTokenCookie(req.headers.cookie || null);
-            let usuario;
-            try {
-              usuario = await auth.obterUsuarioPorToken(token);
-            } catch {
-              await closeDb();
-              usuario = await auth.obterUsuarioPorToken(token);
-            }
-            if (!usuario) {
-              sendJson(res, 401, { usuario: null });
-              return;
-            }
-            sendJson(res, 200, { usuario: auth.paraUsuarioPublico(usuario) });
-            return;
-          }
-
-          sendJson(res, 405, { erro: "Método não permitido." });
+          const request = await toWebRequest(req);
+          const response = await runner(request);
+          await sendWebResponse(res, response);
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Falha na autenticação";
+          const message = error instanceof Error ? error.message : "Falha na API";
           const code =
             error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code) : "";
           const dica =
             code === "ETIMEDOUT" || code === "ENOTFOUND" || /Failed query/i.test(message)
               ? " Confira MYSQL_HOST no .env.local e a conexão com o MySQL."
               : "";
-          sendJson(res, 500, { erro: `${message}${dica}` });
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ erro: `${message}${dica}` }));
         }
       };
 
-      // Garante prioridade sobre o proxy do Cloudflare/vinext.
       return () => {
         server.middlewares.stack.unshift({
           route: "",

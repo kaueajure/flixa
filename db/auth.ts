@@ -1,5 +1,5 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { getDb } from "./index";
 import { sessoes, usuarios, type Usuario } from "./schema";
 
@@ -176,8 +176,85 @@ export async function obterUsuarioPorToken(token: string | null) {
   return rows[0] ?? null;
 }
 
+export async function requireUsuario(request: Request) {
+  const token = lerTokenCookie(request.headers.get("cookie"));
+  const usuario = await obterUsuarioPorToken(token);
+  if (!usuario) return null;
+  return usuario;
+}
+
+export async function requireAdmin(request: Request) {
+  const usuario = await requireUsuario(request);
+  if (!usuario || Number(usuario.administrador) !== 1) return null;
+  return usuario;
+}
+
 export async function encerrarSessao(token: string | null) {
   if (!token) return;
   const db = await getDb();
   await db.delete(sessoes).where(eq(sessoes.token, token));
+}
+
+export async function listarUsuariosAdmin() {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: usuarios.id,
+      nome: usuarios.nome,
+      email: usuarios.email,
+      administrador: usuarios.administrador,
+      criado_em: usuarios.criado_em,
+    })
+    .from(usuarios)
+    .orderBy(asc(usuarios.id));
+  return rows.map((row) => ({
+    id: row.id,
+    nome: row.nome,
+    email: row.email,
+    administrador: Number(row.administrador) === 1,
+    criado_em: row.criado_em,
+  }));
+}
+
+export async function atualizarUsuarioAdmin(
+  alvoId: number,
+  input: { administrador?: boolean; nome?: string },
+  adminId: number,
+) {
+  const db = await getDb();
+  const rows = await db.select().from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
+  const alvo = rows[0];
+  if (!alvo) return { erro: "Usuário não encontrado.", usuario: null as Usuario | null };
+
+  if (input.administrador === false && alvoId === adminId) {
+    return { erro: "Você não pode remover seu próprio acesso de administrador.", usuario: null as Usuario | null };
+  }
+
+  const patch: {
+    atualizado_em: string;
+    administrador?: number;
+    nome?: string;
+  } = { atualizado_em: agoraSql() };
+
+  if (typeof input.administrador === "boolean") {
+    patch.administrador = input.administrador ? 1 : 0;
+  }
+  if (typeof input.nome === "string" && input.nome.trim().length >= 2) {
+    patch.nome = input.nome.trim().replace(/\s+/g, " ");
+  }
+
+  await db.update(usuarios).set(patch).where(eq(usuarios.id, alvoId));
+  const atualizados = await db.select().from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
+  return { erro: null as string | null, usuario: atualizados[0] ?? null };
+}
+
+export async function excluirUsuarioAdmin(alvoId: number, adminId: number) {
+  if (alvoId === adminId) {
+    return { erro: "Você não pode excluir a própria conta por aqui." };
+  }
+  const db = await getDb();
+  const rows = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
+  if (!rows[0]) return { erro: "Usuário não encontrado." };
+  await db.delete(usuarios).where(eq(usuarios.id, alvoId));
+  return { erro: null as string | null };
 }

@@ -121,6 +121,8 @@ export const progresso_reproducao = mysqlTable(
     poster: text("poster"),
     progresso: decimal("progresso", { precision: 5, scale: 2 }).notNull().default("0.00"),
     posicao_segundos: int("posicao_segundos").notNull().default(0),
+    temporada: int("temporada"),
+    episodio: int("episodio"),
     atualizado_em: datetime("atualizado_em", { mode: "string" })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),

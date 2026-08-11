@@ -1655,6 +1655,7 @@ body.player-open > a[href^="http"] {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  text-decoration: none;
 }
 
 .logout-button {
@@ -1669,4 +1670,178 @@ body.player-open > a[href^="http"] {
 
 .logout-button:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.player-episode-label {
+  display: block;
+  margin-top: 0.15rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.player-episode-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.player-episode-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.2rem 0.55rem 0.2rem 0.7rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.player-episode-controls select {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  padding: 2rem 1.25rem 4rem;
+  background:
+    radial-gradient(circle at top left, rgba(231, 195, 106, 0.12), transparent 40%),
+    linear-gradient(180deg, #14110f 0%, #0b0a09 100%);
+  color: #f4f1ea;
+}
+
+.admin-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 auto 1.5rem;
+  max-width: 1100px;
+}
+
+.admin-head h1 {
+  margin: 0.2rem 0 0.35rem;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+
+.admin-head p {
+  margin: 0;
+  color: rgba(244, 241, 234, 0.72);
+}
+
+.admin-back {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 auto 1.5rem;
+  max-width: 1100px;
+}
+
+.admin-stats article {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1rem;
+}
+
+.admin-stats strong {
+  display: block;
+  font-size: 1.6rem;
+}
+
+.admin-stats span {
+  color: rgba(244, 241, 234, 0.68);
+  font-size: 0.84rem;
+}
+
+.admin-table-wrap {
+  margin: 0 auto;
+  max-width: 1100px;
+}
+
+.admin-table-wrap h2 {
+  margin: 0 0 0.75rem;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  color: rgba(244, 241, 234, 0.7);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.admin-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+.admin-actions button.is-danger {
+  border-color: rgba(255, 110, 110, 0.35);
+  color: #ffb4b4;
+}
+
+.admin-actions button:disabled {
+  opacity: 0.45;
+}
+
+@media (max-width: 800px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .player-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+  }
 }

@@ -501,11 +501,77 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
       .filter((item): item is CatalogMovie => Boolean(item))
       .slice(0, 12);
 
+    const seasons = Array.isArray(data.seasons)
+      ? data.seasons
+          .map((item) => asRecord(item))
+          .filter((item): item is Record<string, unknown> => Boolean(item))
+          .map((item) => ({
+            season_number: asNumber(item.season_number) ?? 0,
+            episode_count: asNumber(item.episode_count) ?? 0,
+            name: asString(item.name) || `Temporada ${asNumber(item.season_number) ?? "?"}`,
+            air_date: asString(item.air_date) || undefined,
+          }))
+          .filter((item) => item.season_number > 0)
+      : [];
+
     return movie
-      ? { movie, similar, error: null as string | null }
-      : { movie: null, similar: [] as CatalogMovie[], error: "TMDB: Sem resultados" };
+      ? { movie, similar, seasons, error: null as string | null }
+      : { movie: null, similar: [] as CatalogMovie[], seasons: [], error: "TMDB: Sem resultados" };
   } catch (error) {
-    return { movie: null, similar: [] as CatalogMovie[], error: `TMDB: ${describeFetchError(error)}` };
+    return {
+      movie: null,
+      similar: [] as CatalogMovie[],
+      seasons: [],
+      error: `TMDB: ${describeFetchError(error)}`,
+    };
+  }
+}
+
+async function getTmdbSeason(movieId: string, seasonNumber: number) {
+  const { token, apiKey } = getTmdbCredentials();
+  if (!token && !apiKey) {
+    return { season: null, episodes: [], error: "TMDB: chave ausente (TMDB_ACCESS_TOKEN ou TMDB_API_KEY)" };
+  }
+
+  const id = parseTmdbId(movieId);
+  if (!/^\d+$/.test(id) || !Number.isFinite(seasonNumber) || seasonNumber < 1) {
+    return { season: null, episodes: [], error: "TMDB: temporada inválida" };
+  }
+
+  try {
+    const data = asRecord(await tmdbRequest(`/tv/${id}/season/${seasonNumber}`));
+    if (!data) {
+      return { season: null, episodes: [], error: "TMDB: Sem resultados" };
+    }
+
+    const episodes = Array.isArray(data.episodes)
+      ? data.episodes
+          .map((item) => asRecord(item))
+          .filter((item): item is Record<string, unknown> => Boolean(item))
+          .map((item) => ({
+            episode_number: asNumber(item.episode_number) ?? 0,
+            name: asString(item.name) || `Episódio ${asNumber(item.episode_number) ?? "?"}`,
+            overview: asString(item.overview) || "",
+            still: tmdbImageUrl(item.still_path, "w780") || "",
+            runtime: asNumber(item.runtime) || undefined,
+            air_date: asString(item.air_date) || undefined,
+          }))
+          .filter((item) => item.episode_number > 0)
+      : [];
+
+    return {
+      season: {
+        season_number: asNumber(data.season_number) ?? seasonNumber,
+        name: asString(data.name) || `Temporada ${seasonNumber}`,
+        overview: asString(data.overview) || "",
+        poster: tmdbImageUrl(data.poster_path, "w342") || "",
+        episode_count: episodes.length,
+      },
+      episodes,
+      error: null as string | null,
+    };
+  } catch (error) {
+    return { season: null, episodes: [], error: `TMDB: ${describeFetchError(error)}` };
   }
 }
 
@@ -621,6 +687,11 @@ export async function GET(request: Request) {
   const browse = searchParams.get("browse")?.trim() ?? "";
   const kind = searchParams.get("kind") === "tv" ? "tv" : "movie";
   const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
+  const season = Math.max(0, Number(searchParams.get("season") || "0") || 0);
+
+  if (movieId && kind === "tv" && season > 0) {
+    return Response.json(await getTmdbSeason(movieId, season));
+  }
 
   if (movieId) {
     return Response.json(await getTmdbDetails(movieId, kind));

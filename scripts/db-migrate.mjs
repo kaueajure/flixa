@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
@@ -14,8 +14,10 @@ function required(name) {
   return value;
 }
 
-const sqlPath = resolve(root, "drizzle/0000_flixa_inicial.sql");
-const sql = readFileSync(sqlPath, "utf8");
+const drizzleDir = resolve(root, "drizzle");
+const files = readdirSync(drizzleDir)
+  .filter((name) => /^\d+_.+\.sql$/i.test(name))
+  .sort((a, b) => a.localeCompare(b, "en"));
 
 const connection = await createConnection({
   host: required("MYSQL_HOST"),
@@ -28,9 +30,24 @@ const connection = await createConnection({
 });
 
 try {
-  console.log("Aplicando migration 0000_flixa_inicial.sql ...");
-  await connection.query(sql);
-  console.log("Migration aplicada com sucesso.");
+  for (const file of files) {
+    const sqlPath = resolve(drizzleDir, file);
+    const sql = readFileSync(sqlPath, "utf8");
+    console.log(`Aplicando migration ${file} ...`);
+    try {
+      await connection.query(sql);
+      console.log(`OK ${file}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Reexecução: coluna já existe
+      if (/Duplicate column name|already exists/i.test(message)) {
+        console.log(`Ignorado ${file}: ${message}`);
+        continue;
+      }
+      throw error;
+    }
+  }
+  console.log("Migrations aplicadas com sucesso.");
 } catch (error) {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   if (code === "ETIMEDOUT" || code === "ENOTFOUND" || code === "ECONNREFUSED") {
