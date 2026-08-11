@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 type Movie = {
   id: string;
@@ -16,7 +22,6 @@ type Movie = {
   rating: string;
   director?: string;
   cast?: string[];
-  trailer?: string;
   progress?: number;
 };
 
@@ -190,6 +195,14 @@ function formatClock(seconds: number) {
   return `${minutes}:${rest}`;
 }
 
+function progressPercent(movie: Movie, savedSeconds?: number) {
+  if (savedSeconds && savedSeconds > 0 && movie.durationSeconds > 0) {
+    return Math.min(100, Math.round((savedSeconds / movie.durationSeconds) * 100));
+  }
+
+  return movie.progress ?? 0;
+}
+
 export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [query, setQuery] = useState("");
@@ -198,32 +211,32 @@ export default function Home() {
   const [playerMovie, setPlayerMovie] = useState<Movie | null>(null);
   const [listIds, setListIds] = useState<string[]>([]);
   const [savedProgress, setSavedProgress] = useState<Record<string, number>>({});
+  const [storageReady, setStorageReady] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll);
 
-    const storageTimer = window.setTimeout(() => {
-      setListIds(getStoredIds("flixa-list"));
-      setSavedProgress(getStoredProgress());
-    }, 0);
+    setListIds(getStoredIds("flixa-list"));
+    setSavedProgress(getStoredProgress());
+    setStorageReady(true);
 
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.clearTimeout(storageTimer);
     };
   }, []);
 
   useEffect(() => {
+    if (!storageReady) return;
     window.localStorage.setItem("flixa-list", JSON.stringify(listIds));
-  }, [listIds]);
+  }, [listIds, storageReady]);
 
   const continueMovies = useMemo(
     () =>
       movies.filter((movie) => {
         const stored = savedProgress[movie.id];
-        return movie.progress || (stored && stored > 0);
+        return Boolean(movie.progress) || (stored !== undefined && stored > 0);
       }),
     [savedProgress],
   );
@@ -330,7 +343,7 @@ export default function Home() {
       <section
         className="hero"
         id="home"
-        style={{ "--hero-art": featuredMovie.backdrop } as React.CSSProperties}
+        style={{ "--hero-art": featuredMovie.backdrop } as CSSProperties}
       >
         <div className="frame-strips" aria-hidden="true">
           <span />
@@ -381,7 +394,7 @@ export default function Home() {
                 <MovieCard
                   key={movie.id}
                   movie={movie}
-                  progress={savedProgress[movie.id] || movie.progress || 0}
+                  progress={progressPercent(movie, savedProgress[movie.id])}
                   onOpen={setSelectedMovie}
                 />
               ))}
@@ -439,7 +452,7 @@ function MovieRow({
           <MovieCard
             key={movie.id}
             movie={movie}
-            progress={progress[movie.id] || movie.progress || 0}
+            progress={progressPercent(movie, progress[movie.id])}
             onOpen={onOpen}
           />
         ))}
@@ -551,7 +564,7 @@ function MoviePlayer({
   const [volume, setVolume] = useState(0.84);
   const [speed, setSpeed] = useState(1);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+  const timelinePercent = duration ? (currentTime / duration) * 100 : 0;
 
   const showControls = () => {
     setControlsVisible(true);
@@ -646,7 +659,7 @@ function MoviePlayer({
           min="0"
           max={duration || 0}
           value={currentTime}
-          style={{ "--progress": `${progressPercent}%` } as React.CSSProperties}
+          style={{ "--progress": `${timelinePercent}%` } as CSSProperties}
           onChange={(event) => {
             const value = Number(event.target.value);
             if (videoRef.current) videoRef.current.currentTime = value;
