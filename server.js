@@ -2,13 +2,16 @@ import path from "node:path";
 import { startProdServer } from "vinext/server/prod-server";
 
 /**
- * Entrada de produção para Hostinger (Node.js Web App).
- * A Hostinger injeta process.env.PORT e espera um arquivo .js.
+ * Entrada local / alternativa ESM (sem top-level await).
+ * Na Hostinger use server.cjs no campo Entry file.
  */
 const port = Number(process.env.PORT || 3000);
 
-await startProdServer({
+startProdServer({
   port,
   host: "0.0.0.0",
   outDir: path.resolve(process.cwd(), "dist"),
+}).catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
