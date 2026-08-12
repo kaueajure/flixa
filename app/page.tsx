@@ -29,7 +29,7 @@ type Movie = {
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "lista" | "genero" | "surpreenda-me";
+type View = "home" | "filmes" | "series" | "lista" | "surpreenda-me";
 type AuthUser = {
   id: number;
   nome: string;
@@ -240,21 +240,34 @@ function catalogReturnHash(hash: string) {
   return hash.replace(/^#/, "") || "home";
 }
 
+function catalogPath(view: "filmes" | "series", page = 1, genreId?: string | null) {
+  const genrePart = genreId ? `/genero/${genreId}` : "";
+  const pagePart = page > 1 ? `/${page}` : "";
+  return `${view}${genrePart}${pagePart}`;
+}
+
 function parseRoute(hash: string) {
   const raw = hash.replace(/^#/, "");
   if (!raw || raw === "home") return { view: "home" as View };
-  const catalog = raw.match(/^(filmes|series)(?:\/(\d+))?$/);
+  const catalog = raw.match(/^(filmes|series)(?:\/genero\/(\d+))?(?:\/(\d+))?$/);
   if (catalog) {
     return {
       view: (catalog[1] === "series" ? "series" : "filmes") as View,
-      catalogPage: Math.max(1, Number(catalog[2] || "1") || 1),
+      genreId: catalog[2] || null,
+      catalogPage: Math.max(1, Number(catalog[3] || "1") || 1),
     };
   }
   if (raw === "minha-lista" || raw === "lista") return { view: "lista" as View };
   if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
 
   const genre = raw.match(/^genero\/(\d+)$/);
-  if (genre) return { view: "genero" as View, genreId: genre[1] };
+  if (genre) {
+    return {
+      view: "filmes" as View,
+      genreId: genre[1],
+      catalogPage: 1,
+    };
+  }
 
   const player = raw.match(/^player\/(filme|serie)\/([^/]+)(?:\/s\/(\d+)\/e\/(\d+))?$/);
   if (player) {
@@ -339,9 +352,7 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null);
   const [view, setView] = useState<View>("home");
   const [genreId, setGenreId] = useState<string | null>(null);
-  const [genreItems, setGenreItems] = useState<Movie[]>([]);
-  const [genrePage, setGenrePage] = useState(1);
-  const [genreLoading, setGenreLoading] = useState(false);
+  const [catalogGenres, setCatalogGenres] = useState<Genre[]>([]);
   const [catalogPage, setCatalogPage] = useState(1);
   const [browseItems, setBrowseItems] = useState<Movie[]>([]);
   const [browseTotal, setBrowseTotal] = useState(0);
@@ -567,7 +578,6 @@ export default function Home() {
         route.view === "filmes" ||
         route.view === "series" ||
         route.view === "lista" ||
-        route.view === "genero" ||
         route.view === "surpreenda-me"
       ) {
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -642,31 +652,21 @@ export default function Home() {
   }, [query, searchOpen]);
 
   useEffect(() => {
-    if (view !== "genero" || !genreId) return;
+    if (view !== "filmes" && view !== "series") return;
 
+    const kind = view === "series" ? "tv" : "movie";
     const controller = new AbortController();
-    const timer = window.setTimeout(() => setGenreLoading(true), 0);
-    fetch(`/api/movies?genre=${encodeURIComponent(genreId)}&kind=movie&page=1`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
+    fetch(`/api/movies?genres=1&kind=${kind}`, { cache: "no-store", signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { movies?: Movie[] } | null) => {
-        setGenreItems(Array.isArray(data?.movies) ? data.movies : []);
-        setGenrePage(1);
+      .then((data: { genres?: Genre[] } | null) => {
+        setCatalogGenres(Array.isArray(data?.genres) ? data.genres : []);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setGenreItems([]);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setGenreLoading(false);
+        if (!controller.signal.aborted) setCatalogGenres([]);
       });
 
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [view, genreId]);
+    return () => controller.abort();
+  }, [view]);
 
   useEffect(() => {
     if (view !== "filmes" && view !== "series") return;
@@ -674,7 +674,8 @@ export default function Home() {
     const kind = view === "series" ? "tv" : "movie";
     const controller = new AbortController();
     const timer = window.setTimeout(() => setBrowseLoading(true), 0);
-    fetch(`/api/movies?browse=1&kind=${kind}&page=${catalogPage}`, {
+    const genreParam = genreId ? `&genre=${encodeURIComponent(genreId)}` : "";
+    fetch(`/api/movies?browse=1&kind=${kind}&page=${catalogPage}${genreParam}`, {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -700,7 +701,7 @@ export default function Home() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [view, catalogPage]);
+  }, [view, catalogPage, genreId]);
 
   const uniqueMovies = useMemo(() => dedupeMovies(movies.filter((movie) => mediaKind(movie) === "movie")), [movies]);
   const uniqueSeries = useMemo(() => dedupeMovies(movies.filter((movie) => mediaKind(movie) === "tv")), [movies]);
@@ -732,7 +733,7 @@ export default function Home() {
       .filter((row) => row.items.length > 0);
   }, [movies]);
 
-  const activeGenre = genres.find((genre) => String(genre.id) === genreId) ?? null;
+  const activeGenre = catalogGenres.find((genre) => String(genre.id) === genreId) ?? genres.find((genre) => String(genre.id) === genreId) ?? null;
 
   const searchResults = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -918,23 +919,6 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [playerMovie, selectedMovie, searchOpen, closeDetails, closePlayer]);
 
-  async function loadMoreGenre() {
-    if (!genreId || genreLoading) return;
-    setGenreLoading(true);
-    const nextPage = genrePage + 1;
-    try {
-      const res = await fetch(`/api/movies?genre=${encodeURIComponent(genreId)}&kind=movie&page=${nextPage}`, {
-        cache: "no-store",
-      });
-      const data = (await res.json()) as { movies?: Movie[] };
-      const extra = Array.isArray(data.movies) ? data.movies : [];
-      setGenreItems((current) => dedupeMovies([...current, ...extra]));
-      setGenrePage(nextPage);
-    } finally {
-      setGenreLoading(false);
-    }
-  }
-
   if (authChecking || loading) {
     return (
       <main className="flixa-shell">
@@ -1117,59 +1101,20 @@ export default function Home() {
           onToggleList={toggleList}
           onToast={showToast}
         />
-      ) : view === "genero" ? (
-        <section className="list-view" id="genero">
-          <div className="list-view-head">
-            <div>
-              <p className="eyebrow">Gênero</p>
-              <h1>{activeGenre?.name ?? "Catálogo"}</h1>
-              <p className="hero-description">Filmes deste gênero na TMDB, ordenados por popularidade.</p>
-            </div>
-            <a className="secondary-action" href="#filmes" onClick={() => goTo("filmes")}>
-              Todos os filmes
-            </a>
-          </div>
-          {genreLoading && genreItems.length === 0 ? (
-            <div className="skeleton-row">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <span key={index} className="skeleton-poster" />
-              ))}
-            </div>
-          ) : genreItems.length ? (
-            <>
-              <div className="poster-grid">
-                {genreItems.map((movie) => (
-                  <MovieCard
-                    key={movieKey(movie)}
-                    movie={movie}
-                    inList={isListed(listMovies, movie)}
-                    onOpen={openDetails}
-                    onToggleList={toggleList}
-                  />
-                ))}
-              </div>
-              <button className="text-link load-more" type="button" onClick={loadMoreGenre} disabled={genreLoading}>
-                {genreLoading ? "Carregando..." : "Ver mais"}
-              </button>
-            </>
-          ) : (
-            <div className="empty-state">
-              <p>Nenhum filme neste gênero</p>
-              <a className="primary-action" href="#home" onClick={() => goTo("home")}>
-                Voltar ao início
-              </a>
-            </div>
-          )}
-        </section>
       ) : view === "filmes" || view === "series" ? (
         <section className="list-view" id={view === "series" ? "series" : "filmes"}>
           <div className="list-view-head">
             <div>
-              <p className="eyebrow">Mais famosos</p>
-              <h1>{view === "series" ? "Séries" : "Filmes"}</h1>
+              <p className="eyebrow">{activeGenre ? "Categoria" : "Mais famosos"}</p>
+              <h1>
+                {view === "series" ? "Séries" : "Filmes"}
+                {activeGenre ? ` · ${activeGenre.name}` : ""}
+              </h1>
               <p className="hero-description">
                 {browseTotal
-                  ? `${browseTotal.toLocaleString("pt-BR")} ${view === "series" ? "séries" : "filmes"} mais populares · 50 por página.`
+                  ? `${browseTotal.toLocaleString("pt-BR")} ${view === "series" ? "séries" : "filmes"}${
+                      activeGenre ? ` em ${activeGenre.name}` : " mais populares"
+                    } · 50 por página.`
                   : "Carregando o catálogo…"}
               </p>
             </div>
@@ -1179,7 +1124,7 @@ export default function Home() {
                   className="secondary-action"
                   type="button"
                   disabled={catalogPage <= 1 || browseLoading}
-                  onClick={() => goTo(view === "series" ? `series/${catalogPage - 1}` : `filmes/${catalogPage - 1}`)}
+                  onClick={() => goTo(catalogPath(view, catalogPage - 1, genreId))}
                 >
                   Anterior
                 </button>
@@ -1190,13 +1135,40 @@ export default function Home() {
                   className="secondary-action"
                   type="button"
                   disabled={catalogPage >= browsePages || browseLoading}
-                  onClick={() => goTo(view === "series" ? `series/${catalogPage + 1}` : `filmes/${catalogPage + 1}`)}
+                  onClick={() => goTo(catalogPath(view, catalogPage + 1, genreId))}
                 >
                   Próxima
                 </button>
               </div>
             ) : null}
           </div>
+
+          {catalogGenres.length ? (
+            <div className="catalog-filters" role="listbox" aria-label="Filtrar por categoria">
+              <button
+                type="button"
+                role="option"
+                aria-selected={!genreId}
+                className={`catalog-filter ${!genreId ? "is-active" : ""}`}
+                onClick={() => goTo(catalogPath(view, 1, null))}
+              >
+                Todas
+              </button>
+              {catalogGenres.map((genre) => (
+                <button
+                  key={genre.id}
+                  type="button"
+                  role="option"
+                  aria-selected={String(genre.id) === genreId}
+                  className={`catalog-filter ${String(genre.id) === genreId ? "is-active" : ""}`}
+                  onClick={() => goTo(catalogPath(view, 1, String(genre.id)))}
+                >
+                  {genre.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           {browseLoading && browseItems.length === 0 ? (
             <div className="skeleton-row">
               {Array.from({ length: 10 }).map((_, index) => (
@@ -1222,7 +1194,7 @@ export default function Home() {
                     className="secondary-action"
                     type="button"
                     disabled={catalogPage <= 1 || browseLoading}
-                    onClick={() => goTo(view === "series" ? `series/${catalogPage - 1}` : `filmes/${catalogPage - 1}`)}
+                    onClick={() => goTo(catalogPath(view, catalogPage - 1, genreId))}
                   >
                     Anterior
                   </button>
@@ -1233,7 +1205,7 @@ export default function Home() {
                     className="secondary-action"
                     type="button"
                     disabled={catalogPage >= browsePages || browseLoading}
-                    onClick={() => goTo(view === "series" ? `series/${catalogPage + 1}` : `filmes/${catalogPage + 1}`)}
+                    onClick={() => goTo(catalogPath(view, catalogPage + 1, genreId))}
                   >
                     Próxima
                   </button>
@@ -1242,10 +1214,22 @@ export default function Home() {
             </>
           ) : (
             <div className="empty-state">
-              <p>{view === "series" ? "Nenhuma série no catálogo" : "Nenhum filme no catálogo"}</p>
-              <a className="primary-action" href="#home" onClick={() => goTo("home")}>
-                Voltar ao início
-              </a>
+              <p>
+                {activeGenre
+                  ? `Nenhum título em “${activeGenre.name}”`
+                  : view === "series"
+                    ? "Nenhuma série no catálogo"
+                    : "Nenhum filme no catálogo"}
+              </p>
+              {activeGenre ? (
+                <button className="primary-action" type="button" onClick={() => goTo(catalogPath(view, 1, null))}>
+                  Ver todas
+                </button>
+              ) : (
+                <a className="primary-action" href="#home" onClick={() => goTo("home")}>
+                  Voltar ao início
+                </a>
+              )}
             </div>
           )}
         </section>
@@ -1334,8 +1318,8 @@ export default function Home() {
                     <a
                       key={genre.id}
                       className="genre-chip"
-                      href={`#genero/${genre.id}`}
-                      onClick={() => goTo(`genero/${genre.id}`)}
+                      href={`#filmes/genero/${genre.id}`}
+                      onClick={() => goTo(`filmes/genero/${genre.id}`)}
                     >
                       <span>{genre.name}</span>
                     </a>
@@ -1452,6 +1436,7 @@ function shuffleMovies(items: Movie[]) {
 }
 
 const LOOT_SPIN_MS = 5400;
+const LOOT_REVEAL_DELAY_MS = 1100;
 const TERROR_GENRE: Genre = { id: 27, name: "Terror" };
 
 function buildRouletteGenreOptions(all: Genre[]) {
@@ -1525,14 +1510,42 @@ function RouletteView({
   const [reel, setReel] = useState<Movie[]>([]);
   const [offset, setOffset] = useState(0);
   const [animate, setAnimate] = useState(false);
+  const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
+  const [revealOpen, setRevealOpen] = useState(false);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [watched, setWatched] = useState<RouletteWatched[]>([]);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const spinEndTimer = useRef<number | null>(null);
+  const revealTimer = useRef<number | null>(null);
   const pendingSpinRef = useRef<{ landIndex: number; finalPick: Movie; reel: Movie[] } | null>(null);
   const replenishRef = useRef(false);
   const visibleStripRef = useRef<Movie[]>([]);
+
+  function clearRevealTimer() {
+    if (revealTimer.current) {
+      window.clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+    }
+  }
+
+  const closeReveal = useCallback(() => {
+    if (revealTimer.current) {
+      window.clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+    }
+    setRevealOpen(false);
+  }, []);
+
+  function resetPickState() {
+    clearRevealTimer();
+    setRevealOpen(false);
+    setPick(null);
+    setWinnerIndex(null);
+    setReel([]);
+    setAnimate(false);
+    setOffset(0);
+  }
 
   const activeGenre =
     genreId === 0
@@ -1552,6 +1565,7 @@ function RouletteView({
     setWatched(readRouletteWatched());
     return () => {
       if (spinEndTimer.current) window.clearTimeout(spinEndTimer.current);
+      if (revealTimer.current) window.clearTimeout(revealTimer.current);
     };
   }, []);
 
@@ -1573,19 +1587,15 @@ function RouletteView({
   useEffect(() => {
     if (genreId == null) {
       setPool([]);
-      setPick(null);
+      resetPickState();
       setPoolError(null);
-      setReel([]);
       return;
     }
 
     const controller = new AbortController();
     setPoolLoading(true);
     setPoolError(null);
-    setPick(null);
-    setReel([]);
-    setOffset(0);
-    setAnimate(false);
+    resetPickState();
     setSpinning(false);
     setPreparingSpin(false);
     replenishRef.current = false;
@@ -1695,7 +1705,7 @@ function RouletteView({
     );
 
     if (!candidates.length) {
-      setPick(null);
+      resetPickState();
       onToast("Não há mais filmes neste gênero. Restaure o sorteio ou troque o gênero.");
       return;
     }
@@ -1705,7 +1715,10 @@ function RouletteView({
 
     const built = buildLootReel(candidates, finalPick, visibleStripRef.current.slice(0, 12));
     pendingSpinRef.current = { landIndex: built.landIndex, finalPick, reel: built.reel };
+    clearRevealTimer();
+    setRevealOpen(false);
     setPick(null);
+    setWinnerIndex(null);
     setSpinning(false);
     setPreparingSpin(true);
     setAnimate(false);
@@ -1736,10 +1749,16 @@ function RouletteView({
     });
 
     spinEndTimer.current = window.setTimeout(() => {
+      setWinnerIndex(landIndex);
       setPick(finalPick);
       setSpinning(false);
       pendingSpinRef.current = null;
       spinEndTimer.current = null;
+      clearRevealTimer();
+      revealTimer.current = window.setTimeout(() => {
+        setRevealOpen(true);
+        revealTimer.current = null;
+      }, LOOT_REVEAL_DELAY_MS);
     }, LOOT_SPIN_MS);
 
     return () => {
@@ -1751,14 +1770,17 @@ function RouletteView({
     };
   }, [reel, spinning, preparingSpin]);
 
+  useLayoutEffect(() => {
+    if (!pick || spinning || preparingSpin || !reel.length || winnerIndex == null) return;
+    setAnimate(false);
+    setOffset(Math.max(0, centerOffset(winnerIndex)));
+  }, [pick, reel, winnerIndex, spinning, preparingSpin]);
+
   function handleAlreadySeen() {
     if (!pick || spinning || preparingSpin) return;
     const skippedMovie = pick;
     const next = skipMovie(skippedMovie);
-    setPick(null);
-    setReel([]);
-    setAnimate(false);
-    setOffset(0);
+    resetPickState();
     onToast(`Removido do sorteio · ${skippedMovie.title}`);
     window.setTimeout(() => spin({ skipOverride: next, excludeKey: movieKey(skippedMovie) }), 180);
   }
@@ -1767,10 +1789,7 @@ function RouletteView({
     if (!pick || spinning || preparingSpin) return;
     const movie = pick;
     markWatched(movie);
-    setPick(null);
-    setReel([]);
-    setOffset(0);
-    setAnimate(false);
+    resetPickState();
     onWatch(movie);
   }
 
@@ -1778,15 +1797,10 @@ function RouletteView({
   const showCenterSpin = !poolLoading && !pick && !lootBusy && Boolean(available.length);
   const showCenterLoading = preparingSpin;
   const showReel = reel.length > 0 && (spinning || Boolean(pick));
-  const pickPoster = pick ? imageSrc(pick.poster, "w342") : "";
   const idleStrip = useMemo(() => buildIdleStrip(available), [available]);
   visibleStripRef.current = idleStrip;
 
-  const previewPosters: Movie[] = showReel
-    ? reel
-    : pick && !lootBusy
-      ? buildIdleStrip([pick, ...available.filter((m) => movieKey(m) !== movieKey(pick))], 24)
-      : idleStrip;
+  const previewPosters: Movie[] = showReel ? reel : idleStrip;
 
   function clearWatched() {
     persistWatched([]);
@@ -1867,19 +1881,9 @@ function RouletteView({
                         <span key={index} className="skeleton-poster roleta-loot-skel" />
                       ))}
                     </div>
-                  ) : pick && !lootBusy ? (
-                    <div className="roleta-loot-winner" aria-live="polite">
-                      <div className="roleta-loot-winner-card">
-                        {pickPoster ? (
-                          <img src={pickPoster} alt={pick.title} draggable={false} decoding="async" />
-                        ) : (
-                          <span>{pick.title.slice(0, 1)}</span>
-                        )}
-                      </div>
-                    </div>
                   ) : (
                     <div
-                      className={`roleta-loot-strip ${animate ? "is-animated" : ""}`}
+                      className={`roleta-loot-strip ${animate ? "is-animated" : ""} ${pick && !lootBusy ? "is-landed" : ""}`}
                       ref={stripRef}
                       style={{
                         transform: `translate3d(${-offset}px, 0, 0)`,
@@ -1931,7 +1935,7 @@ function RouletteView({
               </div>
             </div>
 
-            {poolError || pick || (!poolLoading && !lootBusy && !available.length) ? (
+            {poolError || (pick && !revealOpen) || (!poolLoading && !lootBusy && !available.length) ? (
               <div className="roleta-loot-panel">
                 {poolError ? (
                   <h2>{poolError}</h2>
@@ -1943,13 +1947,9 @@ function RouletteView({
                         <span key={String(item)}>{item}</span>
                       ))}
                     </div>
-                    {pick.description ? <p className="roleta-synopsis">{pick.description}</p> : null}
                     <div className="roleta-actions">
-                      <button className="primary-action" type="button" onClick={handleWatch} disabled={!canWatch(pick)}>
-                        Assistir
-                      </button>
-                      <button className="secondary-action" type="button" onClick={handleAlreadySeen}>
-                        Já vi
+                      <button className="primary-action" type="button" onClick={() => setRevealOpen(true)}>
+                        Ver resultado
                       </button>
                       <button
                         className="secondary-action"
@@ -1958,9 +1958,6 @@ function RouletteView({
                         disabled={lootBusy}
                       >
                         Girar de novo
-                      </button>
-                      <button className="text-link" type="button" onClick={() => onOpen(pick)}>
-                        Ver detalhes
                       </button>
                     </div>
                   </>
@@ -1972,6 +1969,25 @@ function RouletteView({
           </div>
         </div>
       )}
+
+      {revealOpen && pick ? (
+        <RouletteRevealModal
+          movie={pick}
+          listed={listed}
+          onClose={closeReveal}
+          onWatch={handleWatch}
+          onAlreadySeen={handleAlreadySeen}
+          onSpinAgain={() => {
+            closeReveal();
+            void spin({ excludeKey: movieKey(pick) });
+          }}
+          onOpenDetails={() => {
+            closeReveal();
+            onOpen(pick);
+          }}
+          onToggleList={() => onToggleList(pick)}
+        />
+      ) : null}
 
       {watched.length ? (
       <section className="roleta-history" aria-label="Histórico do Surpreenda-me">
@@ -2014,6 +2030,95 @@ function RouletteView({
       </section>
       ) : null}
     </section>
+  );
+}
+
+function RouletteRevealModal({
+  movie,
+  listed,
+  onClose,
+  onWatch,
+  onAlreadySeen,
+  onSpinAgain,
+  onOpenDetails,
+  onToggleList,
+}: {
+  movie: Movie;
+  listed: Movie[];
+  onClose: () => void;
+  onWatch: () => void;
+  onAlreadySeen: () => void;
+  onSpinAgain: () => void;
+  onOpenDetails: () => void;
+  onToggleList: () => void;
+}) {
+  const poster = imageSrc(movie.poster, "w780");
+  const backdrop = imageSrc(movie.backdrop || movie.poster, "w1280");
+  const inList = isListed(listed, movie);
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="roleta-reveal"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Filme sorteado: ${movie.title}`}
+      onClick={onClose}
+    >
+      <div className="roleta-reveal-bg" aria-hidden="true">
+        {backdrop ? <img src={backdrop} alt="" /> : null}
+      </div>
+      <div className="roleta-reveal-panel" onClick={(event) => event.stopPropagation()}>
+        <button className="close-button" type="button" onClick={onClose} aria-label="Fechar">
+          ×
+        </button>
+        <div className="roleta-reveal-beam" aria-hidden="true" />
+        <div className="roleta-reveal-poster">
+          {poster ? <img src={poster} alt={`Pôster de ${movie.title}`} /> : <span>{movie.title.slice(0, 1)}</span>}
+        </div>
+        <div className="roleta-reveal-copy">
+          <p className="roleta-reveal-label">Filme sorteado</p>
+          <h2>{movie.title}</h2>
+          <div className="meta-line">
+            {movieMeta(movie).map((item) => (
+              <span key={String(item)}>{item}</span>
+            ))}
+          </div>
+          {movie.description ? <p className="roleta-reveal-synopsis">{movie.description}</p> : null}
+          <div className="roleta-reveal-actions">
+            <button className="primary-action" type="button" onClick={onWatch} disabled={!canWatch(movie)}>
+              Assistir
+            </button>
+            <button className="secondary-action" type="button" onClick={onAlreadySeen}>
+              Já vi
+            </button>
+            <button className="secondary-action" type="button" onClick={onSpinAgain}>
+              Girar de novo
+            </button>
+            <button className={`secondary-action ${inList ? "is-on" : ""}`} type="button" onClick={onToggleList}>
+              {inList ? "Na lista" : "Minha Lista"}
+            </button>
+            <button className="text-link" type="button" onClick={onOpenDetails}>
+              Ver detalhes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

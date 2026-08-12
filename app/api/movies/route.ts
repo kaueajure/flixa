@@ -594,7 +594,8 @@ const BROWSE_PAGE_SIZE = 50;
 const TMDB_PAGE_SIZE = 20;
 const TMDB_DISCOVER_CAP = 10000;
 
-async function browseCatalog(kind: MediaKind, page: number) {
+async function browseCatalog(kind: MediaKind, page: number, genreId?: string) {
+  const hasGenre = Boolean(genreId && /^\d+$/.test(genreId));
   const start = (page - 1) * BROWSE_PAGE_SIZE;
   const firstTmdbPage = Math.floor(start / TMDB_PAGE_SIZE) + 1;
   const lastTmdbPage = Math.ceil((start + BROWSE_PAGE_SIZE) / TMDB_PAGE_SIZE);
@@ -602,9 +603,10 @@ async function browseCatalog(kind: MediaKind, page: number) {
   const params: Record<string, string> = {
     include_adult: "false",
     sort_by: "popularity.desc",
-    "vote_count.gte": "300",
-    "vote_average.gte": "6",
+    "vote_count.gte": "100",
+    "vote_average.gte": "5",
   };
+  if (hasGenre && genreId) params.with_genres = genreId;
 
   try {
     const { map } = await fetchTmdbGenreMap(kind);
@@ -618,9 +620,15 @@ async function browseCatalog(kind: MediaKind, page: number) {
     );
 
     const totalResults = Math.min(asNumber(asRecord(results[0])?.total_results) ?? 0, TMDB_DISCOVER_CAP);
+    const label = hasGenre
+      ? map.get(Number(genreId)) || (kind === "tv" ? "Séries" : "Filmes")
+      : kind === "tv"
+        ? "Séries"
+        : "Filmes";
+    const listId = hasGenre ? `genre-${kind}-${genreId}` : undefined;
     const movies = results.flatMap((data) =>
       findMovieItems(data)
-        .map((item) => mapTmdbMovie(item, kind === "tv" ? "Séries" : "Filmes", map, kind))
+        .map((item) => mapTmdbMovie(item, label, map, kind, listId))
         .filter((item): item is CatalogMovie => Boolean(item?.poster)),
     );
     const offset = start - (firstTmdbPage - 1) * TMDB_PAGE_SIZE;
@@ -632,6 +640,7 @@ async function browseCatalog(kind: MediaKind, page: number) {
       page,
       totalPages,
       totalResults,
+      genreId: hasGenre ? String(genreId) : null,
       error: slice.length === 0 ? "Sem resultados" : null,
     };
   } catch (error) {
@@ -640,36 +649,14 @@ async function browseCatalog(kind: MediaKind, page: number) {
       page,
       totalPages: page,
       totalResults: 0,
+      genreId: genreId || null,
       error: describeFetchError(error),
     };
   }
 }
 
 async function discoverByGenre(genreId: string, kind: MediaKind, page: number) {
-  if (!/^\d+$/.test(genreId)) {
-    return { movies: [] as CatalogMovie[], page, totalPages: 0, error: "Gênero inválido" };
-  }
-
-  try {
-    const { map } = await fetchTmdbGenreMap(kind);
-    const path = kind === "tv" ? "/discover/tv" : "/discover/movie";
-    const data = asRecord(
-      await tmdbRequest(path, {
-        with_genres: genreId,
-        page: String(page),
-        sort_by: "popularity.desc",
-        include_adult: "false",
-      }),
-    );
-    const movies = findMovieItems(data)
-      .map((movie) => mapTmdbMovie(movie, map.get(Number(genreId)) || "Gênero", map, kind, `genre-${kind}-${genreId}`))
-      .filter((movie): movie is CatalogMovie => Boolean(movie));
-    const totalPages = asNumber(data?.total_pages) ?? page;
-
-    return { movies, page, totalPages, error: movies.length === 0 ? "Sem resultados" : null };
-  } catch (error) {
-    return { movies: [] as CatalogMovie[], page, totalPages: page, error: describeFetchError(error) };
-  }
+  return browseCatalog(kind, page, genreId);
 }
 
 /** Pool dos top filmes de um gênero para o Surpreenda-me (várias páginas TMDB). */
@@ -763,7 +750,7 @@ export async function GET(request: Request) {
   }
 
   if (browse === "1" || browse === "az") {
-    return Response.json(await browseCatalog(kind, page));
+    return Response.json(await browseCatalog(kind, page, genreId || undefined));
   }
 
   if (listId) {
