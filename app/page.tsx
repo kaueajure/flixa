@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 type MediaKind = "movie" | "tv";
 
@@ -29,7 +29,7 @@ type Movie = {
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "lista" | "genero";
+type View = "home" | "filmes" | "series" | "lista" | "genero" | "surpreenda-me";
 type AuthUser = {
   id: number;
   nome: string;
@@ -55,6 +55,11 @@ type TvEpisodeInfo = {
 
 const LIST_KEY = "flixa-saved-movies";
 const LEGACY_LIST_KEY = "flixa-list";
+const ROLETA_SKIP_KEY = "flixa-roleta-pulados";
+const ROLETA_WATCHED_KEY = "flixa-roleta-assistidos";
+const ROLETA_LEGACY_SEEN_KEY = "flixa-roleta-vistos";
+
+type RouletteWatched = Movie & { watchedAt: string; genreName?: string };
 
 function mediaKind(movie: Movie): MediaKind {
   return movie.kind === "tv" ? "tv" : "movie";
@@ -82,6 +87,25 @@ function imageSrc(value?: string, size?: "w342" | "w780" | "w1280") {
   if (!raw.startsWith("http://") && !raw.startsWith("https://")) return "";
   if (size) return raw.replace(/\/w\d+\//, `/${size}/`);
   return raw;
+}
+
+function preloadPosterImages(movies: Movie[]) {
+  const urls = [
+    ...new Set(movies.map((movie) => imageSrc(movie.poster)).filter(Boolean)),
+  ] as string[];
+  if (!urls.length) return Promise.resolve();
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.decoding = "async";
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = url;
+        }),
+    ),
+  ).then(() => undefined);
 }
 
 function formatScore(value?: string) {
@@ -124,6 +148,57 @@ function readJsonList(key: string): Movie[] {
   }
 }
 
+function readRouletteSkipped(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROLETA_SKIP_KEY) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === "string" && key.length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRouletteSkipped(keys: string[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ROLETA_SKIP_KEY, JSON.stringify(keys.slice(0, 500)));
+}
+
+function readRouletteWatched(): RouletteWatched[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROLETA_WATCHED_KEY) ?? "[]") as RouletteWatched[];
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => item?.id && item?.title).map((item) => ({ ...item, kind: "movie" as const }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRouletteWatched(items: RouletteWatched[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ROLETA_WATCHED_KEY, JSON.stringify(items.slice(0, 200)));
+}
+
+function migrateRouletteStorage() {
+  if (typeof window === "undefined") return;
+  const legacy = window.localStorage.getItem(ROLETA_LEGACY_SEEN_KEY);
+  if (!legacy) return;
+  try {
+    const parsed = JSON.parse(legacy) as Array<{ id?: string; title?: string; tmdb_id?: string; imdb_id?: string; kind?: string }>;
+    if (Array.isArray(parsed) && parsed.length) {
+      const legacyKeys = parsed
+        .filter((item) => item?.id && item?.title)
+        .map((item) => movieKey({ ...item, id: item.id!, title: item.title!, kind: "movie" } as Movie));
+      const merged = [...new Set([...readRouletteSkipped(), ...legacyKeys])];
+      writeRouletteSkipped(merged);
+    }
+  } catch {
+    /* ignore */
+  }
+  window.localStorage.removeItem(ROLETA_LEGACY_SEEN_KEY);
+}
+
 function isListed(list: Movie[], movie: Movie) {
   return list.some((item) => movieKey(item) === movieKey(movie));
 }
@@ -132,8 +207,31 @@ function detailsHash(movie: Movie) {
   return mediaKind(movie) === "tv" ? `serie/${titleId(movie)}` : `filme/${titleId(movie)}`;
 }
 
-function playerHash(movie: Movie) {
-  return `player/${detailsHash(movie)}`;
+function playerHash(movie: Movie, season?: number, episode?: number) {
+  const base = `player/${detailsHash(movie)}`;
+  if (mediaKind(movie) === "tv") {
+    const s = season ?? movie.season;
+    const e = episode ?? movie.episode;
+    if (s && e) return `${base}/s/${s}/e/${e}`;
+  }
+  return base;
+}
+
+function mergeMovieProgress(movie: Movie, progressList: Movie[]): Movie {
+  const saved = progressList.find((item) => movieKey(item) === movieKey(movie));
+  if (!saved) return movie;
+  return {
+    ...movie,
+    progress: saved.progress ?? movie.progress,
+    season: saved.season ?? movie.season,
+    episode: saved.episode ?? movie.episode,
+    positionSeconds: saved.positionSeconds ?? movie.positionSeconds,
+  };
+}
+
+function tvProgressLabel(movie: Movie) {
+  if (mediaKind(movie) !== "tv" || !movie.season || !movie.episode) return "";
+  return `T${movie.season} E${movie.episode}`;
 }
 
 function catalogReturnHash(hash: string) {
@@ -153,15 +251,23 @@ function parseRoute(hash: string) {
     };
   }
   if (raw === "minha-lista" || raw === "lista") return { view: "lista" as View };
+  if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
 
   const genre = raw.match(/^genero\/(\d+)$/);
   if (genre) return { view: "genero" as View, genreId: genre[1] };
 
-  const player = raw.match(/^player\/(filme|serie)\/([^/]+)$/);
+  const player = raw.match(/^player\/(filme|serie)\/([^/]+)(?:\/s\/(\d+)\/e\/(\d+))?$/);
   if (player) {
+    const season = player[3] ? Math.max(1, Number(player[3]) || 1) : undefined;
+    const episode = player[4] ? Math.max(1, Number(player[4]) || 1) : undefined;
     return {
       view: "home" as View,
-      player: { kind: (player[1] === "serie" ? "tv" : "movie") as MediaKind, id: player[2] },
+      player: {
+        kind: (player[1] === "serie" ? "tv" : "movie") as MediaKind,
+        id: player[2],
+        season,
+        episode,
+      },
     };
   }
 
@@ -246,12 +352,16 @@ export default function Home() {
   const toastTimer = useRef<number | null>(null);
   const lastCatalogHash = useRef("home");
   const playerMovieRef = useRef<Movie | null>(null);
-  const importRef = useRef<HTMLInputElement>(null);
+  const continueMoviesRef = useRef<Movie[]>([]);
   const searchPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     playerMovieRef.current = playerMovie;
   }, [playerMovie]);
+
+  useEffect(() => {
+    continueMoviesRef.current = continueMovies;
+  }, [continueMovies]);
 
   useFocusTrap(searchOpen, searchPanelRef);
 
@@ -389,14 +499,14 @@ export default function Home() {
   }, []);
 
   async function resolveTitle(id: string, kind: MediaKind) {
-    const local = [...movies, ...listMovies, ...recentMovies].find(
+    const local = [...movies, ...listMovies, ...recentMovies, ...continueMoviesRef.current].find(
       (item) => titleId(item) === id && mediaKind(item) === kind,
     );
-    if (local) return local;
+    if (local) return mergeMovieProgress(local, continueMoviesRef.current);
     const res = await fetch(`/api/movies?id=${encodeURIComponent(id)}&kind=${kind}`, { cache: "no-store" });
     if (!res.ok) return null;
     const data = (await res.json()) as { movie?: Movie };
-    return data.movie ?? null;
+    return data.movie ? mergeMovieProgress(data.movie, continueMoviesRef.current) : null;
   }
 
   useEffect(() => {
@@ -412,11 +522,24 @@ export default function Home() {
       if (route.player) {
         void resolveTitle(route.player.id, route.player.kind).then((movie) => {
           if (!movie) return;
+          const merged = mergeMovieProgress(movie, continueMoviesRef.current);
+          const season = route.player.season ?? merged.season ?? (route.player.kind === "tv" ? 1 : undefined);
+          const episode = route.player.episode ?? merged.episode ?? (route.player.kind === "tv" ? 1 : undefined);
+          const enriched: Movie = {
+            ...merged,
+            kind: route.player.kind,
+            season,
+            episode,
+          };
           setSelectedMovie(null);
           setPlayerMovie((current) =>
-            current && titleId(current) === titleId(movie) && mediaKind(current) === mediaKind(movie)
+            current &&
+            titleId(current) === titleId(enriched) &&
+            mediaKind(current) === mediaKind(enriched) &&
+            current.season === enriched.season &&
+            current.episode === enriched.episode
               ? current
-              : movie,
+              : enriched,
           );
         });
         return;
@@ -432,11 +555,21 @@ export default function Home() {
               : movie,
           );
         });
+        const back = lastCatalogHash.current.replace(/^#/, "");
+        if (back === "surpreenda-me" || back === "roleta") {
+          setView("surpreenda-me");
+        }
         return;
       }
 
       setSelectedMovie(null);
-      if (route.view === "filmes" || route.view === "series" || route.view === "lista" || route.view === "genero") {
+      if (
+        route.view === "filmes" ||
+        route.view === "series" ||
+        route.view === "lista" ||
+        route.view === "genero" ||
+        route.view === "surpreenda-me"
+      ) {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     };
@@ -654,6 +787,9 @@ export default function Home() {
   function openDetails(movie: Movie) {
     setSearchOpen(false);
     setSelectedMovie(movie);
+    if (view === "surpreenda-me") {
+      lastCatalogHash.current = "surpreenda-me";
+    }
     goTo(detailsHash(movie));
   }
 
@@ -716,19 +852,35 @@ export default function Home() {
     [saveProgress],
   );
 
-  function openPlayer(movie: Movie) {
+  function openPlayer(movie: Movie, pick?: { season?: number; episode?: number }) {
+    const merged = mergeMovieProgress(movie, continueMovies);
+    const isTv = mediaKind(merged) === "tv";
+    const season = pick?.season ?? merged.season ?? (isTv ? 1 : undefined);
+    const episode = pick?.episode ?? merged.episode ?? (isTv ? 1 : undefined);
+    const payload: Movie = { ...merged, season, episode };
+
     setSearchOpen(false);
     setSelectedMovie(null);
-    setPlayerMovie(movie);
-    rememberWatch(movie);
-    saveProgress(movie, {
-      progresso: Math.max(Number(movie.progress || 0), 5),
-      posicao_segundos: movie.positionSeconds || 0,
-      temporada: movie.season ?? (mediaKind(movie) === "tv" ? 1 : null),
-      episodio: movie.episode ?? (mediaKind(movie) === "tv" ? 1 : null),
+    setPlayerMovie(payload);
+    rememberWatch(payload);
+    saveProgress(payload, {
+      progresso: Math.max(Number(payload.progress || 0), 5),
+      posicao_segundos: payload.positionSeconds || 0,
+      temporada: isTv ? season ?? 1 : null,
+      episodio: isTv ? episode ?? 1 : null,
     });
-    goTo(playerHash(movie));
+    goTo(playerHash(payload, season, episode));
   }
+
+  const syncPlayerEpisode = useCallback((movie: Movie, season: number, episode: number) => {
+    const next = { ...movie, season, episode };
+    setPlayerMovie(next);
+    const hash = playerHash(next, season, episode);
+    const target = `#${hash}`;
+    if (window.location.hash !== target) {
+      window.history.replaceState(null, "", target);
+    }
+  }, []);
 
   const closePlayer = useCallback(() => {
     setPlayerMovie(null);
@@ -765,41 +917,6 @@ export default function Home() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [playerMovie, selectedMovie, searchOpen, closeDetails, closePlayer]);
-
-  function exportList() {
-    const blob = new Blob([JSON.stringify(listMovies, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "flixa-lista.json";
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast("Lista exportada");
-  }
-
-  function importList(file: File) {
-    file
-      .text()
-      .then(async (text) => {
-        const parsed = JSON.parse(text) as Movie[];
-        if (!Array.isArray(parsed)) throw new Error("invalid");
-        const incoming = parsed.filter((item) => item?.id && item?.title);
-        const next = dedupeMovies([...incoming, ...listMovies]);
-        setListMovies(next);
-        await Promise.all(
-          incoming.map((movie) =>
-            fetch("/api/lista", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ movie }),
-            }).catch(() => null),
-          ),
-        );
-        showToast(`${incoming.length} títulos importados`);
-      })
-      .catch(() => showToast("Arquivo de lista inválido"));
-  }
 
   async function loadMoreGenre() {
     if (!genreId || genreLoading) return;
@@ -851,6 +968,13 @@ export default function Home() {
           </a>
           <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
             Séries
+          </a>
+          <a
+            href="#surpreenda-me"
+            className={view === "surpreenda-me" ? "is-active" : ""}
+            onClick={() => goTo("surpreenda-me")}
+          >
+            Surpreenda-me
           </a>
           <a
             href="#minha-lista"
@@ -956,23 +1080,6 @@ export default function Home() {
               </p>
             </div>
             <div className="list-tools">
-              <button className="secondary-action" type="button" onClick={exportList} disabled={listMovies.length === 0}>
-                Exportar
-              </button>
-              <button className="secondary-action" type="button" onClick={() => importRef.current?.click()}>
-                Importar
-              </button>
-              <input
-                ref={importRef}
-                type="file"
-                accept="application/json"
-                hidden
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) importList(file);
-                  event.target.value = "";
-                }}
-              />
               <a className="secondary-action" href="#filmes" onClick={() => goTo("filmes")}>
                 Explorar catálogo
               </a>
@@ -1001,6 +1108,15 @@ export default function Home() {
             </div>
           )}
         </section>
+      ) : view === "surpreenda-me" ? (
+        <RouletteView
+          genres={genres}
+          listed={listMovies}
+          onWatch={openPlayer}
+          onOpen={openDetails}
+          onToggleList={toggleList}
+          onToast={showToast}
+        />
       ) : view === "genero" ? (
         <section className="list-view" id="genero">
           <div className="list-view-head">
@@ -1279,7 +1395,7 @@ export default function Home() {
       {selectedMovie ? (
         <MovieDetails
           key={movieKey(selectedMovie)}
-          movie={selectedMovie}
+          movie={mergeMovieProgress(selectedMovie, continueMovies)}
           inList={isListed(listMovies, selectedMovie)}
           listed={listMovies}
           onClose={closeDetails}
@@ -1294,6 +1410,7 @@ export default function Home() {
           movie={playerMovie}
           onClose={closePlayer}
           onProgress={handlePlayerProgress}
+          onEpisodeChange={syncPlayerEpisode}
         />
       ) : null}
 
@@ -1309,12 +1426,594 @@ export default function Home() {
         <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
           Séries
         </a>
+        <a
+          href="#surpreenda-me"
+          className={view === "surpreenda-me" ? "is-active" : ""}
+          onClick={() => goTo("surpreenda-me")}
+        >
+          Surpreenda-me
+        </a>
         <a href="#minha-lista" className={view === "lista" ? "is-active" : ""} onClick={() => goTo("minha-lista")}>
           Lista
           {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
         </a>
       </nav>
     </main>
+  );
+}
+
+function shuffleMovies(items: Movie[]) {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [next[index], next[swap]] = [next[swap], next[index]];
+  }
+  return next;
+}
+
+const LOOT_SPIN_MS = 5400;
+const TERROR_GENRE: Genre = { id: 27, name: "Terror" };
+
+function buildRouletteGenreOptions(all: Genre[]) {
+  const byId = new Map<number, Genre>();
+  for (const genre of all) byId.set(genre.id, genre);
+  byId.set(TERROR_GENRE.id, byId.get(TERROR_GENRE.id) ?? TERROR_GENRE);
+
+  const terror = byId.get(TERROR_GENRE.id)!;
+  byId.delete(TERROR_GENRE.id);
+
+  const rest = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  return [{ id: 0, name: "Todos" }, terror, ...rest];
+}
+
+function buildIdleStrip(movies: Movie[], min = 28) {
+  if (!movies.length) return [];
+  const out: Movie[] = [];
+  while (out.length < min) out.push(...shuffleMovies(movies));
+  return out.slice(0, min);
+}
+
+function buildLootReel(candidates: Movie[], winner: Movie, visiblePrefix: Movie[] = []) {
+  const pool = candidates.filter((movie) => movieKey(movie) !== movieKey(winner));
+  const base = shuffleMovies(pool.length ? pool : [winner]);
+  const reel: Movie[] = [];
+  while (reel.length < 56) {
+    for (const movie of shuffleMovies(base)) {
+      if (movieKey(movie) === movieKey(winner)) continue;
+      reel.push(movie);
+    }
+  }
+  const landIndex = 38 + Math.floor(Math.random() * 6);
+  reel.length = landIndex + 10;
+  reel[landIndex] = winner;
+  for (let index = 0; index < reel.length; index += 1) {
+    if (index === landIndex) continue;
+    const prefixMovie = visiblePrefix[index];
+    if (prefixMovie && movieKey(prefixMovie) !== movieKey(winner)) {
+      reel[index] = prefixMovie;
+      continue;
+    }
+    const filler = base[index % base.length] ?? winner;
+    if (movieKey(filler) !== movieKey(winner)) reel[index] = filler;
+  }
+  return { reel, landIndex };
+}
+
+function RouletteView({
+  genres: catalogGenres,
+  listed,
+  onWatch,
+  onOpen,
+  onToggleList,
+  onToast,
+}: {
+  genres: Genre[];
+  listed: Movie[];
+  onWatch: (movie: Movie) => void;
+  onOpen: (movie: Movie) => void;
+  onToggleList: (movie: Movie) => void;
+  onToast: (message: string) => void;
+}) {
+  const [genres, setGenres] = useState<Genre[]>(catalogGenres);
+  const [genreId, setGenreId] = useState<number | null>(null);
+  const [pool, setPool] = useState<Movie[]>([]);
+  const [poolLoading, setPoolLoading] = useState(false);
+  const [poolError, setPoolError] = useState<string | null>(null);
+  const [pick, setPick] = useState<Movie | null>(null);
+  const [spinning, setSpinning] = useState(false);
+  const [preparingSpin, setPreparingSpin] = useState(false);
+  const [reel, setReel] = useState<Movie[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [animate, setAnimate] = useState(false);
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [watched, setWatched] = useState<RouletteWatched[]>([]);
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const spinEndTimer = useRef<number | null>(null);
+  const pendingSpinRef = useRef<{ landIndex: number; finalPick: Movie; reel: Movie[] } | null>(null);
+  const replenishRef = useRef(false);
+  const visibleStripRef = useRef<Movie[]>([]);
+
+  const activeGenre =
+    genreId === 0
+      ? { id: 0, name: "Todos" }
+      : (genres.find((genre) => genre.id === genreId) ?? null);
+  const genreOptions = useMemo(() => buildRouletteGenreOptions(genres), [genres]);
+  const skippedKeys = useMemo(() => new Set(skipped), [skipped]);
+  const watchedKeys = useMemo(() => new Set(watched.map((item) => movieKey(item))), [watched]);
+  const available = useMemo(
+    () => pool.filter((movie) => !skippedKeys.has(movieKey(movie)) && !watchedKeys.has(movieKey(movie))),
+    [pool, skippedKeys, watchedKeys],
+  );
+
+  useEffect(() => {
+    migrateRouletteStorage();
+    setSkipped(readRouletteSkipped());
+    setWatched(readRouletteWatched());
+    return () => {
+      if (spinEndTimer.current) window.clearTimeout(spinEndTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/movies?genres=1&kind=movie", { cache: "no-store", signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { genres?: Genre[] } | null) => {
+        const list = Array.isArray(data?.genres) ? data.genres : [];
+        if (list.length) setGenres(list);
+        else if (catalogGenres.length) setGenres(catalogGenres);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted && catalogGenres.length) setGenres(catalogGenres);
+      });
+    return () => controller.abort();
+  }, [catalogGenres]);
+
+  useEffect(() => {
+    if (genreId == null) {
+      setPool([]);
+      setPick(null);
+      setPoolError(null);
+      setReel([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    setPoolLoading(true);
+    setPoolError(null);
+    setPick(null);
+    setReel([]);
+    setOffset(0);
+    setAnimate(false);
+    setSpinning(false);
+    setPreparingSpin(false);
+    replenishRef.current = false;
+    pendingSpinRef.current = null;
+    if (spinEndTimer.current) {
+      window.clearTimeout(spinEndTimer.current);
+      spinEndTimer.current = null;
+    }
+
+    const genreParam = genreId === 0 ? "all" : String(genreId);
+    fetch(`/api/movies?genre=${encodeURIComponent(genreParam)}&kind=movie&roulette=1&pages=5`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { movies?: Movie[]; error?: string | null } | null) => {
+        const movies = asMovieList(data?.movies);
+        setPool(movies);
+        if (!movies.length) setPoolError(data?.error || "Nenhum filme encontrado neste gênero.");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPool([]);
+          setPoolError("Não foi possível carregar os top filmes deste gênero.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPoolLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [genreId]);
+
+  useEffect(() => {
+    if (genreId == null || poolLoading || available.length >= 14 || replenishRef.current) return;
+    replenishRef.current = true;
+    const genreParam = genreId === 0 ? "all" : String(genreId);
+    fetch(`/api/movies?genre=${encodeURIComponent(genreParam)}&kind=movie&roulette=1&pages=8`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { movies?: Movie[] } | null) => {
+        const extra = asMovieList(data?.movies);
+        if (!extra.length) return;
+        setPool((current) => dedupeMovies([...current, ...extra]));
+      })
+      .finally(() => {
+        replenishRef.current = false;
+      });
+  }, [genreId, poolLoading, available.length]);
+
+  function persistSkipped(next: string[]) {
+    setSkipped(next);
+    writeRouletteSkipped(next);
+  }
+
+  function persistWatched(next: RouletteWatched[]) {
+    setWatched(next);
+    writeRouletteWatched(next);
+  }
+
+  function skipMovie(movie: Movie) {
+    const key = movieKey(movie);
+    const next = [...new Set([key, ...skipped])].slice(0, 500);
+    persistSkipped(next);
+    return next;
+  }
+
+  function markWatched(movie: Movie) {
+    const entry: RouletteWatched = {
+      ...movie,
+      kind: "movie",
+      watchedAt: new Date().toISOString(),
+      genreName: activeGenre?.name || movie.genres?.[0],
+    };
+    const next = [entry, ...watched.filter((item) => movieKey(item) !== movieKey(movie))].slice(0, 200);
+    persistWatched(next);
+    return next;
+  }
+
+  function pickRandom(from: Movie[]) {
+    if (!from.length) return null;
+    return from[Math.floor(Math.random() * from.length)] ?? null;
+  }
+
+  function cardStep() {
+    const first = stripRef.current?.querySelector<HTMLElement>(".roleta-loot-card");
+    if (!first) return 116;
+    const style = window.getComputedStyle(stripRef.current!);
+    const gap = Number.parseFloat(style.columnGap || style.gap || "10") || 10;
+    return first.getBoundingClientRect().width + gap;
+  }
+
+  function centerOffset(landIndex: number) {
+    const viewport = viewportRef.current;
+    if (!viewport) return landIndex * cardStep();
+    const step = cardStep();
+    return landIndex * step - (viewport.clientWidth / 2 - step / 2);
+  }
+
+  async function spin(options?: { excludeKey?: string; skipOverride?: string[] }) {
+    if (genreId == null || poolLoading || spinning || preparingSpin) return;
+
+    const skipKeys = new Set(options?.skipOverride ?? skipped);
+    const excludedWatched = new Set(watched.map((item) => movieKey(item)));
+    if (options?.excludeKey) skipKeys.add(options.excludeKey);
+    const candidates = pool.filter(
+      (movie) => !skipKeys.has(movieKey(movie)) && !excludedWatched.has(movieKey(movie)),
+    );
+
+    if (!candidates.length) {
+      setPick(null);
+      onToast("Não há mais filmes neste gênero. Restaure o sorteio ou troque o gênero.");
+      return;
+    }
+
+    const finalPick = pickRandom(candidates);
+    if (!finalPick) return;
+
+    const built = buildLootReel(candidates, finalPick, visibleStripRef.current.slice(0, 12));
+    pendingSpinRef.current = { landIndex: built.landIndex, finalPick, reel: built.reel };
+    setPick(null);
+    setSpinning(false);
+    setPreparingSpin(true);
+    setAnimate(false);
+
+    await preloadPosterImages(built.reel);
+
+    if (genreId == null || !pendingSpinRef.current) return;
+
+    setReel(pendingSpinRef.current.reel);
+    setOffset(0);
+    setPreparingSpin(false);
+    setSpinning(true);
+  }
+
+  useLayoutEffect(() => {
+    if (!spinning || preparingSpin || !pendingSpinRef.current || !reel.length) return;
+
+    const { landIndex, finalPick } = pendingSpinRef.current;
+    const target = centerOffset(landIndex);
+
+    if (spinEndTimer.current) window.clearTimeout(spinEndTimer.current);
+
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        setAnimate(true);
+        setOffset(Math.max(0, target));
+      });
+    });
+
+    spinEndTimer.current = window.setTimeout(() => {
+      setPick(finalPick);
+      setSpinning(false);
+      pendingSpinRef.current = null;
+      spinEndTimer.current = null;
+    }, LOOT_SPIN_MS);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (spinEndTimer.current) {
+        window.clearTimeout(spinEndTimer.current);
+        spinEndTimer.current = null;
+      }
+    };
+  }, [reel, spinning, preparingSpin]);
+
+  function handleAlreadySeen() {
+    if (!pick || spinning || preparingSpin) return;
+    const skippedMovie = pick;
+    const next = skipMovie(skippedMovie);
+    setPick(null);
+    setReel([]);
+    setAnimate(false);
+    setOffset(0);
+    onToast(`Removido do sorteio · ${skippedMovie.title}`);
+    window.setTimeout(() => spin({ skipOverride: next, excludeKey: movieKey(skippedMovie) }), 180);
+  }
+
+  function handleWatch() {
+    if (!pick || spinning || preparingSpin) return;
+    const movie = pick;
+    markWatched(movie);
+    setPick(null);
+    setReel([]);
+    setOffset(0);
+    setAnimate(false);
+    onWatch(movie);
+  }
+
+  const lootBusy = spinning || preparingSpin;
+  const showCenterSpin = !poolLoading && !pick && !lootBusy && Boolean(available.length);
+  const showCenterLoading = preparingSpin;
+  const showReel = reel.length > 0 && (spinning || Boolean(pick));
+  const pickPoster = pick ? imageSrc(pick.poster, "w342") : "";
+  const idleStrip = useMemo(() => buildIdleStrip(available), [available]);
+  visibleStripRef.current = idleStrip;
+
+  const previewPosters: Movie[] = showReel
+    ? reel
+    : pick && !lootBusy
+      ? buildIdleStrip([pick, ...available.filter((m) => movieKey(m) !== movieKey(pick))], 24)
+      : idleStrip;
+
+  function clearWatched() {
+    persistWatched([]);
+    onToast("Histórico limpo");
+  }
+
+  function clearSkipped() {
+    persistSkipped([]);
+    onToast("Filmes restaurados no sorteio");
+  }
+
+  function removeFromHistory(movie: Movie) {
+    persistWatched(watched.filter((item) => movieKey(item) !== movieKey(movie)));
+  }
+
+  useEffect(() => {
+    if (!available.length || lootBusy || poolLoading) return;
+    void preloadPosterImages(idleStrip);
+  }, [available, idleStrip, lootBusy, poolLoading]);
+
+  return (
+    <section className="list-view roleta-view" id="surpreenda-me">
+      <div className="list-view-head">
+        <div>
+          <h1>Surpreenda-me</h1>
+          <p className="hero-description">
+            Escolha um gênero e gire. Se já viu o filme sorteado, use &quot;Já vi&quot; para tirá-lo do sorteio — assistindo, ele vai para o histórico.
+          </p>
+        </div>
+        <div className="list-tools">
+          {skipped.length ? (
+            <button className="secondary-action" type="button" onClick={clearSkipped}>
+              Restaurar sorteio
+            </button>
+          ) : null}
+          {watched.length ? (
+            <button className="secondary-action" type="button" onClick={clearWatched}>
+              Limpar histórico
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="roleta-genres" role="listbox" aria-label="Gêneros para sortear">
+        {genreOptions.map((genre) => (
+          <button
+            key={genre.id}
+            type="button"
+            role="option"
+            aria-selected={genre.id === genreId}
+            className={`roleta-genre ${genre.id === genreId ? "is-active" : ""}`}
+            onClick={() => setGenreId(genre.id)}
+            disabled={lootBusy}
+          >
+            {genre.name}
+          </button>
+        ))}
+      </div>
+
+      {genreId == null ? (
+        <div className="roleta-empty">
+          <p>Escolha um gênero (ou Todos) para começar.</p>
+        </div>
+      ) : (
+        <div className="roleta-stage">
+          <div
+            className={`roleta-loot ${spinning ? "is-spinning" : ""} ${pick ? "has-pick" : ""} ${!spinning && !pick && !poolLoading ? "is-idle" : ""}`}
+          >
+            <div className="roleta-loot-shell">
+              <div className="roleta-loot-frame">
+                <span className="roleta-loot-pointer" aria-hidden="true" />
+                <div className="roleta-loot-fade roleta-loot-fade--left" aria-hidden="true" />
+                <div className="roleta-loot-fade roleta-loot-fade--right" aria-hidden="true" />
+                <div className="roleta-loot-viewport" ref={viewportRef}>
+                  {poolLoading ? (
+                    <div className="roleta-loot-loading">
+                      {Array.from({ length: 10 }).map((_, index) => (
+                        <span key={index} className="skeleton-poster roleta-loot-skel" />
+                      ))}
+                    </div>
+                  ) : pick && !lootBusy ? (
+                    <div className="roleta-loot-winner" aria-live="polite">
+                      <div className="roleta-loot-winner-card">
+                        {pickPoster ? (
+                          <img src={pickPoster} alt={pick.title} draggable={false} decoding="async" />
+                        ) : (
+                          <span>{pick.title.slice(0, 1)}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={`roleta-loot-strip ${animate ? "is-animated" : ""}`}
+                      ref={stripRef}
+                      style={{
+                        transform: `translate3d(${-offset}px, 0, 0)`,
+                        transitionDuration: animate ? `${LOOT_SPIN_MS}ms` : "0ms",
+                      }}
+                    >
+                      {previewPosters.length ? (
+                        previewPosters.map((movie, index) => {
+                          const src = imageSrc(movie.poster);
+                          const isWinner = Boolean(pick && movieKey(pick) === movieKey(movie) && !lootBusy);
+                          return (
+                            <div
+                              key={`${movieKey(movie)}-${index}`}
+                              className={`roleta-loot-card ${isWinner ? "is-winner" : ""}`}
+                            >
+                              {src ? <img src={src} alt="" draggable={false} decoding="async" /> : <span>?</span>}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        Array.from({ length: 10 }).map((_, index) => (
+                          <div key={`empty-${index}`} className="roleta-loot-card">
+                            <span>?</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {showCenterLoading ? (
+                  <div className="roleta-loot-center" aria-live="polite">
+                    <button className="roleta-spin-btn" type="button" disabled>
+                      Carregando…
+                    </button>
+                  </div>
+                ) : showCenterSpin ? (
+                  <div className="roleta-loot-center">
+                    <button
+                      className="roleta-spin-btn"
+                      type="button"
+                      onClick={() => void spin()}
+                      disabled={!available.length || poolLoading}
+                    >
+                      Girar
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {poolError || pick || (!poolLoading && !lootBusy && !available.length) ? (
+              <div className="roleta-loot-panel">
+                {poolError ? (
+                  <h2>{poolError}</h2>
+                ) : pick ? (
+                  <>
+                    <h2>{pick.title}</h2>
+                    <div className="meta-line">
+                      {movieMeta(pick).map((item) => (
+                        <span key={String(item)}>{item}</span>
+                      ))}
+                    </div>
+                    {pick.description ? <p className="roleta-synopsis">{pick.description}</p> : null}
+                    <div className="roleta-actions">
+                      <button className="primary-action" type="button" onClick={handleWatch} disabled={!canWatch(pick)}>
+                        Assistir
+                      </button>
+                      <button className="secondary-action" type="button" onClick={handleAlreadySeen}>
+                        Já vi
+                      </button>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => void spin({ excludeKey: movieKey(pick) })}
+                        disabled={lootBusy}
+                      >
+                        Girar de novo
+                      </button>
+                      <button className="text-link" type="button" onClick={() => onOpen(pick)}>
+                        Ver detalhes
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <h2>Sem filmes neste gênero</h2>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {watched.length ? (
+      <section className="roleta-history" aria-label="Histórico do Surpreenda-me">
+        <div className="roleta-history-head">
+          <h2>Assistidos</h2>
+        </div>
+          <div className="roleta-history-rail">
+            {watched.map((movie) => {
+              const src = imageSrc(movie.poster);
+              return (
+                <article key={`${movieKey(movie)}-${movie.watchedAt}`} className="roleta-history-card">
+                  <button type="button" className="roleta-history-poster" onClick={() => onOpen(movie)}>
+                    {src ? <img src={src} alt="" loading="lazy" /> : <span>{movie.title.slice(0, 1)}</span>}
+                  </button>
+                  <div className="roleta-history-meta">
+                    <strong>{movie.title}</strong>
+                    <small>
+                      {[movie.genreName || movie.genres?.[0], movie.year].filter(Boolean).join(" · ")}
+                    </small>
+                    <div className="roleta-history-actions">
+                      <button type="button" className="text-link" onClick={() => onWatch(movie)}>
+                        Assistir
+                      </button>
+                      <button type="button" className="text-link" onClick={() => removeFromHistory(movie)}>
+                        Remover
+                      </button>
+                      <button
+                        type="button"
+                        className={`text-link ${isListed(listed, movie) ? "is-on" : ""}`}
+                        onClick={() => onToggleList(movie)}
+                      >
+                        {isListed(listed, movie) ? "Na lista" : "Lista"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+      </section>
+      ) : null}
+    </section>
   );
 }
 
@@ -1350,6 +2049,35 @@ function MovieRow({
   const [loadingMore, setLoadingMore] = useState(false);
 
   const allItems = useMemo(() => dedupeMovies([...items, ...extra]), [items, extra]);
+
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+
+    const desktop = window.matchMedia("(min-width: 761px)");
+    const onWheel = (event: WheelEvent) => {
+      if (!desktop.matches) return;
+      const usingShift = event.shiftKey;
+      const mostlyHorizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+      if (!usingShift && !mostlyHorizontal) return;
+
+      const maxScroll = rail.scrollWidth - rail.clientWidth;
+      if (maxScroll <= 0) return;
+
+      const delta = usingShift && Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+        ? event.deltaY
+        : event.deltaX || event.deltaY;
+      if (!delta) return;
+
+      const next = Math.min(maxScroll, Math.max(0, rail.scrollLeft + delta));
+      if (next === rail.scrollLeft) return;
+      event.preventDefault();
+      rail.scrollLeft = next;
+    };
+
+    rail.addEventListener("wheel", onWheel, { passive: false });
+    return () => rail.removeEventListener("wheel", onWheel);
+  }, []);
 
   const scroll = (direction: number) => {
     const rail = railRef.current;
@@ -1448,11 +2176,145 @@ function MovieCard({
         <strong>{movie.title}</strong>
         <div className="card-tags">
           {mediaKind(movie) === "tv" ? <span className="card-kind">Série</span> : null}
+          {tvProgressLabel(movie) ? <span className="card-progress">{tvProgressLabel(movie)}</span> : null}
           {movie.genres?.[0] ? <span className="card-genre">{movie.genres[0]}</span> : null}
           {movie.year ? <span className="card-year">{movie.year}</span> : null}
         </div>
       </div>
     </article>
+  );
+}
+
+function TvEpisodePicker({
+  movie,
+  onWatch,
+}: {
+  movie: Movie;
+  onWatch: (movie: Movie, pick?: { season?: number; episode?: number }) => void;
+}) {
+  const savedSeason = Math.max(1, movie.season || 1);
+  const savedEpisode = Math.max(1, movie.episode || 1);
+  const hasProgress = Number(movie.progress || 0) > 0 && movie.season && movie.episode;
+
+  const [season, setSeason] = useState(savedSeason);
+  const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
+  const [episodes, setEpisodes] = useState<TvEpisodeInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { seasons?: TvSeasonInfo[] } | null) => {
+        const list = Array.isArray(data?.seasons) ? data.seasons.filter((item) => item.season_number > 0) : [];
+        setSeasons(list);
+        if (list.length > 0 && !list.some((item) => item.season_number === season)) {
+          setSeason(list[0].season_number);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSeasons([]);
+      });
+    return () => controller.abort();
+  }, [movie.id, movie.tmdb_id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv&season=${season}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { episodes?: TvEpisodeInfo[] } | null) => {
+        const list = Array.isArray(data?.episodes) ? data.episodes.filter((item) => item.episode_number > 0) : [];
+        setEpisodes(list);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setEpisodes([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [movie.id, movie.tmdb_id, season]);
+
+  function watchEpisode(episodeNumber: number) {
+    onWatch(movie, { season, episode: episodeNumber });
+  }
+
+  return (
+    <section className="tv-catalog" aria-label="Episódios">
+      <div className="tv-catalog-head">
+        <h3>Episódios</h3>
+        {hasProgress ? (
+          <button
+            className="text-link"
+            type="button"
+            onClick={() => onWatch(movie, { season: savedSeason, episode: savedEpisode })}
+          >
+            Continuar {tvProgressLabel(movie)}
+          </button>
+        ) : null}
+      </div>
+
+      {seasons.length ? (
+        <div className="tv-season-tabs" role="tablist" aria-label="Temporadas">
+          {seasons.map((item) => (
+            <button
+              key={item.season_number}
+              type="button"
+              role="tab"
+              aria-selected={item.season_number === season}
+              className={item.season_number === season ? "is-active" : ""}
+              onClick={() => setSeason(item.season_number)}
+            >
+              {item.name || `Temporada ${item.season_number}`}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {loading ? <p className="tv-catalog-status">Carregando episódios…</p> : null}
+
+      {!loading && episodes.length ? (
+        <div className="tv-episode-grid">
+          {episodes.map((item) => {
+            const isCurrent = hasProgress && savedSeason === season && savedEpisode === item.episode_number;
+            const still = imageSrc(item.still, "w780");
+            return (
+              <button
+                key={item.episode_number}
+                type="button"
+                className={`tv-episode-card ${isCurrent ? "is-current" : ""}`}
+                onClick={() => watchEpisode(item.episode_number)}
+              >
+                <span className="tv-episode-thumb">
+                  {still ? <img src={still} alt="" loading="lazy" /> : <span>E{item.episode_number}</span>}
+                  {isCurrent && Number(movie.progress || 0) > 0 ? (
+                    <span className="tv-episode-progress" style={{ width: `${Math.min(100, Number(movie.progress))}%` }} />
+                  ) : null}
+                </span>
+                <span className="tv-episode-copy">
+                  <strong>
+                    {item.episode_number}. {item.name}
+                  </strong>
+                  {item.runtime ? <small>{item.runtime} min</small> : null}
+                  {item.overview ? <p>{item.overview}</p> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {!loading && !episodes.length ? (
+        <p className="tv-catalog-status">Nenhum episódio encontrado para esta temporada.</p>
+      ) : null}
+    </section>
   );
 }
 
@@ -1470,7 +2332,7 @@ function MovieDetails({
   listed: Movie[];
   onClose: () => void;
   onToggleList: (movie: Movie) => void;
-  onWatch: (movie: Movie) => void;
+  onWatch: (movie: Movie, pick?: { season?: number; episode?: number }) => void;
   onOpen: (movie: Movie) => void;
 }) {
   const [details, setDetails] = useState(movie);
@@ -1511,6 +2373,13 @@ function MovieDetails({
 
   const backdrop = imageSrc(details.backdrop || details.poster, "w1280");
   const poster = imageSrc(details.poster, "w780");
+  const isTv = mediaKind(details) === "tv";
+  const watchLabel =
+    isTv && details.season && details.episode && Number(details.progress || 0) > 0
+      ? `Continuar ${tvProgressLabel(details)}`
+      : isTv
+        ? "Assistir T1 E1"
+        : "Assistir agora";
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={details.title} onClick={onClose}>
@@ -1545,8 +2414,14 @@ function MovieDetails({
               {details.description ? <p>{details.description}</p> : null}
               <div className="details-actions">
                 {canWatch(details) ? (
-                  <button className="primary-action" type="button" onClick={() => onWatch(details)}>
-                    Assistir agora
+                  <button
+                    className="primary-action"
+                    type="button"
+                    onClick={() =>
+                      onWatch(details, isTv ? { season: details.season || 1, episode: details.episode || 1 } : undefined)
+                    }
+                  >
+                    {watchLabel}
                   </button>
                 ) : null}
                 {details.trailer ? (
@@ -1572,6 +2447,7 @@ function MovieDetails({
               </div>
             </div>
           </div>
+          {isTv && canWatch(details) ? <TvEpisodePicker movie={details} onWatch={onWatch} /> : null}
           {similar.length ? (
             <div className="similar-block">
               <MovieRow
@@ -1590,10 +2466,10 @@ function MovieDetails({
 }
 
 const PLAYER_UI_SELECTOR =
-  ".player-view, .player-bar, .player-server-menu, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell";
+  ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
+  return /cdn-embed\.com|superflixapi|warezcdn|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -1601,6 +2477,7 @@ function isOverlayAd(node: Element) {
   if (node.closest(PLAYER_UI_SELECTOR)) return false;
   if (
     node.classList.contains("player-view") ||
+    node.classList.contains("player-chrome") ||
     node.classList.contains("video-stage") ||
     node.classList.contains("flixa-shell")
   ) {
@@ -1610,22 +2487,29 @@ function isOverlayAd(node: Element) {
   const playerOpen = document.body.classList.contains("player-open");
   const style = node.getAttribute("style") || "";
   const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+  const className = typeof node.className === "string" ? node.className : "";
+
+  if (playerOpen && node.parentElement === document.body) {
+    if (node instanceof HTMLAnchorElement) return true;
+    if (node instanceof HTMLIFrameElement && !node.classList.contains("video-stage")) return true;
+    if (node instanceof HTMLImageElement) return true;
+    if (/position:\s*(fixed|absolute)/i.test(style) || /z-index:\s*\d{3,}/i.test(style)) return true;
+    if (/embedmovies|superflix|warez|cdn-embed|popads|exoclick|juicyads/i.test(`${text} ${className}`)) return true;
+    // Badges/pill flutuantes injetados no body pelo embed
+    if (node.childElementCount <= 3 && text.length > 0 && text.length < 80) {
+      if (/embed|ads?|anúncios|premium|claim|congratulations|jackpot/i.test(text)) return true;
+    }
+  }
 
   if (node instanceof HTMLIFrameElement && !node.classList.contains("video-stage") && !node.classList.contains("trailer-frame")) {
     const src = `${node.src || ""} ${node.getAttribute("src") || ""}`.toLowerCase();
     if (!src.trim() || src.includes("about:blank")) return playerOpen;
     if (!isAllowedPlayerFrame(src)) {
       if (playerOpen) return true;
-      if (/aichouphaugn|popads|exoclick|juicyads|propeller|doubleclick|adsystem|adsterra|tsyndicate|oumaxi|pushground|pushnami/.test(src)) {
+      if (/aichouphaugn|popads|exoclick|juicyads|propeller|doubleclick|adsystem|adsterra|tsyndicate|oumaxi|pushground|pushnami|embedmovies/.test(src)) {
         return true;
       }
     }
-  }
-
-  if (playerOpen && node.parentElement === document.body) {
-    if (node instanceof HTMLAnchorElement) return true;
-    if (node instanceof HTMLIFrameElement) return true;
-    if (/position:\s*(fixed|absolute)/i.test(style) || /z-index:\s*\d{3,}/i.test(style)) return true;
   }
 
   if (node.matches("img[src*='aichouphaugn'], a[href*='aichouphaugn']")) return true;
@@ -1658,7 +2542,9 @@ function installPlayerAdblock() {
   const blockEvent = (event: Event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest(".player-bar, .player-server-menu, .back-button, .video-stage, .player-view")) return;
+    if (target.closest(".player-chrome, .player-bar, .player-fs-dock, .player-server-menu, .player-episode-drawer, .back-button, .video-stage, .player-view")) {
+      return;
+    }
 
     if (event instanceof MouseEvent && (event.button === 1 || event.ctrlKey || event.metaKey)) {
       event.preventDefault();
@@ -1683,7 +2569,7 @@ function installPlayerAdblock() {
   scrubOverlayAds();
   const observer = new MutationObserver(() => scrubOverlayAds());
   observer.observe(document.documentElement, { childList: true, subtree: true });
-  const timer = window.setInterval(() => scrubOverlayAds(), 250);
+  const timer = window.setInterval(() => scrubOverlayAds(), 200);
 
   return () => {
     window.open = originalOpen;
@@ -1706,13 +2592,21 @@ type PlayerSource = {
   src: string;
 };
 
+function withSuperflixFlags(url: string, isTv: boolean) {
+  const base = url.split("#")[0];
+  const flags = ["noLink", "transparent"];
+  if (isTv) flags.push("noEpList");
+  return `${base}#${flags.join("#")}`;
+}
+
 function buildPlayerSources(movie: Movie, season?: number, episode?: number): PlayerSource[] {
   const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
   const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
   const kind = mediaKind(movie);
-  const path = kind === "tv" ? "serie" : "filme";
+  const isTv = kind === "tv";
+  const path = isTv ? "serie" : "filme";
   const episodeSuffix =
-    kind === "tv" && season && episode ? `/${season}/${episode}` : "";
+    isTv && season && episode ? `/${season}/${episode}` : "";
   const sources: PlayerSource[] = [];
 
   if (tmdbId) {
@@ -1728,14 +2622,14 @@ function buildPlayerSources(movie: Movie, season?: number, episode?: number): Pl
       name: "SuperFlix",
       hint: "PT-BR · dublado/legendado",
       theme: "gold",
-      src: `https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}#noLink`,
+      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
     });
     sources.push({
       id: "superflix-help",
       name: "SuperFlix Alt",
       hint: "PT-BR · espelho oficial",
       theme: "violet",
-      src: `https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`,
+      src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
     });
     sources.push({
       id: "warez-tmdb",
@@ -1759,7 +2653,7 @@ function buildPlayerSources(movie: Movie, season?: number, episode?: number): Pl
       name: "SuperFlix IMDb",
       hint: "PT-BR · IMDb",
       theme: "rose",
-      src: `https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}#noLink`,
+      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
     });
     sources.push({
       id: "warez-imdb",
@@ -1783,11 +2677,13 @@ function PlayerServerMenu({
   activeId,
   onSelect,
   onOpenChange,
+  compact = false,
 }: {
   sources: PlayerSource[];
   activeId: string;
   onSelect: (id: string) => void;
   onOpenChange?: (open: boolean) => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -1819,18 +2715,22 @@ function PlayerServerMenu({
   if (!active || sources.length === 0) return null;
 
   return (
-    <div className={`player-server-menu theme-${active.theme} ${open ? "is-open" : ""}`} ref={menuRef}>
+    <div
+      className={`player-server-menu theme-${active.theme} ${open ? "is-open" : ""} ${compact ? "is-compact" : ""}`}
+      ref={menuRef}
+    >
       <button
         type="button"
         className="player-server-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={`Servidor: ${active.name}`}
         onClick={() => updateOpen(!open)}
       >
         <span className="player-server-dot" aria-hidden="true" />
         <span className="player-server-copy">
-          <strong>{active.name}</strong>
-          <small>{active.hint}</small>
+          <strong>{compact ? active.name.split(" ")[0] : active.name}</strong>
+          {compact ? null : <small>{active.hint}</small>}
         </span>
         <span className="player-server-chevron" aria-hidden="true" />
       </button>
@@ -1871,6 +2771,7 @@ function MoviePlayer({
   movie,
   onClose,
   onProgress,
+  onEpisodeChange,
 }: {
   movie: Movie;
   onClose: () => void;
@@ -1880,6 +2781,7 @@ function MoviePlayer({
     temporada?: number | null;
     episodio?: number | null;
   }) => void;
+  onEpisodeChange?: (movie: Movie, season: number, episode: number) => void;
 }) {
   const isTv = mediaKind(movie) === "tv";
   const [season, setSeason] = useState(Math.max(1, movie.season || 1));
@@ -1887,17 +2789,40 @@ function MoviePlayer({
   const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
   const [episodes, setEpisodes] = useState<TvEpisodeInfo[]>([]);
   const [seasonLoading, setSeasonLoading] = useState(false);
+  const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fsDockVisible, setFsDockVisible] = useState(false);
   const sources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
   const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "cdn-tmdb");
-  const [showBar, setShowBar] = useState(true);
   const [menuPinned, setMenuPinned] = useState(false);
-  const hideBar = useRef<number | null>(null);
   const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
+  const onProgressRef = useRef(onProgress);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const fsHideTimer = useRef<number | null>(null);
   const activeSource = sources.find((source) => source.id === sourceId) ?? sources[0];
-  const controlsVisible = showBar || menuPinned;
+  const currentEpisodeInfo = episodes.find((item) => item.episode_number === episode);
   const episodeLabel = isTv
-    ? `T${season} E${episode}${episodes.find((item) => item.episode_number === episode)?.name ? ` · ${episodes.find((item) => item.episode_number === episode)?.name}` : ""}`
+    ? `T${season} E${episode}${currentEpisodeInfo?.name ? ` · ${currentEpisodeInfo.name}` : ""}`
     : null;
+
+  const episodeIndex = episodes.findIndex((item) => item.episode_number === episode);
+  const prevEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
+  const nextEpisode = episodeIndex >= 0 && episodeIndex < episodes.length - 1 ? episodes[episodeIndex + 1] : null;
+  const seasonIndex = seasons.findIndex((item) => item.season_number === season);
+  const prevSeason = !prevEpisode && seasonIndex > 0 ? seasons[seasonIndex - 1] : null;
+  const nextSeason =
+    !nextEpisode && seasonIndex >= 0 && seasonIndex < seasons.length - 1 ? seasons[seasonIndex + 1] : null;
+
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  useEffect(() => {
+    if (!isTv) return;
+    setSeason(Math.max(1, movie.season || 1));
+    setEpisode(Math.max(1, movie.episode || 1));
+    progressRef.current = Math.max(5, Number(movie.progress || 5));
+  }, [isTv, movie.id, movie.season, movie.episode, movie.progress]);
 
   useEffect(() => {
     const nextSources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
@@ -1937,9 +2862,6 @@ function MoviePlayer({
       .then((data: { episodes?: TvEpisodeInfo[] } | null) => {
         const list = Array.isArray(data?.episodes) ? data.episodes.filter((item) => item.episode_number > 0) : [];
         setEpisodes(list);
-        if (list.length > 0 && !list.some((item) => item.episode_number === episode)) {
-          setEpisode(list[0].episode_number);
-        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setEpisodes([]);
@@ -1960,129 +2882,307 @@ function MoviePlayer({
   }, []);
 
   useEffect(() => {
-    const reveal = () => {
-      setShowBar(true);
-      if (menuPinned) return;
-      if (hideBar.current) window.clearTimeout(hideBar.current);
-      hideBar.current = window.setTimeout(() => setShowBar(false), 2400);
+    const syncFullscreen = () => {
+      const active = document.fullscreenElement;
+      setIsFullscreen(Boolean(active && (active === stageRef.current || stageRef.current?.contains(active))));
     };
-    reveal();
-    window.addEventListener("mousemove", reveal);
-    return () => {
-      window.removeEventListener("mousemove", reveal);
-      if (hideBar.current) window.clearTimeout(hideBar.current);
-    };
-  }, [menuPinned]);
+    syncFullscreen();
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
 
   useEffect(() => {
-    // Embeds de terceiros não expõem currentTime; estimamos progresso enquanto o player fica aberto.
-    const timer = window.setInterval(() => {
-      progressRef.current = Math.min(95, progressRef.current + 2);
-      onProgress({
-        progresso: progressRef.current,
-        posicao_segundos: Math.round(progressRef.current * 60),
-        temporada: isTv ? season : null,
-        episodio: isTv ? episode : null,
-      });
-    }, 45000);
-    onProgress({
+    if (!isFullscreen) {
+      setFsDockVisible(false);
+      if (fsHideTimer.current) window.clearTimeout(fsHideTimer.current);
+      return;
+    }
+
+    const reveal = (event: MouseEvent) => {
+      if (event.clientY > 72) return;
+      setFsDockVisible(true);
+      if (fsHideTimer.current) window.clearTimeout(fsHideTimer.current);
+      fsHideTimer.current = window.setTimeout(() => setFsDockVisible(false), 2800);
+    };
+
+    window.addEventListener("mousemove", reveal, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", reveal);
+      if (fsHideTimer.current) window.clearTimeout(fsHideTimer.current);
+    };
+  }, [isFullscreen]);
+
+  async function toggleFullscreen() {
+    const stage = stageRef.current;
+    if (!stage) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      await stage.requestFullscreen();
+    } catch {
+      // Alguns browsers bloqueiam se o gesto não for direto o suficiente.
+    }
+  }
+
+  function emitProgress(nextSeason = season, nextEpisode = episode) {
+    onProgressRef.current({
       progresso: progressRef.current,
-      posicao_segundos: movie.positionSeconds || 0,
-      temporada: isTv ? season : null,
-      episodio: isTv ? episode : null,
+      posicao_segundos: Math.round(progressRef.current * 60),
+      temporada: isTv ? nextSeason : null,
+      episodio: isTv ? nextEpisode : null,
     });
-    return () => window.clearInterval(timer);
-  }, [episode, isTv, movie.positionSeconds, onProgress, season]);
+  }
+
+  function applyEpisode(nextSeason: number, nextEpisode: number, resetProgress = true) {
+    setSeason(nextSeason);
+    setEpisode(nextEpisode);
+    if (resetProgress) progressRef.current = 8;
+    onEpisodeChange?.(movie, nextSeason, nextEpisode);
+    emitProgress(nextSeason, nextEpisode);
+  }
 
   function selectSeason(next: number) {
-    setSeason(next);
-    setEpisode(1);
-    progressRef.current = Math.max(progressRef.current, 8);
-    onProgress({ progresso: progressRef.current, temporada: next, episodio: 1 });
+    applyEpisode(next, 1);
   }
 
   function selectEpisode(next: number) {
-    setEpisode(next);
-    progressRef.current = Math.max(progressRef.current, 10);
-    onProgress({ progresso: progressRef.current, temporada: season, episodio: next });
+    applyEpisode(season, next);
+    setEpisodePanelOpen(false);
   }
 
-  return (
-    <div className={`player-view ${controlsVisible ? "show-controls" : ""} ${activeSource ? `theme-${activeSource.theme}` : ""}`}>
-      <div className="player-bar">
-        <button className="player-back" type="button" onClick={onClose}>
-          <span className="player-back-icon" aria-hidden="true" />
-          Voltar
-        </button>
-        <div className="player-heading">
-          <span className="player-kicker">{isTv ? "Série" : "Filme"} · PT-BR</span>
-          <strong className="player-title">{movie.title}</strong>
-          {episodeLabel ? <small className="player-episode-label">{episodeLabel}</small> : null}
-        </div>
-        <div className="player-toolbar">
-          {isTv ? (
-            <div className="player-episode-controls">
-              <label>
-                <span>Temp.</span>
-                <select
-                  value={season}
-                  onChange={(event) => selectSeason(Number(event.target.value))}
-                  aria-label="Temporada"
-                >
-                  {(seasons.length ? seasons : [{ season_number: season, name: `Temporada ${season}`, episode_count: 0 }]).map(
-                    (item) => (
-                      <option key={item.season_number} value={item.season_number}>
-                        T{item.season_number}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-              <label>
-                <span>Ep.</span>
-                <select
-                  value={episode}
-                  onChange={(event) => selectEpisode(Number(event.target.value))}
-                  aria-label="Episódio"
-                  disabled={seasonLoading}
-                >
-                  {(episodes.length
-                    ? episodes
-                    : [{ episode_number: episode, name: `Episódio ${episode}` }]
-                  ).map((item) => (
-                    <option key={item.episode_number} value={item.episode_number}>
-                      E{item.episode_number}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          ) : null}
-          <PlayerServerMenu
-            sources={sources}
-            activeId={activeSource?.id ?? ""}
-            onSelect={setSourceId}
-            onOpenChange={setMenuPinned}
-          />
-        </div>
+  function goPrevEpisode() {
+    if (prevEpisode) {
+      selectEpisode(prevEpisode.episode_number);
+      return;
+    }
+    if (prevSeason) {
+      applyEpisode(prevSeason.season_number, Math.max(1, prevSeason.episode_count || 1));
+    }
+  }
+
+  function goNextEpisode() {
+    if (nextEpisode) {
+      selectEpisode(nextEpisode.episode_number);
+      return;
+    }
+    if (nextSeason) selectSeason(nextSeason.season_number);
+  }
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      progressRef.current = Math.min(95, progressRef.current + 2);
+      emitProgress();
+    }, 45000);
+    emitProgress();
+    return () => {
+      window.clearInterval(timer);
+      emitProgress();
+    };
+  }, [episode, isTv, season]);
+
+  const canGoPrev = Boolean(prevEpisode || prevSeason);
+  const canGoNext = Boolean(nextEpisode || nextSeason);
+
+  const playerChrome = (
+    <>
+      <button className="player-icon-btn player-back-btn" type="button" onClick={onClose} aria-label="Voltar">
+        <span className="player-back-icon" aria-hidden="true" />
+      </button>
+
+      <div className="player-meta">
+        <strong className="player-title" title={movie.title}>
+          {movie.title}
+        </strong>
+        {isTv ? <span className="player-ep-badge">{episodeLabel ?? `T${season} E${episode}`}</span> : null}
       </div>
 
-      {activeSource ? (
-        <iframe
-          key={activeSource.src}
-          className="video-stage"
-          src={activeSource.src}
-          allowFullScreen
-          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-          referrerPolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"
-          title={movie.title}
+      <div className="player-actions">
+        {isTv ? (
+          <>
+            <button
+              type="button"
+              className="player-icon-btn"
+              aria-label="Episódio anterior"
+              disabled={!canGoPrev || seasonLoading}
+              onClick={goPrevEpisode}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className={`player-icon-btn ${episodePanelOpen ? "is-active" : ""}`}
+              aria-expanded={episodePanelOpen}
+              aria-label="Episódios"
+              onClick={() => setEpisodePanelOpen((value) => !value)}
+            >
+              Eps
+            </button>
+            <button
+              type="button"
+              className="player-icon-btn"
+              aria-label="Próximo episódio"
+              disabled={!canGoNext || seasonLoading}
+              onClick={goNextEpisode}
+            >
+              ›
+            </button>
+          </>
+        ) : null}
+        <PlayerServerMenu
+          compact
+          sources={sources}
+          activeId={activeSource?.id ?? ""}
+          onSelect={setSourceId}
+          onOpenChange={setMenuPinned}
         />
-      ) : (
-        <div className="video-stage video-empty">
-          <p>Este título ainda não tem um ID válido para reprodução.</p>
-        </div>
-      )}
+        <button
+          type="button"
+          className={`player-icon-btn player-fs-btn ${isFullscreen ? "is-active" : ""}`}
+          aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          onClick={() => void toggleFullscreen()}
+        >
+          <span className="player-fs-enter" aria-hidden="true">⛶</span>
+          <span className="player-fs-exit" aria-hidden="true">⤡</span>
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div
+      className={`player-view ${isFullscreen ? "is-fullscreen" : ""} ${menuPinned || episodePanelOpen ? "is-menu-open" : ""} ${activeSource ? `theme-${activeSource.theme}` : ""}`}
+      data-flixa="player"
+    >
+      {!isFullscreen ? (
+        <header className="player-chrome" data-flixa="player-chrome">
+          <div className="player-bar">{playerChrome}</div>
+
+          {isTv && episodePanelOpen ? (
+            <div className="player-episode-drawer" role="dialog" aria-label="Lista de episódios" data-flixa="player-episodes">
+              <div className="player-episode-drawer-head">
+                <strong>Episódios</strong>
+                <button type="button" className="text-link" onClick={() => setEpisodePanelOpen(false)}>
+                  Fechar
+                </button>
+              </div>
+              {seasons.length ? (
+                <div className="tv-season-tabs tv-season-tabs--compact" role="tablist" aria-label="Temporadas">
+                  {seasons.map((item) => (
+                    <button
+                      key={item.season_number}
+                      type="button"
+                      role="tab"
+                      aria-selected={item.season_number === season}
+                      className={item.season_number === season ? "is-active" : ""}
+                      onClick={() => selectSeason(item.season_number)}
+                    >
+                      T{item.season_number}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {seasonLoading ? <p className="tv-catalog-status">Carregando…</p> : null}
+              {!seasonLoading && episodes.length ? (
+                <div className="player-episode-list">
+                  {episodes.map((item) => {
+                    const still = imageSrc(item.still, "w780");
+                    const active = item.episode_number === episode;
+                    return (
+                      <button
+                        key={item.episode_number}
+                        type="button"
+                        className={`player-episode-item ${active ? "is-active" : ""}`}
+                        onClick={() => selectEpisode(item.episode_number)}
+                      >
+                        <span className="tv-episode-thumb">
+                          {still ? <img src={still} alt="" loading="lazy" /> : <span>E{item.episode_number}</span>}
+                        </span>
+                        <span className="tv-episode-copy">
+                          <strong>
+                            {item.episode_number}. {item.name}
+                          </strong>
+                          {item.runtime ? <small>{item.runtime} min</small> : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </header>
+      ) : null}
+
+      <div className="player-stage-wrap" ref={stageRef}>
+        {isFullscreen ? (
+          <div className={`player-fs-dock ${fsDockVisible || menuPinned || episodePanelOpen ? "is-visible" : ""}`}>
+            <div className="player-bar player-bar--dock">{playerChrome}</div>
+            {isTv && episodePanelOpen ? (
+              <div className="player-episode-drawer player-episode-drawer--dock" role="dialog" aria-label="Lista de episódios">
+                <div className="player-episode-drawer-head">
+                  <strong>Episódios</strong>
+                  <button type="button" className="text-link" onClick={() => setEpisodePanelOpen(false)}>
+                    Fechar
+                  </button>
+                </div>
+                {seasons.length ? (
+                  <div className="tv-season-tabs tv-season-tabs--compact" role="tablist" aria-label="Temporadas">
+                    {seasons.map((item) => (
+                      <button
+                        key={item.season_number}
+                        type="button"
+                        role="tab"
+                        aria-selected={item.season_number === season}
+                        className={item.season_number === season ? "is-active" : ""}
+                        onClick={() => selectSeason(item.season_number)}
+                      >
+                        T{item.season_number}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {!seasonLoading && episodes.length ? (
+                  <div className="player-episode-list">
+                    {episodes.map((item) => (
+                      <button
+                        key={item.episode_number}
+                        type="button"
+                        className={`player-episode-item ${item.episode_number === episode ? "is-active" : ""}`}
+                        onClick={() => selectEpisode(item.episode_number)}
+                      >
+                        <span className="tv-episode-copy">
+                          <strong>
+                            {item.episode_number}. {item.name}
+                          </strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeSource ? (
+          <iframe
+            key={activeSource.src}
+            className="video-stage"
+            src={activeSource.src}
+            allowFullScreen
+            allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen"
+            title={movie.title}
+          />
+        ) : (
+          <div className="video-stage video-empty">
+            <p>Este título ainda não tem um ID válido para reprodução.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -672,6 +672,62 @@ async function discoverByGenre(genreId: string, kind: MediaKind, page: number) {
   }
 }
 
+/** Pool dos top filmes de um gênero para o Surpreenda-me (várias páginas TMDB). */
+async function roulettePool(genreId: string, pages = 5) {
+  const pageCount = Math.min(8, Math.max(1, Math.floor(pages) || 5));
+  const allGenres = !genreId || genreId === "all" || genreId === "0";
+  if (!allGenres && !/^\d+$/.test(genreId)) {
+    return { movies: [] as CatalogMovie[], genre: null as Genre | null, error: "Gênero inválido" };
+  }
+
+  try {
+    const { map, list } = await fetchTmdbGenreMap("movie");
+    const genreName = allGenres ? "Todos" : map.get(Number(genreId)) || "Gênero";
+    const genre = allGenres
+      ? { id: 0, name: "Todos" }
+      : (list.find((item) => item.id === Number(genreId)) ?? { id: Number(genreId), name: genreName });
+
+    const params: Record<string, string> = {
+      page: "1",
+      sort_by: "popularity.desc",
+      include_adult: "false",
+      "vote_count.gte": "300",
+      "vote_average.gte": "6",
+    };
+    if (!allGenres) params.with_genres = genreId;
+
+    const results = await Promise.all(
+      Array.from({ length: pageCount }, (_, index) =>
+        tmdbRequest("/discover/movie", {
+          ...params,
+          page: String(index + 1),
+        }),
+      ),
+    );
+
+    const seen = new Set<string>();
+    const movies: CatalogMovie[] = [];
+    for (const data of results) {
+      for (const item of findMovieItems(data)) {
+        const movie = mapTmdbMovie(item, genreName, map, "movie", allGenres ? "roleta-all" : `roleta-${genreId}`);
+        if (!movie?.poster) continue;
+        const key = movie.tmdb_id || movie.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        movies.push(movie);
+      }
+    }
+
+    return {
+      movies,
+      genre,
+      error: movies.length === 0 ? "Sem resultados para este gênero" : null,
+    };
+  } catch (error) {
+    return { movies: [] as CatalogMovie[], genre: null as Genre | null, error: describeFetchError(error) };
+  }
+}
+
 const CACHE_TTL_MS = 10 * 60 * 1000;
 let catalogCache: {
   expiresAt: number;
@@ -701,12 +757,26 @@ export async function GET(request: Request) {
     return Response.json(await searchTmdb(query));
   }
 
+  if (searchParams.get("genres") === "1") {
+    const { list } = await fetchTmdbGenreMap(kind);
+    return Response.json({ genres: list });
+  }
+
   if (browse === "1" || browse === "az") {
     return Response.json(await browseCatalog(kind, page));
   }
 
   if (listId) {
     return Response.json(await fetchListPage(listId, page));
+  }
+
+  if ((genreId || searchParams.get("roulette") === "1") && searchParams.get("roulette") === "1") {
+    const pages = Number(searchParams.get("pages") || "5") || 5;
+    // genreId vazio ou "all" = top gerais (sem filtro de gênero)
+    if (!genreId || genreId === "all" || genreId === "0") {
+      return Response.json(await roulettePool("", pages));
+    }
+    return Response.json(await roulettePool(genreId, pages));
   }
 
   if (genreId) {
