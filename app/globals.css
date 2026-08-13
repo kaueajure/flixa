@@ -629,6 +629,15 @@ img {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.official-watch-action {
+  gap: 0.5rem;
+}
+
+.official-watch-action span {
+  font-size: 0.82em;
+  opacity: 0.72;
+}
+
 .content-rows,
 .list-view {
   position: relative;

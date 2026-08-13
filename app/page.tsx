@@ -2536,6 +2536,7 @@ function MovieDetails({
   const backdrop = imageSrc(details.backdrop || details.poster, "w1280");
   const poster = imageSrc(details.poster, "w780");
   const watchLabel = Number(details.progress || 0) > 0 ? "Continuar assistindo" : "Assistir agora";
+  const officialProvider = details.watchProviders?.find((provider) => provider.preferredForPtBr) ?? details.watchProviders?.[0];
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={details.title} onClick={onClose}>
@@ -2579,6 +2580,17 @@ function MovieDetails({
                   >
                     {watchLabel}
                   </button>
+                ) : null}
+                {officialProvider ? (
+                  <a
+                    className={canWatch(details) ? "secondary-action official-watch-action" : "primary-action official-watch-action"}
+                    href={officialProvider.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                  >
+                    Assistir no {officialProvider.name}
+                    <span aria-hidden="true">↗</span>
+                  </a>
                 ) : null}
                 {details.trailer ? (
                   <button className="secondary-action" type="button" onClick={() => setShowTrailer((value) => !value)}>
@@ -2625,7 +2637,7 @@ function MovieDetails({
                         {provider.logo ? <img src={provider.logo} alt="" /> : <span className="watch-provider-fallback" />}
                         <span className="watch-provider-copy">
                           <strong>{provider.name}</strong>
-                          <small>{provider.preferredForPtBr ? "Prioridade para este título" : provider.access}</small>
+                          <small>{provider.preferredForPtBr ? "Assistir · prioridade para este título" : `Assistir · ${provider.access}`}</small>
                         </span>
                         <span className="watch-provider-arrow" aria-hidden="true">↗</span>
                       </a>
