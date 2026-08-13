@@ -133,7 +133,7 @@ export default function LoginPage() {
     return (
       <main className="login-shell">
         <div className="login-card">
-          <img className="login-logo" src="/logo.png" alt="Flixa" />
+          <img className="login-logo" src="/logo-transparent.png" alt="Flixa" />
           <p>Verificando sessão…</p>
         </div>
       </main>
@@ -144,7 +144,7 @@ export default function LoginPage() {
     <main className="login-shell">
       <section className="login-card">
         <div className="login-brand">
-          <img className="login-logo" src="/logo.png" alt="Flixa" />
+          <img className="login-logo" src="/logo-transparent.png" alt="Flixa" />
           <p>
             {modo === "login"
               ? "Entre para acessar o catálogo em português."

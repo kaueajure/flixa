@@ -30,6 +30,6 @@ test("renders the finalized Flixa opening and metadata", async () => {
   assert.match(html, /<title>Flixa<\/title>/i);
   assert.match(html, /<meta(?=[^>]*property=["']og:image["'])(?=[^>]*content=["'][^"']*\/og\.png["'])[^>]*>/i);
   assert.match(html, /<video(?=[^>]*class=["']site-intro-video["'])(?=[^>]*src=["']\/intro\.mp4["'])[^>]*>/i);
-  assert.match(html, /<img(?=[^>]*class=["']boot-logo["'])(?=[^>]*src=["']\/logo\.png["'])[^>]*>/i);
+  assert.match(html, /<img(?=[^>]*class=["']boot-logo["'])(?=[^>]*src=["']\/logo-transparent\.png["'])[^>]*>/i);
   assert.doesNotMatch(html, /name=["']codex-preview["']/i);
 });

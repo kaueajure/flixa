@@ -72,14 +72,14 @@ export default function SiteIntro() {
         muted
         playsInline
         preload="auto"
-        poster="/logo.png"
+        poster="/logo-transparent.png"
         onCanPlay={() => setReady(true)}
         onEnded={finish}
         onError={finish}
       />
       <div className="site-intro-vignette" aria-hidden="true" />
       <div className="site-intro-loading" aria-hidden={ready}>
-        <img src="/logo.png" alt="" />
+        <img src="/logo-transparent.png" alt="" />
         <span />
       </div>
       <div className="site-intro-actions">
