@@ -26,6 +26,9 @@ type Movie = {
   season?: number;
   episode?: number;
   positionSeconds?: number;
+  available?: boolean;
+  playback_locale?: "pt-BR";
+  is_brazilian?: boolean;
 };
 
 type Genre = { id: number; name: string };
@@ -117,6 +120,7 @@ function formatScore(value?: string) {
 function movieMeta(movie: Movie) {
   return [
     mediaKind(movie) === "tv" ? "Série" : "Filme",
+    movie.is_brazilian ? "Brasil" : null,
     movie.year,
     movie.duration,
     movie.genres?.slice(0, 2).join(" · "),
@@ -125,7 +129,40 @@ function movieMeta(movie: Movie) {
 }
 
 function canWatch(movie: Movie) {
-  return Boolean(movie.imdb_id || movie.tmdb_id || (movie.id && /^(tt|movie-|tv-|\d)/.test(movie.id)));
+  return movie.available === true && /^\d+$/.test(titleId(movie));
+}
+
+function availabilityKey(movie: Movie) {
+  return `${mediaKind(movie)}:${titleId(movie)}`;
+}
+
+async function retainAvailableMovies(items: Movie[], signal?: AbortSignal) {
+  const movies = dedupeMovies(items);
+  if (movies.length === 0) return [];
+
+  try {
+    const response = await fetch("/api/movies/availability", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: movies.map((movie) => ({
+          kind: mediaKind(movie),
+          tmdb_id: movie.tmdb_id,
+          id: movie.id,
+        })),
+      }),
+      signal,
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { available?: string[] };
+    const available = new Set(Array.isArray(data.available) ? data.available : []);
+    return movies
+      .filter((movie) => available.has(availabilityKey(movie)))
+      .map((movie) => ({ ...movie, available: true, playback_locale: "pt-BR" as const }));
+  } catch {
+    return [];
+  }
 }
 
 function dedupeMovies(items: Movie[]) {
@@ -209,11 +246,10 @@ function detailsHash(movie: Movie) {
 
 function playerHash(movie: Movie, season?: number, episode?: number) {
   const base = `player/${detailsHash(movie)}`;
-  if (mediaKind(movie) === "tv") {
-    const s = season ?? movie.season;
-    const e = episode ?? movie.episode;
-    if (s && e) return `${base}/s/${s}/e/${e}`;
-  }
+  // O provedor verificado gerencia os episódios que realmente possui.
+  // Não criamos uma URL de episódio usando a lista mais ampla da TMDB.
+  void season;
+  void episode;
   return base;
 }
 
@@ -230,8 +266,8 @@ function mergeMovieProgress(movie: Movie, progressList: Movie[]): Movie {
 }
 
 function tvProgressLabel(movie: Movie) {
-  if (mediaKind(movie) !== "tv" || !movie.season || !movie.episode) return "";
-  return `T${movie.season} E${movie.episode}`;
+  void movie;
+  return "";
 }
 
 function catalogReturnHash(hash: string) {
@@ -407,12 +443,14 @@ export default function Home() {
         const historicoData = historicoRes.ok ? ((await historicoRes.json()) as { itens?: Movie[] }) : { itens: [] };
         const progressoData = progressoRes.ok ? ((await progressoRes.json()) as { itens?: Movie[] }) : { itens: [] };
 
-        let lista = asMovieList(listaData.itens);
-        const historico = asMovieList(historicoData.itens);
-        const progresso = asMovieList(progressoData.itens);
+        let lista = await retainAvailableMovies(asMovieList(listaData.itens), controller.signal);
+        const [historico, progresso] = await Promise.all([
+          retainAvailableMovies(asMovieList(historicoData.itens), controller.signal),
+          retainAvailableMovies(asMovieList(progressoData.itens), controller.signal),
+        ]);
 
         // Migra lista local (formato completo) uma vez para o MySQL.
-        const localLista = dedupeMovies(readJsonList(LIST_KEY));
+        const localLista = await retainAvailableMovies(readJsonList(LIST_KEY), controller.signal);
         if (lista.length === 0 && localLista.length > 0) {
           await Promise.all(
             localLista.map((movie) =>
@@ -427,7 +465,7 @@ export default function Home() {
           const again = await fetch("/api/lista", { cache: "no-store", credentials: "include" });
           if (again.ok) {
             const againData = (await again.json()) as { itens?: Movie[] };
-            lista = asMovieList(againData.itens);
+            lista = await retainAvailableMovies(asMovieList(againData.itens), controller.signal);
             if (lista.length > 0) window.localStorage.removeItem(LIST_KEY);
           }
         }
@@ -478,7 +516,7 @@ export default function Home() {
         setGenres(Array.isArray(data.genres) ? data.genres : []);
         if (next.length === 0) {
           setMovies([]);
-          setLoadError("Nenhum título retornou da TMDB neste momento.");
+          setLoadError("Nenhum título disponível no catálogo brasileiro verificado neste momento.");
           return;
         }
         setMovies(next);
@@ -786,6 +824,10 @@ export default function Home() {
   }
 
   function openDetails(movie: Movie) {
+    if (!canWatch(movie)) {
+      showToast("Título indisponível no catálogo verificado");
+      return;
+    }
     setSearchOpen(false);
     setSelectedMovie(movie);
     if (view === "surpreenda-me") {
@@ -854,10 +896,14 @@ export default function Home() {
   );
 
   function openPlayer(movie: Movie, pick?: { season?: number; episode?: number }) {
+    if (!canWatch(movie)) {
+      showToast("Título indisponível no catálogo verificado");
+      return;
+    }
     const merged = mergeMovieProgress(movie, continueMovies);
     const isTv = mediaKind(merged) === "tv";
-    const season = pick?.season ?? merged.season ?? (isTv ? 1 : undefined);
-    const episode = pick?.episode ?? merged.episode ?? (isTv ? 1 : undefined);
+    const season = isTv ? undefined : pick?.season ?? merged.season;
+    const episode = isTv ? undefined : pick?.episode ?? merged.episode;
     const payload: Movie = { ...merged, season, episode };
 
     setSearchOpen(false);
@@ -867,8 +913,8 @@ export default function Home() {
     saveProgress(payload, {
       progresso: Math.max(Number(payload.progress || 0), 5),
       posicao_segundos: payload.positionSeconds || 0,
-      temporada: isTv ? season ?? 1 : null,
-      episodio: isTv ? episode ?? 1 : null,
+      temporada: null,
+      episodio: null,
     });
     goTo(playerHash(payload, season, episode));
   }
@@ -1112,10 +1158,12 @@ export default function Home() {
               </h1>
               <p className="hero-description">
                 {browseTotal
-                  ? `${browseTotal.toLocaleString("pt-BR")} ${view === "series" ? "séries" : "filmes"}${
-                      activeGenre ? ` em ${activeGenre.name}` : " mais populares"
-                    } · 50 por página.`
-                  : "Carregando o catálogo…"}
+                  ? `${browseTotal.toLocaleString("pt-BR")} ${view === "series" ? "séries" : "filmes"} disponíveis nesta página${
+                      activeGenre ? ` em ${activeGenre.name}` : ""
+                    } · Catálogo brasileiro verificado.`
+                  : browseLoading
+                    ? "Carregando o catálogo…"
+                    : "Nenhum título verificado disponível nesta página."}
               </p>
             </div>
             {browsePages > 1 ? (
@@ -2478,13 +2526,7 @@ function MovieDetails({
 
   const backdrop = imageSrc(details.backdrop || details.poster, "w1280");
   const poster = imageSrc(details.poster, "w780");
-  const isTv = mediaKind(details) === "tv";
-  const watchLabel =
-    isTv && details.season && details.episode && Number(details.progress || 0) > 0
-      ? `Continuar ${tvProgressLabel(details)}`
-      : isTv
-        ? "Assistir T1 E1"
-        : "Assistir agora";
+  const watchLabel = Number(details.progress || 0) > 0 ? "Continuar assistindo" : "Assistir agora";
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={details.title} onClick={onClose}>
@@ -2523,7 +2565,7 @@ function MovieDetails({
                     className="primary-action"
                     type="button"
                     onClick={() =>
-                      onWatch(details, isTv ? { season: details.season || 1, episode: details.episode || 1 } : undefined)
+                      onWatch(details)
                     }
                   >
                     {watchLabel}
@@ -2552,7 +2594,6 @@ function MovieDetails({
               </div>
             </div>
           </div>
-          {isTv && canWatch(details) ? <TvEpisodePicker movie={details} onWatch={onWatch} /> : null}
           {similar.length ? (
             <div className="similar-block">
               <MovieRow
@@ -2697,75 +2738,22 @@ type PlayerSource = {
   src: string;
 };
 
-function withSuperflixFlags(url: string, isTv: boolean) {
-  const base = url.split("#")[0];
-  const flags = ["noLink", "transparent"];
-  if (isTv) flags.push("noEpList");
-  return `${base}#${flags.join("#")}`;
-}
-
 function buildPlayerSources(movie: Movie, season?: number, episode?: number): PlayerSource[] {
-  const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
   const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
   const kind = mediaKind(movie);
   const isTv = kind === "tv";
   const path = isTv ? "serie" : "filme";
-  const episodeSuffix =
-    isTv && season && episode ? `/${season}/${episode}` : "";
+  void season;
+  void episode;
   const sources: PlayerSource[] = [];
 
-  if (tmdbId) {
-    sources.push({
-      id: "cdn-tmdb",
-      name: "CDN Brasil",
-      hint: "PT-BR · TMDB · rápido",
-      theme: "cyan",
-      src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
-    });
+  if (movie.available === true && /^\d+$/.test(tmdbId)) {
     sources.push({
       id: "superflix-pro",
-      name: "SuperFlix",
-      hint: "PT-BR · dublado/legendado",
+      name: "Player verificado",
+      hint: "Português (Brasil) · catálogo confirmado",
       theme: "gold",
-      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
-    });
-    sources.push({
-      id: "superflix-help",
-      name: "SuperFlix Alt",
-      hint: "PT-BR · espelho oficial",
-      theme: "violet",
-      src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
-    });
-    sources.push({
-      id: "warez-tmdb",
-      name: "WarezCDN",
-      hint: "PT-BR · TMDB",
-      theme: "emerald",
-      src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
-    });
-  }
-
-  if (imdbId) {
-    sources.push({
-      id: "cdn-imdb",
-      name: "CDN IMDb",
-      hint: "PT-BR · IMDb",
-      theme: "sky",
-      src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
-    });
-    sources.push({
-      id: "superflix-imdb",
-      name: "SuperFlix IMDb",
-      hint: "PT-BR · IMDb",
-      theme: "rose",
-      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
-    });
-    sources.push({
-      id: "warez-imdb",
-      name: "WarezCDN IMDb",
-      hint: "PT-BR · IMDb",
-      theme: "emerald",
-      src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
+      src: `https://superflixapi.pro/${path}/${tmdbId}#noLink#transparent`,
     });
   }
 
@@ -2889,6 +2877,7 @@ function MoviePlayer({
   onEpisodeChange?: (movie: Movie, season: number, episode: number) => void;
 }) {
   const isTv = mediaKind(movie) === "tv";
+  const localEpisodeControls = false;
   const [season, setSeason] = useState(Math.max(1, movie.season || 1));
   const [episode, setEpisode] = useState(Math.max(1, movie.episode || 1));
   const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
@@ -2898,7 +2887,7 @@ function MoviePlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fsDockVisible, setFsDockVisible] = useState(false);
   const sources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
-  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "cdn-tmdb");
+  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "superflix-pro");
   const [menuPinned, setMenuPinned] = useState(false);
   const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
   const onProgressRef = useRef(onProgress);
@@ -2931,11 +2920,11 @@ function MoviePlayer({
 
   useEffect(() => {
     const nextSources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
-    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "cdn-tmdb")));
+    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "superflix-pro")));
   }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv]);
 
   useEffect(() => {
-    if (!isTv) return;
+    if (!isTv || !localEpisodeControls) return;
     const controller = new AbortController();
     fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv`, {
       cache: "no-store",
@@ -2956,7 +2945,7 @@ function MoviePlayer({
   }, [isTv, movie.id, movie.tmdb_id]);
 
   useEffect(() => {
-    if (!isTv) return;
+    if (!isTv || !localEpisodeControls) return;
     const controller = new AbortController();
     setSeasonLoading(true);
     fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv&season=${season}`, {
@@ -3035,8 +3024,8 @@ function MoviePlayer({
     onProgressRef.current({
       progresso: progressRef.current,
       posicao_segundos: Math.round(progressRef.current * 60),
-      temporada: isTv ? nextSeason : null,
-      episodio: isTv ? nextEpisode : null,
+      temporada: isTv && localEpisodeControls ? nextSeason : null,
+      episodio: isTv && localEpisodeControls ? nextEpisode : null,
     });
   }
 
@@ -3100,11 +3089,11 @@ function MoviePlayer({
         <strong className="player-title" title={movie.title}>
           {movie.title}
         </strong>
-        {isTv ? <span className="player-ep-badge">{episodeLabel ?? `T${season} E${episode}`}</span> : null}
+        {isTv && localEpisodeControls ? <span className="player-ep-badge">{episodeLabel ?? `T${season} E${episode}`}</span> : null}
       </div>
 
       <div className="player-actions">
-        {isTv ? (
+        {isTv && localEpisodeControls ? (
           <>
             <button
               type="button"
@@ -3164,7 +3153,7 @@ function MoviePlayer({
         <header className="player-chrome" data-flixa="player-chrome">
           <div className="player-bar">{playerChrome}</div>
 
-          {isTv && episodePanelOpen ? (
+          {isTv && localEpisodeControls && episodePanelOpen ? (
             <div className="player-episode-drawer" role="dialog" aria-label="Lista de episódios" data-flixa="player-episodes">
               <div className="player-episode-drawer-head">
                 <strong>Episódios</strong>
@@ -3224,7 +3213,7 @@ function MoviePlayer({
         {isFullscreen ? (
           <div className={`player-fs-dock ${fsDockVisible || menuPinned || episodePanelOpen ? "is-visible" : ""}`}>
             <div className="player-bar player-bar--dock">{playerChrome}</div>
-            {isTv && episodePanelOpen ? (
+            {isTv && localEpisodeControls && episodePanelOpen ? (
               <div className="player-episode-drawer player-episode-drawer--dock" role="dialog" aria-label="Lista de episódios">
                 <div className="player-episode-drawer-head">
                   <strong>Episódios</strong>

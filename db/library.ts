@@ -24,6 +24,9 @@ export type TituloPayload = {
   season?: number;
   episode?: number;
   positionSeconds?: number;
+  available?: boolean;
+  playback_locale?: "pt-BR";
+  is_brazilian?: boolean;
 };
 
 function agoraSql() {
@@ -85,6 +88,9 @@ function movieFromRow(row: {
     progress: row.progresso != null ? Number(row.progresso) : fromJson?.progress,
     season: row.temporada ?? fromJson?.season,
     episode: row.episodio ?? fromJson?.episode,
+    available: fromJson?.available,
+    playback_locale: fromJson?.playback_locale,
+    is_brazilian: fromJson?.is_brazilian,
     positionSeconds: row.posicao_segundos ?? fromJson?.positionSeconds,
   };
 }

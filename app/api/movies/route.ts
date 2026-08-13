@@ -1,3 +1,5 @@
+import { getProviderInventory, isProviderTitleAvailable } from "./provider";
+
 export const dynamic = "force-dynamic";
 
 type MediaKind = "movie" | "tv";
@@ -21,6 +23,9 @@ type CatalogMovie = {
   director?: string;
   cast?: string[];
   trailer?: string;
+  available: true;
+  playback_locale: "pt-BR";
+  is_brazilian?: boolean;
 };
 
 type Genre = { id: number; name: string };
@@ -205,6 +210,16 @@ function tmdbGenreNames(movie: Record<string, unknown>, genreMap: Map<number, st
     .filter((name): name is string => Boolean(name));
 }
 
+function isBrazilianProduction(movie: Record<string, unknown>) {
+  const originCountries = Array.isArray(movie.origin_country) ? movie.origin_country : [];
+  const productionCountries = Array.isArray(movie.production_countries)
+    ? movie.production_countries
+        .map((item) => asRecord(item))
+        .map((item) => firstString(item?.iso_3166_1))
+    : [];
+  return [...originCountries, ...productionCountries].some((country) => String(country).toUpperCase() === "BR");
+}
+
 function tmdbCredits(movie: Record<string, unknown>, kind: MediaKind) {
   const credits = asRecord(movie.credits);
   const crew = Array.isArray(credits?.crew) ? credits.crew : [];
@@ -305,7 +320,30 @@ function mapTmdbMovie(
     director,
     cast,
     trailer: tmdbTrailer(movie),
+    available: true,
+    playback_locale: "pt-BR",
+    is_brazilian: isBrazilianProduction(movie) || undefined,
   };
+}
+
+async function retainAvailableTitles(movies: CatalogMovie[]) {
+  if (movies.length === 0) return [];
+  const kinds = [...new Set(movies.map((movie) => movie.kind))];
+  const inventories = new Map<MediaKind, Set<string>>();
+  await Promise.all(
+    kinds.map(async (kind) => {
+      inventories.set(kind, await getProviderInventory(kind));
+    }),
+  );
+
+  const seen = new Set<string>();
+  return movies.filter((movie) => {
+    const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
+    const key = `${movie.kind}:${id}`;
+    if (!/^\d+$/.test(id) || !inventories.get(movie.kind)?.has(id) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function tmdbRequest(path: string, params: Record<string, string> = {}) {
@@ -384,9 +422,10 @@ async function fetchTmdbList(
   page = 1,
 ) {
   const data = await tmdbRequest(list.path, { page: String(page) });
-  return findMovieItems(data)
+  const movies = findMovieItems(data)
     .map((movie) => mapTmdbMovie(movie, list.name, genreMap, list.kind, list.id))
     .filter((movie): movie is CatalogMovie => Boolean(movie));
+  return retainAvailableTitles(movies);
 }
 
 async function fetchTmdbCatalog() {
@@ -452,14 +491,14 @@ async function searchTmdb(query: string) {
       tmdbRequest("/search/tv", { query, include_adult: "false", page: "1" }),
     ]);
 
-    const movies = [
+    const movies = await retainAvailableTitles([
       ...findMovieItems(movieData).map((movie) =>
         mapTmdbMovie(movie, "Busca", movieGenres.map, "movie"),
       ),
       ...findMovieItems(tvData).map((movie) =>
         mapTmdbMovie(movie, "Busca", tvGenres.map, "tv"),
       ),
-    ].filter((movie): movie is CatalogMovie => Boolean(movie));
+    ].filter((movie): movie is CatalogMovie => Boolean(movie)));
 
     return {
       movies,
@@ -486,6 +525,14 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
   }
 
   try {
+    if (!(await isProviderTitleAvailable(kind, id))) {
+      return {
+        movie: null,
+        similar: [] as CatalogMovie[],
+        seasons: [],
+        error: "Título indisponível no catálogo verificado do player",
+      };
+    }
     const path = kind === "tv" ? `/tv/${id}` : `/movie/${id}`;
     const data = asRecord(
       await tmdbRequest(path, { append_to_response: "credits,videos,external_ids,similar" }),
@@ -496,10 +543,10 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
 
     const genreMap = new Map<number, string>();
     const movie = mapTmdbMovie(data, kind === "tv" ? "Série" : "Filme", genreMap, kind);
-    const similar = findMovieItems(asRecord(data.similar))
+    const similar = await retainAvailableTitles(findMovieItems(asRecord(data.similar))
       .map((item) => mapTmdbMovie(item, "Semelhantes", genreMap, kind))
       .filter((item): item is CatalogMovie => Boolean(item))
-      .slice(0, 12);
+      .slice(0, 12));
 
     const seasons = Array.isArray(data.seasons)
       ? data.seasons
@@ -539,11 +586,15 @@ async function getTmdbSeason(movieId: string, seasonNumber: number) {
   }
 
   try {
+    if (!(await isProviderTitleAvailable("tv", id))) {
+      return { season: null, episodes: [], error: "Série indisponível no catálogo verificado do player" };
+    }
     const data = asRecord(await tmdbRequest(`/tv/${id}/season/${seasonNumber}`));
     if (!data) {
       return { season: null, episodes: [], error: "TMDB: Sem resultados" };
     }
 
+    const today = new Date().toISOString().slice(0, 10);
     const episodes = Array.isArray(data.episodes)
       ? data.episodes
           .map((item) => asRecord(item))
@@ -556,7 +607,7 @@ async function getTmdbSeason(movieId: string, seasonNumber: number) {
             runtime: asNumber(item.runtime) || undefined,
             air_date: asString(item.air_date) || undefined,
           }))
-          .filter((item) => item.episode_number > 0)
+          .filter((item) => item.episode_number > 0 && Boolean(item.air_date) && item.air_date! <= today)
       : [];
 
     return {
@@ -632,14 +683,15 @@ async function browseCatalog(kind: MediaKind, page: number, genreId?: string) {
         .filter((item): item is CatalogMovie => Boolean(item?.poster)),
     );
     const offset = start - (firstTmdbPage - 1) * TMDB_PAGE_SIZE;
-    const slice = movies.slice(offset, offset + BROWSE_PAGE_SIZE);
+    const candidates = movies.slice(offset, offset + BROWSE_PAGE_SIZE);
+    const slice = await retainAvailableTitles(candidates);
     const totalPages = Math.max(1, Math.ceil(totalResults / BROWSE_PAGE_SIZE));
 
     return {
       movies: slice,
       page,
       totalPages,
-      totalResults,
+      totalResults: slice.length,
       genreId: hasGenre ? String(genreId) : null,
       error: slice.length === 0 ? "Sem resultados" : null,
     };
@@ -705,10 +757,11 @@ async function roulettePool(genreId: string, pages = 5) {
       }
     }
 
+    const availableMovies = await retainAvailableTitles(movies);
     return {
-      movies,
+      movies: availableMovies,
       genre,
-      error: movies.length === 0 ? "Sem resultados para este gênero" : null,
+      error: availableMovies.length === 0 ? "Sem resultados disponíveis para este gênero" : null,
     };
   } catch (error) {
     return { movies: [] as CatalogMovie[], genre: null as Genre | null, error: describeFetchError(error) };
