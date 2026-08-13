@@ -2737,22 +2737,74 @@ type PlayerSource = {
   src: string;
 };
 
+function withSuperflixFlags(url: string, isTv: boolean) {
+  const base = url.split("#")[0];
+  const flags = ["noLink", "transparent"];
+  if (isTv) flags.push("noEpList");
+  return `${base}#${flags.join("#")}`;
+}
+
 function buildPlayerSources(movie: Movie, season?: number, episode?: number): PlayerSource[] {
+  const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
   const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
   const kind = mediaKind(movie);
   const isTv = kind === "tv";
   const path = isTv ? "serie" : "filme";
-  void season;
-  void episode;
+  const episodeSuffix = isTv && season && episode ? `/${season}/${episode}` : "";
   const sources: PlayerSource[] = [];
 
   if (movie.available === true && /^\d+$/.test(tmdbId)) {
     sources.push({
+      id: "cdn-tmdb",
+      name: "CDN Brasil",
+      hint: "PT-BR · TMDB · rápido",
+      theme: "cyan",
+      src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
+    });
+    sources.push({
       id: "superflix-pro",
-      name: "Player verificado",
-      hint: "Português (Brasil) · catálogo confirmado",
+      name: "SuperFlix",
+      hint: "PT-BR · dublado/legendado",
       theme: "gold",
-      src: `https://superflixapi.pro/${path}/${tmdbId}#noLink#transparent`,
+      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
+    });
+    sources.push({
+      id: "superflix-help",
+      name: "SuperFlix Alt",
+      hint: "PT-BR · espelho oficial",
+      theme: "violet",
+      src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
+    });
+    sources.push({
+      id: "warez-tmdb",
+      name: "WarezCDN",
+      hint: "PT-BR · TMDB",
+      theme: "emerald",
+      src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
+    });
+  }
+
+  if (movie.available === true && /^tt\d+$/i.test(imdbId)) {
+    sources.push({
+      id: "cdn-imdb",
+      name: "CDN IMDb",
+      hint: "PT-BR · IMDb",
+      theme: "sky",
+      src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
+    });
+    sources.push({
+      id: "superflix-imdb",
+      name: "SuperFlix IMDb",
+      hint: "PT-BR · IMDb",
+      theme: "rose",
+      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
+    });
+    sources.push({
+      id: "warez-imdb",
+      name: "WarezCDN IMDb",
+      hint: "PT-BR · IMDb",
+      theme: "emerald",
+      src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
     });
   }
 
@@ -2876,7 +2928,7 @@ function MoviePlayer({
   onEpisodeChange?: (movie: Movie, season: number, episode: number) => void;
 }) {
   const isTv = mediaKind(movie) === "tv";
-  const localEpisodeControls = false;
+  const localEpisodeControls = true;
   const [season, setSeason] = useState(Math.max(1, movie.season || 1));
   const [episode, setEpisode] = useState(Math.max(1, movie.episode || 1));
   const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
@@ -2886,7 +2938,7 @@ function MoviePlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fsDockVisible, setFsDockVisible] = useState(false);
   const sources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
-  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "superflix-pro");
+  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "cdn-tmdb");
   const [menuPinned, setMenuPinned] = useState(false);
   const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
   const onProgressRef = useRef(onProgress);
@@ -2919,7 +2971,7 @@ function MoviePlayer({
 
   useEffect(() => {
     const nextSources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
-    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "superflix-pro")));
+    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "cdn-tmdb")));
   }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv]);
 
   useEffect(() => {
