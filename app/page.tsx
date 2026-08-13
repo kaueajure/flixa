@@ -969,7 +969,7 @@ export default function Home() {
     return (
       <main className="flixa-shell">
         <div className="boot-screen">
-          <span className="brand-mark" />
+          <img className="boot-logo" src="/logo.png" alt="Flixa" />
           <p>{authChecking ? "Validando sessão" : "Carregando o catálogo"}</p>
           <div className="skeleton-row" aria-hidden="true">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -985,8 +985,7 @@ export default function Home() {
     <main className="flixa-shell has-mobile-nav">
       <header className={`flixa-header ${scrolled || searchOpen || view !== "home" ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" onClick={() => goTo("home")} aria-label="Flixa início">
-          <span className="brand-mark" />
-          <span>FLIXA</span>
+          <img className="brand-logo" src="/logo.png" alt="Flixa" />
         </a>
 
         <nav className="nav-links" aria-label="Navegação principal">

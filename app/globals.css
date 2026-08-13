@@ -69,6 +69,131 @@ img {
   max-width: 100%;
 }
 
+.site-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  background: #000;
+  opacity: 1;
+  isolation: isolate;
+  transition: opacity 650ms cubic-bezier(0.22, 1, 0.36, 1), visibility 650ms ease;
+}
+
+.site-intro.is-leaving {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.site-intro-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  object-fit: contain;
+  filter: saturate(1.06) contrast(1.04);
+}
+
+.site-intro-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 54%, rgba(0, 0, 0, 0.32) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.2), transparent 22%, transparent 76%, rgba(0, 0, 0, 0.48));
+  pointer-events: none;
+}
+
+.site-intro-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.2rem;
+  background: #000;
+  opacity: 1;
+  transition: opacity 500ms ease, visibility 500ms ease;
+}
+
+.site-intro.is-ready .site-intro-loading {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.site-intro-loading img {
+  width: min(23rem, 70vw);
+  height: auto;
+  filter: drop-shadow(0 0 36px rgba(229, 9, 20, 0.25));
+}
+
+.site-intro-loading span {
+  width: min(13rem, 46vw);
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.site-intro-loading span::after {
+  display: block;
+  width: 45%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, #f20d19, transparent);
+  content: "";
+  animation: intro-loading 1.1s ease-in-out infinite;
+}
+
+.site-intro-actions {
+  position: absolute;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 0.55rem;
+  opacity: 0;
+  transform: translateY(0.5rem);
+  transition: opacity 380ms ease 450ms, transform 380ms ease 450ms;
+}
+
+.site-intro.is-ready .site-intro-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.site-intro-actions button {
+  min-height: 2.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(8, 8, 10, 0.58);
+  color: rgba(255, 255, 255, 0.88);
+  padding: 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(16px);
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.site-intro-actions button:hover,
+.site-intro-actions button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.46);
+  outline: none;
+  background: rgba(24, 24, 28, 0.82);
+  transform: translateY(-1px);
+}
+
+@keyframes intro-loading {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
 .flixa-shell {
   min-height: 100dvh;
   background:
@@ -103,39 +228,29 @@ img {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.62rem;
-  font-family: var(--font-display), sans-serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  width: clamp(5.6rem, 8vw, 7.2rem);
+  height: 2.15rem;
+  overflow: hidden;
 }
 
-.brand-mark {
-  position: relative;
-  display: inline-block;
-  width: 2.05rem;
-  height: 1.3rem;
-  border: 1px solid rgba(229, 9, 20, 0.7);
-  border-radius: 0.18rem;
-  box-shadow: 0 0 20px rgba(229, 9, 20, 0.16);
+.brand-logo,
+.boot-logo,
+.login-logo {
+  object-fit: cover;
+  object-position: center;
+  filter: drop-shadow(0 0 14px rgba(229, 9, 20, 0.24));
 }
 
-.brand-mark::before,
-.brand-mark::after {
-  position: absolute;
-  top: 0.24rem;
-  bottom: 0.24rem;
-  width: 1px;
-  background: rgba(229, 9, 20, 0.7);
-  content: "";
+.brand-logo {
+  width: 100%;
+  height: 100%;
+  transform: scale(1.18);
 }
 
-.brand-mark::before {
-  left: 0.48rem;
-}
-
-.brand-mark::after {
-  right: 0.48rem;
+.boot-logo,
+.login-logo {
+  width: min(14rem, 70vw);
+  height: 5.3rem;
 }
 
 .nav-links {
@@ -1759,6 +1874,19 @@ body.player-open > div[style*="z-index"] {
 }
 
 @media (max-width: 480px) {
+  .site-intro-actions {
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: max(0.75rem, env(safe-area-inset-left));
+    justify-content: center;
+  }
+
+  .site-intro-actions button {
+    flex: 1;
+    max-width: 10rem;
+    padding-inline: 0.7rem;
+  }
+
   .hero-actions,
   .details-actions {
     flex-direction: column;
