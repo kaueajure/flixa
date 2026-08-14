@@ -2853,14 +2853,14 @@ function buildPlayerSources(
   const episodeDashPath = `${season ?? 1}-${episode ?? 1}`;
   const tmdbOnlyId = /^\d+$/.test(tmdbId) ? tmdbId : "";
 
-  // Reservas independentes verificadas em filme e episódio. Elas ficam antes
+  // Fontes independentes verificadas em filme e episódio. Elas ficam antes
   // dos provedores legados para que uma origem ativa seja aberta por padrão.
   if (tmdbOnlyId) {
     sources.push(
       {
         id: "vidlink",
         name: "VidLink",
-        hint: "Reserva · múltiplos servidores",
+        hint: "Múltiplos servidores",
         theme: "cyan",
         src: isTv
           ? `https://vidlink.pro/tv/${tmdbOnlyId}/${episodePath}`
@@ -2869,7 +2869,7 @@ function buildPlayerSources(
       {
         id: "vidsrc-wiki",
         name: "VidSrc Wiki",
-        hint: "Reserva · TMDB",
+        hint: "Compatível com TMDB",
         theme: "violet",
         src: isTv
           ? `https://vidsrc.wiki/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -2878,7 +2878,7 @@ function buildPlayerSources(
       {
         id: "vidphantom",
         name: "VidPhantom",
-        hint: "Reserva · player alternativo",
+        hint: "Player alternativo",
         theme: "rose",
         src: isTv
           ? `https://vidphantom.com/tv/${tmdbOnlyId}/${episodePath}`
@@ -2887,7 +2887,7 @@ function buildPlayerSources(
       {
         id: "yapgrid",
         name: "YapGrid",
-        hint: "Reserva · multi-CDN",
+        hint: "Multi-CDN",
         theme: "emerald",
         src: isTv
           ? `https://yapgrid.com/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -2896,7 +2896,7 @@ function buildPlayerSources(
       {
         id: "videasy",
         name: "Videasy",
-        hint: "Reserva · legendas",
+        hint: "Legendas disponíveis",
         theme: "sky",
         src: isTv
           ? `https://player.videasy.net/tv/${tmdbOnlyId}/${episodePath}`
@@ -2911,7 +2911,7 @@ function buildPlayerSources(
       {
         id: "moviesapi",
         name: "MoviesAPI",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "gold",
         src: isTv
           ? `https://moviesapi.to/tv/${fallbackId}/${episodePath}`
@@ -2920,7 +2920,7 @@ function buildPlayerSources(
       {
         id: "vidfast",
         name: "VidFast",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "emerald",
         src: isTv
           ? `https://vidfast.vc/tv/${fallbackId}/${episodePath}?autoPlay=false`
@@ -2929,7 +2929,7 @@ function buildPlayerSources(
       {
         id: "autoembed-co",
         name: "AutoEmbed",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "gold",
         src: isTv
           ? `https://autoembed.co/tv/${autoEmbedKind}/${fallbackId}-${episodeDashPath}`
@@ -2938,7 +2938,7 @@ function buildPlayerSources(
       {
         id: "vidsrc-link",
         name: "VidSrc Link",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "violet",
         src: isTv
           ? `https://vidsrc.link/embed/tv/${fallbackId}/${episodePath}`
@@ -2947,7 +2947,7 @@ function buildPlayerSources(
       {
         id: "vidsrcme",
         name: "VidSrcMe",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "sky",
         src: isTv
           ? `https://vidsrcme.su/embed/tv/${fallbackId}/${episodeDashPath}`
@@ -2961,7 +2961,7 @@ function buildPlayerSources(
       {
         id: "ezvidapi",
         name: "EZVidAPI",
-        hint: "Reserva · failover automático",
+        hint: "Failover automático",
         theme: "cyan",
         src: isTv
           ? `https://ezvidapi.com/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -2970,7 +2970,7 @@ function buildPlayerSources(
       {
         id: "vidcore",
         name: "VidCore",
-        hint: "Reserva · multi-servidor",
+        hint: "Múltiplos servidores",
         theme: "gold",
         src: isTv
           ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -2979,7 +2979,7 @@ function buildPlayerSources(
       {
         id: "cinesrc",
         name: "CineSrc",
-        hint: "Reserva · TMDB",
+        hint: "Compatível com TMDB",
         theme: "rose",
         src: isTv
           ? `https://cinesrc.st/embed/tv/${tmdbOnlyId}?s=${season ?? 1}&e=${episode ?? 1}`
@@ -2988,7 +2988,7 @@ function buildPlayerSources(
       {
         id: "cinextream",
         name: "CineXtream",
-        hint: "Reserva · player alternativo",
+        hint: "Player alternativo",
         theme: "emerald",
         src: isTv
           ? `https://cinextream.net/api/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -2997,7 +2997,7 @@ function buildPlayerSources(
       {
         id: "embed-api",
         name: "Embed API",
-        hint: "Reserva · TMDB",
+        hint: "Compatível com TMDB",
         theme: "violet",
         src: isTv
           ? `https://player.embed-api.stream/?id=${tmdbOnlyId}&s=${season ?? 1}&e=${episode ?? 1}`
@@ -3006,7 +3006,7 @@ function buildPlayerSources(
       {
         id: "1embed",
         name: "1Embed",
-        hint: "Reserva · múltiplos áudios",
+        hint: "Múltiplos áudios",
         theme: "sky",
         src: isTv
           ? `https://1embed.cc/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3015,7 +3015,7 @@ function buildPlayerSources(
       {
         id: "iembed",
         name: "iEmbed",
-        hint: "Reserva · multi-source",
+        hint: "Múltiplas fontes",
         theme: "cyan",
         src: isTv
           ? `https://iembed.codeera.dev/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3024,7 +3024,7 @@ function buildPlayerSources(
       {
         id: "mapple",
         name: "Mapple",
-        hint: "Reserva · player alternativo",
+        hint: "Player alternativo",
         theme: "gold",
         src: isTv
           ? `https://mapple.uk/watch/tv/${tmdbOnlyId}-${episodeDashPath}`
@@ -3038,7 +3038,7 @@ function buildPlayerSources(
       {
         id: "vidsrc-mov",
         name: "VidSrc MOV",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "violet",
         src: isTv
           ? `https://vidsrc.mov/embed/tv/${fallbackId}/${episodePath}`
@@ -3047,7 +3047,7 @@ function buildPlayerSources(
       {
         id: "vidapi",
         name: "VidAPI",
-        hint: `Reserva · ${fallbackIdType}`,
+        hint: fallbackIdType,
         theme: "rose",
         src: isTv
           ? `https://vaplayer.ru/embed/tv/${fallbackId}/${episodePath}`
