@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { playerServerIdForSource } from "../lib/player-servers";
+import { getPlayerServer, playerServerIdForSource } from "../lib/player-servers";
 import BorderCollieForum from "./border-collie-forum";
 import SiteIntro from "./site-intro";
 
@@ -2703,7 +2703,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|vidlink\.pro|vidsrc|vidfast\.vc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|ezvidapi\.com|vidcore\.org|cinesrc\.st|cinextream\.net|embed-api\.stream|vaplayer\.com|1embed\.cc|iembed\.codeera\.dev|mapple\.uk|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
+  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|vidlink\.pro|vidsrc|vidfast\.vc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|ezvidapi\.com|vidcore\.org|cinesrc\.st|cinextream\.net|embed-api\.stream|vaplayer\.com|1embed\.cc|iembed\.codeera\.dev|mapple\.uk|mgeb\.top|pipocacine\.lat|redeflixapi\.store|api\.pomfy\.stream|betterflix\.lat|megaembedapi\.site|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -2824,6 +2824,8 @@ type PlayerSource = {
   hint: string;
   theme: PlayerTheme;
   src: string;
+  audioProfile?: "pt-BR" | "legendado";
+  priority?: number;
 };
 
 function withSuperflixFlags(url: string, isTv: boolean) {
@@ -2858,6 +2860,51 @@ function buildPlayerSources(
   if (tmdbOnlyId) {
     sources.push(
       {
+        id: "megaembed-br",
+        name: "MegaEmbed BR",
+        hint: "PT-BR prioritário",
+        theme: "gold",
+        src: isTv
+          ? `https://mgeb.top/embed/${tmdbOnlyId}/${episodePath}`
+          : `https://mgeb.top/embed/${tmdbOnlyId}`,
+      },
+      {
+        id: "pomfy",
+        name: "Pomfy",
+        hint: "PT-BR prioritário",
+        theme: "cyan",
+        src: isTv
+          ? `https://api.pomfy.stream/serie/${tmdbOnlyId}/${episodePath}`
+          : `https://api.pomfy.stream/filme/${tmdbOnlyId}`,
+      },
+      {
+        id: "betterflix",
+        name: "BetterFlix",
+        hint: "PT-BR prioritário",
+        theme: "emerald",
+        src: isTv
+          ? `https://betterflix.lat/api/player?id=${tmdbOnlyId}&type=tv&season=${season ?? 1}&episode=${episode ?? 1}`
+          : `https://betterflix.lat/api/player?id=${tmdbOnlyId}&type=movie`,
+      },
+      {
+        id: "pipocacine",
+        name: "PipocaCine",
+        hint: "PT-BR prioritário",
+        theme: "rose",
+        src: isTv
+          ? `https://pipocacine.lat/embed/${tmdbOnlyId}/${episodePath}`
+          : `https://pipocacine.lat/embed/${tmdbOnlyId}`,
+      },
+      {
+        id: "redeflix",
+        name: "RedeFlix",
+        hint: "PT-BR prioritário",
+        theme: "violet",
+        src: isTv
+          ? `https://redeflixapi.store/serie/${tmdbOnlyId}/${episodePath}`
+          : `https://redeflixapi.store/filme/${tmdbOnlyId}`,
+      },
+      {
         id: "vidlink",
         name: "VidLink",
         hint: "Múltiplos servidores",
@@ -2890,8 +2937,8 @@ function buildPlayerSources(
         hint: "Multi-CDN",
         theme: "emerald",
         src: isTv
-          ? `https://yapgrid.com/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://yapgrid.com/embed/movie/${tmdbOnlyId}`,
+          ? `https://yapgrid.com/embed/tv/${tmdbOnlyId}/${episodePath}?lang=pt`
+          : `https://yapgrid.com/embed/movie/${tmdbOnlyId}?lang=pt`,
       },
       {
         id: "videasy",
@@ -2901,6 +2948,15 @@ function buildPlayerSources(
         src: isTv
           ? `https://player.videasy.net/tv/${tmdbOnlyId}/${episodePath}`
           : `https://player.videasy.net/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "vidsrc-fyi",
+        name: "VidSrc FYI",
+        hint: "Legendado",
+        theme: "sky",
+        src: isTv
+          ? `https://vidsrc.fyi/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://vidsrc.fyi/embed/movie/${tmdbOnlyId}`,
       },
     );
   }
@@ -2923,8 +2979,8 @@ function buildPlayerSources(
         hint: fallbackIdType,
         theme: "emerald",
         src: isTv
-          ? `https://vidfast.vc/tv/${fallbackId}/${episodePath}?autoPlay=false`
-          : `https://vidfast.vc/movie/${fallbackId}?autoPlay=false`,
+          ? `https://vidfast.vc/tv/${fallbackId}/${episodePath}?autoPlay=false&sub=pt`
+          : `https://vidfast.vc/movie/${fallbackId}?autoPlay=false&sub=pt`,
       },
       {
         id: "autoembed-co",
@@ -2952,6 +3008,15 @@ function buildPlayerSources(
         src: isTv
           ? `https://vidsrcme.su/embed/tv/${fallbackId}/${episodeDashPath}`
           : `https://vidsrcme.su/embed/movie/${fallbackId}`,
+      },
+      {
+        id: "megaembedapi",
+        name: "MegaEmbedAPI",
+        hint: "PT-BR prioritário",
+        theme: "gold",
+        src: isTv && /^tt\d+$/i.test(imdbId)
+          ? `https://megaembedapi.site/embed/series?imdb=${imdbId}&sea=${season ?? 1}&epi=${episode ?? 1}`
+          : `https://megaembedapi.site/embed/${fallbackId}`,
       },
     );
   }
@@ -3163,11 +3228,22 @@ function buildPlayerSources(
   }
 
   const seen = new Set<string>();
+  const seenServers = new Set<string>();
   return sources.filter((source) => {
-    if (!source.src || seen.has(source.src) || disabledServerIds.has(playerServerIdForSource(source.id))) return false;
+    const serverId = playerServerIdForSource(source.id);
+    if (!source.src || seen.has(source.src) || seenServers.has(serverId) || disabledServerIds.has(serverId)) return false;
     seen.add(source.src);
+    seenServers.add(serverId);
     return true;
-  });
+  }).map((source) => {
+    const server = getPlayerServer(playerServerIdForSource(source.id));
+    return {
+      ...source,
+      audioProfile: server?.audioProfile ?? "pt-BR",
+      priority: server?.priority ?? 999,
+      hint: server?.audioProfile === "legendado" ? "Legendado" : "PT-BR prioritário",
+    };
+  }).sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
 }
 
 function PlayerServerMenu({
@@ -3236,27 +3312,36 @@ function PlayerServerMenu({
       {open ? (
         <div className="player-server-dropdown" role="listbox" aria-label="Servidores disponíveis">
           <p className="player-server-heading">Servidores disponíveis</p>
-          {sources.map((source) => {
-            const selected = source.id === active.id;
+          {(["pt-BR", "legendado"] as const).map((profile) => {
+            const groupedSources = sources.filter((source) => source.audioProfile === profile);
+            if (!groupedSources.length) return null;
             return (
-              <button
-                key={source.id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
-                onClick={() => {
-                  onSelect(source.id);
-                  updateOpen(false);
-                }}
-              >
-                <span className="player-server-dot" aria-hidden="true" />
-                <span className="player-server-copy">
-                  <strong>{source.name}</strong>
-                  <small>{source.hint}</small>
-                </span>
-                {selected ? <span className="player-server-check" aria-hidden="true" /> : null}
-              </button>
+              <div className="player-server-group" role="group" aria-label={profile === "pt-BR" ? "Áudio PT-BR prioritário" : "Legendados"} key={profile}>
+                <p className={`player-server-group-title is-${profile === "pt-BR" ? "ptbr" : "sub"}`}>
+                  {profile === "pt-BR" ? "PT-BR prioritário" : "Legendados"}
+                  <span>{groupedSources.length}</span>
+                </p>
+                {groupedSources.map((source) => {
+                  const selected = source.id === active.id;
+                  return (
+                    <button
+                      key={source.id}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
+                      onClick={() => {
+                        onSelect(source.id);
+                        updateOpen(false);
+                      }}
+                    >
+                      <span className="player-server-dot" aria-hidden="true" />
+                      <span className="player-server-copy"><strong>{source.name}</strong><small>{source.hint}</small></span>
+                      {selected ? <span className="player-server-check" aria-hidden="true" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </div>

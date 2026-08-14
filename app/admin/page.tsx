@@ -28,6 +28,8 @@ type AdminServer = {
   testTvUrl: string;
   supportsMovie: boolean;
   supportsTv: boolean;
+  audioProfile: "pt-BR" | "legendado";
+  priority: number;
   enabled: boolean;
   disabled_until: string | null;
   last_status: ServerStatus;
@@ -83,6 +85,8 @@ export default function AdminPage() {
     online: servidores.filter((server) => server.last_status === "online").length,
     offline: servidores.filter((server) => server.last_status === "offline").length,
     enabled: servidores.filter((server) => server.enabled).length,
+    ptbr: servidores.filter((server) => server.audioProfile === "pt-BR").length,
+    subtitled: servidores.filter((server) => server.audioProfile === "legendado").length,
   }), [servidores]);
 
   function handleUnauthorized(status: number) {
@@ -230,15 +234,23 @@ export default function AdminPage() {
     setTestingAll(true);
     setErro("");
     try {
-      const response = await fetch("/api/admin/servidores", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test" }),
-      });
-      const data = await responseJson<{ servidores?: AdminServer[] }>(response);
-      if (!response.ok || !Array.isArray(data.servidores)) throw new Error(data.erro || "Teste em lote não concluído");
-      setServidores(data.servidores);
+      const batches: string[][] = [];
+      for (let index = 0; index < servidores.length; index += 5) {
+        batches.push(servidores.slice(index, index + 5).map((server) => server.id));
+      }
+      const testedBatches = await Promise.all(batches.map(async (ids) => {
+        const response = await fetch("/api/admin/servidores", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "test", ids }),
+        });
+        const data = await responseJson<{ servidores?: AdminServer[] }>(response);
+        if (!response.ok || !Array.isArray(data.servidores)) throw new Error(data.erro || "Teste em lote não concluído");
+        return data.servidores;
+      }));
+      const tested = new Map(testedBatches.flat().map((server) => [server.id, server]));
+      setServidores((current) => current.map((server) => tested.get(server.id) ?? server));
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Falha ao testar servidores");
     } finally {
@@ -351,6 +363,8 @@ export default function AdminPage() {
         <>
           <section className="admin-stats admin-server-stats" aria-label="Estado dos servidores">
             <article><strong>{servidores.length}</strong><span>Total</span></article>
+            <article className="is-ptbr"><strong>{serverStats.ptbr}</strong><span>Prioridade PT-BR</span></article>
+            <article className="is-subtitled"><strong>{serverStats.subtitled}</strong><span>Legendados</span></article>
             <article className="is-online"><strong>{serverStats.online}</strong><span>Verdes</span></article>
             <article className="is-offline"><strong>{serverStats.offline}</strong><span>Vermelhos</span></article>
             <article><strong>{serverStats.enabled}</strong><span>Habilitados</span></article>
@@ -392,7 +406,7 @@ export default function AdminPage() {
                   <tr key={server.id} className={!server.enabled ? "is-disabled" : ""}>
                     <td><span className={`server-status is-${server.last_status}`}><i aria-hidden="true" />{server.last_status === "online" ? "Online" : server.last_status === "offline" ? "Falhou" : "Não testado"}</span></td>
                     <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small></td>
-                    <td>{[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}</td>
+                    <td>{[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}<small className={`server-audio-profile is-${server.audioProfile === "pt-BR" ? "ptbr" : "sub"}`}>{server.audioProfile === "pt-BR" ? "PT-BR prioritário" : "Legendado"}</small></td>
                     <td className="server-last-test"><strong>{formatDate(server.last_tested_at)}</strong><small>{server.last_latency_ms != null ? `${server.last_latency_ms} ms · ` : ""}{server.last_http_status ? `HTTP ${server.last_http_status} · ` : ""}{server.last_message || "Aguardando teste"}</small></td>
                     <td><span className={`server-enabled ${server.enabled ? "is-on" : "is-off"}`}>{server.enabled ? "Habilitado" : "Desativado"}</span>{!server.enabled && server.disabled_until ? <small className="server-domain">até {formatDate(server.disabled_until)}</small> : null}</td>
                     <td className="admin-actions server-actions">

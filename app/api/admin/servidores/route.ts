@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       action?: "test" | "confirm";
       id?: string;
+      ids?: string[];
       ok?: boolean;
     };
 
@@ -79,7 +80,14 @@ export async function POST(request: Request) {
     }
 
     const requestedId = String(body.id || "").trim();
-    const targets = requestedId ? [getPlayerServer(requestedId)].filter(Boolean) : PLAYER_SERVERS;
+    const requestedIds = Array.isArray(body.ids)
+      ? [...new Set(body.ids.map((id) => String(id).trim()))].slice(0, 8)
+      : [];
+    const targets = requestedId
+      ? [getPlayerServer(requestedId)].filter(Boolean)
+      : requestedIds.length
+        ? requestedIds.map((id) => getPlayerServer(id)).filter(Boolean)
+        : PLAYER_SERVERS;
     if (targets.length === 0) {
       return Response.json({ erro: "Servidor não encontrado." }, { status: 404 });
     }
@@ -102,7 +110,11 @@ export async function POST(request: Request) {
     const all = await listarServidoresAdmin();
     return Response.json(
       {
-        servidores: requestedId ? all.filter((server) => server.id === requestedId) : all,
+        servidores: requestedId
+          ? all.filter((server) => server.id === requestedId)
+          : requestedIds.length
+            ? all.filter((server) => requestedIds.includes(server.id))
+            : all,
         resultados: results,
       },
       { headers: { "Cache-Control": "no-store" } },
