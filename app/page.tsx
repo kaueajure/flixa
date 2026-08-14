@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { playerServerIdForSource } from "../lib/player-servers";
 import BorderCollieForum from "./border-collie-forum";
 import SiteIntro from "./site-intro";
 
@@ -2701,7 +2702,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|vidlink\.pro|vidsrc|vidfast\.vc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
+  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|vidlink\.pro|vidsrc|vidfast\.vc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|ezvidapi\.com|vidcore\.org|cinesrc\.st|cinextream\.net|embed-api\.stream|vaplayer\.com|1embed\.cc|iembed\.codeera\.dev|mapple\.uk|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -2831,7 +2832,12 @@ function withSuperflixFlags(url: string, isTv: boolean) {
   return `${base}#${flags.join("#")}`;
 }
 
-function buildPlayerSources(movie: Movie, season?: number, episode?: number): PlayerSource[] {
+function buildPlayerSources(
+  movie: Movie,
+  season?: number,
+  episode?: number,
+  disabledServerIds: Set<string> = new Set(),
+): PlayerSource[] {
   const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
   const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
   const kind = mediaKind(movie);
@@ -2949,6 +2955,106 @@ function buildPlayerSources(movie: Movie, season?: number, episode?: number): Pl
     );
   }
 
+  if (tmdbOnlyId) {
+    sources.push(
+      {
+        id: "ezvidapi",
+        name: "EZVidAPI",
+        hint: "Reserva · failover automático",
+        theme: "cyan",
+        src: isTv
+          ? `https://ezvidapi.com/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://ezvidapi.com/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "vidcore",
+        name: "VidCore",
+        hint: "Reserva · multi-servidor",
+        theme: "gold",
+        src: isTv
+          ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://www.vidcore.org/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "cinesrc",
+        name: "CineSrc",
+        hint: "Reserva · TMDB",
+        theme: "rose",
+        src: isTv
+          ? `https://cinesrc.st/embed/tv/${tmdbOnlyId}?s=${season ?? 1}&e=${episode ?? 1}`
+          : `https://cinesrc.st/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "cinextream",
+        name: "CineXtream",
+        hint: "Reserva · player alternativo",
+        theme: "emerald",
+        src: isTv
+          ? `https://cinextream.net/api/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://cinextream.net/api/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "embed-api",
+        name: "Embed API",
+        hint: "Reserva · TMDB",
+        theme: "violet",
+        src: isTv
+          ? `https://player.embed-api.stream/?id=${tmdbOnlyId}&s=${season ?? 1}&e=${episode ?? 1}`
+          : `https://player.embed-api.stream/?id=${tmdbOnlyId}&type=movie`,
+      },
+      {
+        id: "1embed",
+        name: "1Embed",
+        hint: "Reserva · múltiplos áudios",
+        theme: "sky",
+        src: isTv
+          ? `https://1embed.cc/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://1embed.cc/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "iembed",
+        name: "iEmbed",
+        hint: "Reserva · multi-source",
+        theme: "cyan",
+        src: isTv
+          ? `https://iembed.codeera.dev/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://iembed.codeera.dev/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "mapple",
+        name: "Mapple",
+        hint: "Reserva · player alternativo",
+        theme: "gold",
+        src: isTv
+          ? `https://mapple.uk/watch/tv/${tmdbOnlyId}-${episodeDashPath}`
+          : `https://mapple.uk/watch/movie/${tmdbOnlyId}`,
+      },
+    );
+  }
+
+  if (fallbackId) {
+    sources.push(
+      {
+        id: "vidsrc-mov",
+        name: "VidSrc MOV",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "violet",
+        src: isTv
+          ? `https://vidsrc.mov/embed/tv/${fallbackId}/${episodePath}`
+          : `https://vidsrc.mov/embed/movie/${fallbackId}`,
+      },
+      {
+        id: "vidapi",
+        name: "VidAPI",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "rose",
+        src: isTv
+          ? `https://vaplayer.ru/embed/tv/${fallbackId}/${episodePath}`
+          : `https://vaplayer.ru/embed/movie/${fallbackId}`,
+      },
+    );
+  }
+
   if (movie.available === true && /^\d+$/.test(tmdbId)) {
     if (!isTv) {
       sources.push({
@@ -3057,7 +3163,7 @@ function buildPlayerSources(movie: Movie, season?: number, episode?: number): Pl
 
   const seen = new Set<string>();
   return sources.filter((source) => {
-    if (!source.src || seen.has(source.src)) return false;
+    if (!source.src || seen.has(source.src) || disabledServerIds.has(playerServerIdForSource(source.id))) return false;
     seen.add(source.src);
     return true;
   });
@@ -3184,8 +3290,14 @@ function MoviePlayer({
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fsDockVisible, setFsDockVisible] = useState(false);
-  const sources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
-  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "cdn-tmdb");
+  const [disabledServerIds, setDisabledServerIds] = useState<Set<string>>(() => new Set());
+  const sources = buildPlayerSources(
+    movie,
+    isTv ? season : undefined,
+    isTv ? episode : undefined,
+    disabledServerIds,
+  );
+  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "vidlink");
   const [menuPinned, setMenuPinned] = useState(false);
   const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
   const onProgressRef = useRef(onProgress);
@@ -3218,9 +3330,29 @@ function MoviePlayer({
   }, [isTv, movie.id, movie.season, movie.episode, movie.progress]);
 
   useEffect(() => {
-    const nextSources = buildPlayerSources(movie, isTv ? season : undefined, isTv ? episode : undefined);
-    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "cdn-tmdb")));
-  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv]);
+    const nextSources = buildPlayerSources(
+      movie,
+      isTv ? season : undefined,
+      isTv ? episode : undefined,
+      disabledServerIds,
+    );
+    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "vidlink")));
+  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv, disabledServerIds]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/movies/servers", { cache: "no-store", signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { disabled?: string[] } | null) => {
+        if (!controller.signal.aborted) {
+          setDisabledServerIds(new Set(Array.isArray(data?.disabled) ? data.disabled : []));
+        }
+      })
+      .catch(() => {
+        // Falha aberta: se o controle estiver indisponível, preserva as fontes.
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!isTv || !localEpisodeControls) return;

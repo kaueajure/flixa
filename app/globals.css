@@ -3672,6 +3672,324 @@ body.player-open > div[style*="z-index"] {
   opacity: 0.45;
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 0.45rem;
+  margin: 0 auto 1.35rem;
+  max-width: 1100px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-tabs button {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: rgba(244, 241, 234, 0.58);
+  padding: 0.75rem 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.admin-tabs button::after {
+  position: absolute;
+  right: 0.7rem;
+  bottom: -1px;
+  left: 0.7rem;
+  height: 2px;
+  background: transparent;
+  content: "";
+}
+
+.admin-tabs button.is-active {
+  color: #fff;
+}
+
+.admin-tabs button.is-active::after {
+  background: #e7c36a;
+}
+
+.admin-tabs button span {
+  display: inline-grid;
+  min-width: 1.45rem;
+  min-height: 1.45rem;
+  margin-left: 0.35rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+}
+
+.admin-server-stats .is-online {
+  border-color: rgba(71, 218, 132, 0.26);
+  background: rgba(71, 218, 132, 0.07);
+}
+
+.admin-server-stats .is-online strong {
+  color: #70e7a2;
+}
+
+.admin-server-stats .is-offline {
+  border-color: rgba(255, 91, 102, 0.26);
+  background: rgba(255, 91, 102, 0.07);
+}
+
+.admin-server-stats .is-offline strong {
+  color: #ff7d86;
+}
+
+.admin-servers-wrap {
+  max-width: 1420px;
+}
+
+.admin-section-head,
+.admin-server-toolbar,
+.admin-server-toolbar label {
+  display: flex;
+  align-items: center;
+}
+
+.admin-section-head {
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-section-head h2,
+.admin-section-head p {
+  margin: 0;
+}
+
+.admin-section-head p {
+  margin-top: 0.2rem;
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 0.84rem;
+}
+
+.admin-server-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.admin-server-toolbar label {
+  gap: 0.45rem;
+  color: rgba(244, 241, 234, 0.68);
+  font-size: 0.78rem;
+}
+
+.admin-server-toolbar select,
+.admin-test-all {
+  min-height: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: #191714;
+  color: #fff;
+  padding: 0 0.85rem;
+}
+
+.admin-test-all {
+  border-color: rgba(231, 195, 106, 0.42);
+  background: rgba(231, 195, 106, 0.12);
+  color: #f7d984;
+  font-weight: 800;
+}
+
+.admin-test-all:disabled {
+  opacity: 0.55;
+}
+
+.admin-server-table tr.is-disabled {
+  opacity: 0.58;
+}
+
+.admin-server-table td > strong {
+  display: block;
+}
+
+.server-domain,
+.server-last-test small {
+  display: block;
+  margin-top: 0.2rem;
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 0.72rem;
+}
+
+.server-last-test {
+  max-width: 25rem;
+}
+
+.server-last-test strong {
+  font-size: 0.78rem;
+}
+
+.server-last-test small {
+  overflow: hidden;
+  max-width: 32rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-status,
+.server-enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.server-status i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0.65rem currentColor;
+}
+
+.server-status.is-online,
+.server-enabled.is-on {
+  background: rgba(71, 218, 132, 0.12);
+  color: #70e7a2;
+}
+
+.server-status.is-offline,
+.server-enabled.is-off {
+  background: rgba(255, 91, 102, 0.12);
+  color: #ff7d86;
+}
+
+.server-status.is-unknown {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.admin-actions button.is-enable {
+  border-color: rgba(71, 218, 132, 0.35);
+  color: #70e7a2;
+}
+
+.server-actions {
+  min-width: 11.5rem;
+}
+
+.server-test-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.86);
+  padding: 1rem;
+  backdrop-filter: blur(10px);
+}
+
+.server-test-dialog {
+  display: grid;
+  width: min(1120px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.1rem;
+  background: #0b0d11;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.72);
+}
+
+.server-test-dialog header,
+.server-test-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+}
+
+.server-test-dialog header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.server-test-dialog header h2,
+.server-test-dialog header p,
+.server-test-dialog footer p {
+  margin: 0;
+}
+
+.server-test-dialog header span {
+  display: block;
+  overflow: hidden;
+  max-width: min(70vw, 50rem);
+  margin-top: 0.25rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-test-dialog header > button {
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 1.35rem;
+}
+
+.server-test-frame-wrap {
+  position: relative;
+  min-height: min(64vh, 680px);
+  background: #000;
+}
+
+.server-test-frame-wrap iframe {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.server-test-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.server-test-dialog footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.server-test-dialog footer div {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.server-test-dialog footer button {
+  min-height: 2.45rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0 1rem;
+  color: #fff;
+  font-weight: 800;
+}
+
+.server-test-dialog footer button.is-danger {
+  border-color: rgba(255, 91, 102, 0.35);
+  background: rgba(255, 91, 102, 0.12);
+  color: #ff9299;
+}
+
+.server-test-dialog footer button.is-success {
+  border-color: rgba(71, 218, 132, 0.35);
+  background: rgba(71, 218, 132, 0.15);
+  color: #80ecad;
+}
+
 .roleta-view {
   --roleta-accent: var(--accent);
   --roleta-accent-soft: var(--accent-soft);
@@ -4452,6 +4770,25 @@ body.player-open > div[style*="z-index"] {
 @media (max-width: 800px) {
   .admin-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-section-head,
+  .server-test-dialog footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-server-toolbar {
+    justify-content: flex-start;
+  }
+
+  .server-test-frame-wrap {
+    min-height: 50vh;
+  }
+
+  .server-test-dialog footer div,
+  .server-test-dialog footer button {
+    width: 100%;
   }
 
   .player-toolbar {

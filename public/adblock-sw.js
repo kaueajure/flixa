@@ -295,7 +295,7 @@ const AD_HOST_PARTS = [
 
 const AD_PATH = /\/(adserver|advert|popunder|popads|prebid|onclick|banner|pop)(\/|$)/i;
 const MEDIA = /\.(m3u8|mpd|mp4|webm|ts|m4s|vtt|srt)(\?|$)/i;
-const PLAYER_HOST = /cdn-embed|warezcdn|superflix|111movies|2embed|myembed|filmesyseries\.epizy|vidlink|vidsrc|vidfast|vidphantom|autoembed|moviesapi|yapgrid|videasy|vidcore|cloudflare|themoviedb|tmdb|googlevideo|gstatic|youtube/i;
+const PLAYER_HOST = /cdn-embed|warezcdn|superflix|111movies|2embed|myembed|filmesyseries\.epizy|vidlink|vidsrc|vidfast|vidphantom|autoembed|moviesapi|yapgrid|videasy|vidcore|ezvidapi|cinesrc|cinextream|embed-api|vaplayer|1embed|iembed|mapple|cloudflare|themoviedb|tmdb|googlevideo|gstatic|youtube/i;
 
 function isAdUrl(raw) {
   try {

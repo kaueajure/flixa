@@ -133,5 +133,31 @@ export const progresso_reproducao = mysqlTable(
   ],
 );
 
+/** Estado operacional dos provedores externos controlado pelo painel admin. */
+export const servidores_player = mysqlTable(
+  "servidores_player",
+  {
+    servidor_id: varchar("servidor_id", { length: 64 }).primaryKey(),
+    habilitado: tinyint("habilitado").notNull().default(1),
+    desabilitado_ate: datetime("desabilitado_ate", { mode: "string" }),
+    ultimo_status: mysqlEnum("ultimo_status", ["unknown", "online", "offline"])
+      .notNull()
+      .default("unknown"),
+    ultimo_http_status: int("ultimo_http_status"),
+    ultima_latencia_ms: int("ultima_latencia_ms"),
+    ultima_mensagem: varchar("ultima_mensagem", { length: 500 }),
+    ultimo_teste_em: datetime("ultimo_teste_em", { mode: "string" }),
+    atualizado_por: int("atualizado_por").references(() => usuarios.id, { onDelete: "set null" }),
+    atualizado_em: datetime("atualizado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("servidores_habilitado_idx").on(table.habilitado),
+    index("servidores_status_idx").on(table.ultimo_status),
+  ],
+);
+
 export type Usuario = typeof usuarios.$inferSelect;
 export type Sessao = typeof sessoes.$inferSelect;
+export type ServidorPlayer = typeof servidores_player.$inferSelect;
