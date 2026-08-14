@@ -1,4 +1,6 @@
 import { getProviderInventory } from "./provider";
+import { listarServidoresDesabilitados } from "../../../db/player-servers";
+import { PLAYER_SERVERS } from "../../../lib/player-servers";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,8 @@ type CatalogMovie = {
   director?: string;
   cast?: string[];
   trailer?: string;
-  available: true;
+  available: boolean;
+  server_count?: number;
   provider_available?: boolean;
   playback_locale: "pt-BR";
   is_brazilian?: boolean;
@@ -149,7 +152,9 @@ function asGenres(value: unknown): string[] {
 
 function asRating(movie: Record<string, unknown>): string | undefined {
   const numeric = asNumber(movie.vote_average) ?? asNumber(movie.rating);
-  return numeric != null ? String(numeric) : firstString(movie.rating) ?? undefined;
+  if (numeric != null) return numeric >= 0 && numeric <= 10 ? String(numeric) : undefined;
+  const text = firstString(movie.rating);
+  return text && text.length <= 12 ? text : undefined;
 }
 
 function asYear(movie: Record<string, unknown>, kind: MediaKind): number | undefined {
@@ -344,7 +349,10 @@ function retainPlayableTitles(movies: CatalogMovie[]) {
   return movies.filter((movie) => {
     const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
     const key = `${movie.kind}:${id}`;
-    if (!/^\d+$/.test(id) || seen.has(key)) return false;
+    const title = movie.title.trim();
+    const safePoster = /^https:\/\//i.test(movie.poster);
+    const safeBackdrop = !movie.backdrop || /^https:\/\//i.test(movie.backdrop);
+    if (!/^[1-9]\d*$/.test(id) || !title || title.length > 200 || !safePoster || !safeBackdrop || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
@@ -352,6 +360,17 @@ function retainPlayableTitles(movies: CatalogMovie[]) {
 
 async function markProviderAvailability(movies: CatalogMovie[]) {
   const playable = retainPlayableTitles(movies);
+  let disabledIds: string[] = [];
+  try {
+    disabledIds = await listarServidoresDesabilitados();
+  } catch {
+    // Falha aberta: preserva o catálogo quando o controle administrativo estiver indisponível.
+  }
+  const disabled = new Set(disabledIds);
+  const enabledServerCount = {
+    movie: PLAYER_SERVERS.filter((server) => server.supportsMovie && !disabled.has(server.id)).length,
+    tv: PLAYER_SERVERS.filter((server) => server.supportsTv && !disabled.has(server.id)).length,
+  };
   const kinds = [...new Set(playable.map((movie) => movie.kind))];
   const entries = await Promise.all(
     kinds.map(async (kind) => {
@@ -366,7 +385,13 @@ async function markProviderAvailability(movies: CatalogMovie[]) {
 
   return playable.map((movie) => {
     const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
-    return { ...movie, provider_available: inventories.get(movie.kind)?.has(id) === true };
+    const serverCount = enabledServerCount[movie.kind];
+    return {
+      ...movie,
+      available: serverCount > 0,
+      server_count: serverCount,
+      provider_available: inventories.get(movie.kind)?.has(id) === true,
+    };
   });
 }
 

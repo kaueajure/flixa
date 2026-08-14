@@ -1,4 +1,6 @@
 import { getProviderInventory } from "../provider";
+import { listarServidoresDesabilitados } from "../../../../db/player-servers";
+import { PLAYER_SERVERS } from "../../../../lib/player-servers";
 
 export const dynamic = "force-dynamic";
 
@@ -11,16 +13,19 @@ type AvailabilityItem = {
   id?: unknown;
 };
 
-function mediaKind(value: unknown): MediaKind {
-  return value === "tv" ? "tv" : "movie";
+function mediaKind(value: unknown): MediaKind | null {
+  return value === "movie" || value === "tv" ? value : null;
 }
 
 function mediaId(item: AvailabilityItem) {
   const tmdbId = String(item.tmdb_id ?? "").trim();
-  if (/^\d+$/.test(tmdbId)) return tmdbId;
+  if (/^[1-9]\d*$/.test(tmdbId)) return tmdbId;
   const imdbId = String(item.imdb_id ?? "").trim();
-  if (/^tt\d+$/i.test(imdbId)) return imdbId;
-  return String(item.id ?? "").trim().replace(/^(?:movie-|tv-)/i, "");
+  if (/^tt[1-9]\d{4,}$/i.test(imdbId)) return imdbId.toLowerCase();
+  const fallback = String(item.id ?? "").trim().replace(/^(?:movie-|tv-)/i, "");
+  if (/^[1-9]\d*$/.test(fallback)) return fallback;
+  if (/^tt[1-9]\d{4,}$/i.test(fallback)) return fallback.toLowerCase();
+  return "";
 }
 
 export async function POST(request: Request) {
@@ -34,14 +39,33 @@ export async function POST(request: Request) {
   const items = Array.isArray(body.items) ? body.items.slice(0, 300) : [];
   if (items.length === 0) return Response.json({ available: [] });
 
-  const available = items.flatMap((item) => {
+  let disabledIds: string[] = [];
+  try {
+    disabledIds = await listarServidoresDesabilitados();
+  } catch {
+    // Falha aberta: a indisponibilidade do controle não deve invalidar o catálogo inteiro.
+  }
+  const disabled = new Set(disabledIds);
+  const enabledByKind = {
+    movie: PLAYER_SERVERS.filter((server) => server.supportsMovie && !disabled.has(server.id)).length,
+    tv: PLAYER_SERVERS.filter((server) => server.supportsTv && !disabled.has(server.id)).length,
+  };
+
+  const validKeys: string[] = [];
+  let rejected = 0;
+  items.forEach((item) => {
     const kind = mediaKind(item.kind);
     const id = mediaId(item);
-    return /^\d+$|^tt\d+$/i.test(id) ? [`${kind}:${id}`] : [];
+    if (!kind || !id || enabledByKind[kind] === 0) {
+      rejected += 1;
+      return;
+    }
+    validKeys.push(`${kind}:${id}`);
   });
+  const available = [...new Set(validKeys)];
 
   const providerAvailable: string[] = [];
-  const neededKinds = [...new Set(items.map((item) => mediaKind(item.kind)))];
+  const neededKinds = [...new Set(items.map((item) => mediaKind(item.kind)).filter((kind): kind is MediaKind => kind != null))];
   const entries = await Promise.all(
     neededKinds.map(async (kind) => {
       try {
@@ -54,8 +78,9 @@ export async function POST(request: Request) {
   const inventories = new Map(entries);
   items.forEach((item) => {
     const kind = mediaKind(item.kind);
+    if (!kind) return;
     const id = mediaId(item);
-    if (/^\d+$/.test(id) && inventories.get(kind)?.has(id)) {
+    if (/^[1-9]\d*$/.test(id) && enabledByKind[kind] > 0 && inventories.get(kind)?.has(id)) {
       providerAvailable.push(`${kind}:${id}`);
     }
   });
@@ -63,5 +88,12 @@ export async function POST(request: Request) {
   return Response.json({
     available: [...new Set(available)],
     provider_available: [...new Set(providerAvailable)],
+    validation: {
+      received: items.length,
+      valid: available.length,
+      rejected,
+      duplicates: Math.max(0, validKeys.length - available.length),
+      enabled_servers: enabledByKind,
+    },
   });
 }

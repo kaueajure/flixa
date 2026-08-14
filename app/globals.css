@@ -3737,6 +3737,66 @@ body.player-open > div[style*="z-index"] {
   color: #ff7d86;
 }
 
+.admin-catalog-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1420px;
+  margin: 0 auto 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 1rem;
+}
+
+.admin-catalog-check.is-online {
+  border-color: rgba(71, 218, 132, 0.28);
+}
+
+.admin-catalog-check.is-offline {
+  border-color: rgba(255, 91, 102, 0.28);
+}
+
+.admin-catalog-check h2,
+.admin-catalog-check p {
+  margin: 0;
+}
+
+.admin-catalog-check h2 {
+  margin-top: 0.55rem;
+  font-size: 1.05rem;
+}
+
+.admin-catalog-check p,
+.catalog-check-result span,
+.catalog-check-result small {
+  display: block;
+  margin-top: 0.3rem;
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 0.78rem;
+}
+
+.catalog-check-result {
+  margin-top: 0.75rem;
+}
+
+.catalog-check-result small {
+  max-width: 62rem;
+  color: #ff9ca3;
+}
+
+.admin-catalog-check > button {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  border: 1px solid rgba(77, 225, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(77, 225, 255, 0.1);
+  padding: 0 1rem;
+  color: #8feeff;
+  font-weight: 800;
+}
+
 .admin-servers-wrap {
   max-width: 1420px;
 }
@@ -3935,6 +3995,30 @@ body.player-open > div[style*="z-index"] {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
   font-size: 1.35rem;
+}
+
+.server-test-kind {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.server-test-kind button {
+  min-height: 2.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0 0.9rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 800;
+}
+
+.server-test-kind button.is-active {
+  border-color: rgba(77, 225, 255, 0.42);
+  background: rgba(77, 225, 255, 0.12);
+  color: #8feeff;
 }
 
 .server-test-frame-wrap {
@@ -4773,9 +4857,14 @@ body.player-open > div[style*="z-index"] {
   }
 
   .admin-section-head,
+  .admin-catalog-check,
   .server-test-dialog footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .admin-catalog-check > button {
+    width: 100%;
   }
 
   .admin-server-toolbar {

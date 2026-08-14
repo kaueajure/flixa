@@ -39,6 +39,17 @@ type AdminServer = {
 
 type AdminTab = "usuarios" | "servidores";
 
+type CatalogCheck = {
+  status: "online" | "offline";
+  tested_at: string;
+  total: number;
+  valid: number;
+  invalid: number;
+  provider_available: number;
+  problems: Array<{ key: string; title: string; issues: string[] }>;
+  rules: string[];
+};
+
 function formatDate(value: string | null) {
   if (!value) return "Nunca";
   const parsed = new Date(`${value.replace(" ", "T")}Z`);
@@ -64,6 +75,9 @@ export default function AdminPage() {
   const [disableMinutes, setDisableMinutes] = useState(360);
   const [modalServer, setModalServer] = useState<AdminServer | null>(null);
   const [modalLoaded, setModalLoaded] = useState(false);
+  const [modalKind, setModalKind] = useState<"movie" | "tv">("movie");
+  const [catalogChecking, setCatalogChecking] = useState(false);
+  const [catalogCheck, setCatalogCheck] = useState<CatalogCheck | null>(null);
 
   const serverStats = useMemo(() => ({
     online: servidores.filter((server) => server.last_status === "online").length,
@@ -203,6 +217,7 @@ export default function AdminPage() {
       if (!response.ok || !data.servidores?.[0]) throw new Error(data.erro || "Teste não concluído");
       mergeServer(data.servidores[0]);
       setModalLoaded(false);
+      setModalKind("movie");
       setModalServer(data.servidores[0]);
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Falha ao testar servidor");
@@ -231,6 +246,25 @@ export default function AdminPage() {
     }
   }
 
+  async function validarCatalogo() {
+    setCatalogChecking(true);
+    setErro("");
+    try {
+      const response = await fetch("/api/admin/catalogo", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await responseJson<CatalogCheck>(response);
+      if (!response.ok || !data.status) throw new Error(data.erro || "Validação do catálogo não concluída");
+      setCatalogCheck(data);
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Falha ao validar catálogo");
+    } finally {
+      setCatalogChecking(false);
+    }
+  }
+
   async function confirmarModal(ok: boolean) {
     if (!modalServer) return;
     setBusyId(`confirm:${modalServer.id}`);
@@ -256,6 +290,12 @@ export default function AdminPage() {
   if (carregando) {
     return <main className="admin-shell"><p>Carregando painel…</p></main>;
   }
+
+  const modalUrl = modalServer
+    ? modalKind === "tv" && modalServer.testTvUrl
+      ? modalServer.testTvUrl
+      : modalServer.testUrl
+    : "";
 
   return (
     <main className="admin-shell">
@@ -316,6 +356,22 @@ export default function AdminPage() {
             <article><strong>{serverStats.enabled}</strong><span>Habilitados</span></article>
           </section>
 
+          <section className={`admin-catalog-check ${catalogCheck ? `is-${catalogCheck.status}` : ""}`}>
+            <div>
+              <span className={`server-status is-${catalogCheck?.status ?? "unknown"}`}><i aria-hidden="true" />{catalogCheck ? (catalogCheck.status === "online" ? "Catálogo válido" : "Catálogo com problemas") : "Catálogo não validado"}</span>
+              <h2>Validação do catálogo</h2>
+              <p>Confere IDs, duplicidades, tipo, imagens HTTPS, disponibilidade de servidores e inventário do provedor.</p>
+              {catalogCheck ? (
+                <div className="catalog-check-result">
+                  <strong>{catalogCheck.valid}/{catalogCheck.total} títulos válidos</strong>
+                  <span>{catalogCheck.invalid} inválidos · {catalogCheck.provider_available} confirmados no inventário</span>
+                  {catalogCheck.problems.length ? <small>{catalogCheck.problems.slice(0, 3).map((problem) => `${problem.title}: ${problem.issues.join(", ")}`).join(" · ")}</small> : null}
+                </div>
+              ) : null}
+            </div>
+            <button type="button" disabled={catalogChecking} onClick={() => void validarCatalogo()}>{catalogChecking ? "Validando…" : "Validar catálogo"}</button>
+          </section>
+
           <section className="admin-table-wrap admin-servers-wrap">
             <div className="admin-section-head">
               <div><h2>Servidores</h2><p>Teste automático de acesso e confirmação visual do vídeo.</p></div>
@@ -354,12 +410,18 @@ export default function AdminPage() {
       {modalServer ? (
         <div className="server-test-modal" role="dialog" aria-modal="true" aria-label={`Teste de ${modalServer.name}`}>
           <div className="server-test-dialog">
-            <header><div><p className="eyebrow">Teste visual</p><h2>{modalServer.name}</h2><span>{modalServer.testUrl}</span></div><button type="button" aria-label="Fechar teste" onClick={() => setModalServer(null)}>×</button></header>
+            <header><div><p className="eyebrow">Teste visual protegido</p><h2>{modalServer.name}</h2><span>{modalUrl}</span></div><button type="button" aria-label="Fechar teste" onClick={() => setModalServer(null)}>×</button></header>
+            {modalServer.supportsTv && modalServer.testTvUrl ? (
+              <div className="server-test-kind" role="tablist" aria-label="Tipo de conteúdo para testar">
+                <button type="button" role="tab" aria-selected={modalKind === "movie"} className={modalKind === "movie" ? "is-active" : ""} onClick={() => { setModalLoaded(false); setModalKind("movie"); }}>Filme</button>
+                <button type="button" role="tab" aria-selected={modalKind === "tv"} className={modalKind === "tv" ? "is-active" : ""} onClick={() => { setModalLoaded(false); setModalKind("tv"); }}>Série</button>
+              </div>
+            ) : null}
             <div className="server-test-frame-wrap">
               {!modalLoaded ? <div className="server-test-loading">Carregando o player real…</div> : null}
-              <iframe key={modalServer.testUrl} src={modalServer.testUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen allow-popups" onLoad={() => setModalLoaded(true)} />
+              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen" onLoad={() => setModalLoaded(true)} />
             </div>
-            <footer><p>Pressione Play. O vídeo realmente abriu?</p><div><button type="button" className="is-danger" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(false)}>Não funciona</button><button type="button" className="is-success" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(true)}>Funciona</button></div></footer>
+            <footer><p>Pressione Play. Pop-ups e novas abas estão bloqueados neste teste.</p><div><button type="button" className="is-danger" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(false)}>Não funciona</button><button type="button" className="is-success" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(true)}>Funciona</button></div></footer>
           </div>
         </div>
       ) : null}

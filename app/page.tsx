@@ -30,6 +30,7 @@ type Movie = {
   episode?: number;
   positionSeconds?: number;
   available?: boolean;
+  server_count?: number;
   provider_available?: boolean;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
