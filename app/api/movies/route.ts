@@ -200,6 +200,15 @@ function tmdbImageUrl(path: unknown, size: "w342" | "w780" | "w1280") {
   return `${TMDB_IMAGE}/${size}${text.startsWith("/") ? text : `/${text}`}`;
 }
 
+function tmdbImagePath(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  for (const item of value) {
+    const path = firstString(asRecord(item)?.file_path);
+    if (path) return path;
+  }
+  return null;
+}
+
 function tmdbGenreNames(movie: Record<string, unknown>, genreMap: Map<number, string>) {
   const named = asGenres(movie.genres);
   if (named.length > 0) return named;
@@ -290,8 +299,11 @@ function mapTmdbMovie(
   const tmdbId = firstString(movie.id != null ? String(movie.id) : null);
   if (!title || !tmdbId) return null;
 
-  const poster = tmdbImageUrl(movie.poster_path, "w342");
-  const backdrop = tmdbImageUrl(movie.backdrop_path, "w780") || poster;
+  const images = asRecord(movie.images);
+  const posterPath = firstString(movie.poster_path) || tmdbImagePath(images?.posters) || firstString(movie.backdrop_path);
+  const backdropPath = firstString(movie.backdrop_path) || tmdbImagePath(images?.backdrops) || posterPath;
+  const poster = tmdbImageUrl(posterPath, "w342");
+  const backdrop = tmdbImageUrl(backdropPath, "w780") || poster;
   const seasons = asNumber(movie.number_of_seasons);
   const episodeRuntime = Array.isArray(movie.episode_run_time)
     ? asNumber(movie.episode_run_time[0])
@@ -539,7 +551,7 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
   try {
     const path = kind === "tv" ? `/tv/${id}` : `/movie/${id}`;
     const data = asRecord(
-      await tmdbRequest(path, { append_to_response: "credits,videos,external_ids,similar" }),
+      await tmdbRequest(path, { append_to_response: "credits,videos,external_ids,similar,images" }),
     );
     if (!data) {
       return { movie: null, similar: [] as CatalogMovie[], error: "TMDB: Sem resultados" };
@@ -562,6 +574,7 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
             episode_count: asNumber(item.episode_count) ?? 0,
             name: asString(item.name) || `Temporada ${asNumber(item.season_number) ?? "?"}`,
             air_date: asString(item.air_date) || undefined,
+            poster: tmdbImageUrl(item.poster_path, "w342") || undefined,
           }))
           .filter((item) => item.season_number > 0)
       : [];

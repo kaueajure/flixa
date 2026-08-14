@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 type MediaKind = "movie" | "tv";
 
@@ -46,6 +46,7 @@ type TvSeasonInfo = {
   episode_count: number;
   name: string;
   air_date?: string;
+  poster?: string;
 };
 
 type TvEpisodeInfo = {
@@ -89,8 +90,48 @@ function imageSrc(value?: string, size?: "w342" | "w780" | "w1280") {
   const nested = value.match(/url\(['"]?([^'")]+)['"]?\)/);
   const raw = nested?.[1] || value;
   if (!raw.startsWith("http://") && !raw.startsWith("https://")) return "";
-  if (size) return raw.replace(/\/w\d+\//, `/${size}/`);
-  return raw;
+  const resized = size ? raw.replace(/\/w\d+\//, `/${size}/`) : raw;
+  try {
+    const url = new URL(resized);
+    if (url.hostname === "image.tmdb.org" || url.hostname === "media.themoviedb.org") {
+      const match = url.pathname.match(/^\/t\/p\/(w\d+|original)(\/.*)$/);
+      if (match) {
+        const proxySize = size || match[1];
+        return `/api/images/tmdb?size=${encodeURIComponent(proxySize)}&path=${encodeURIComponent(match[2])}`;
+      }
+    }
+  } catch {
+    return "";
+  }
+  return resized;
+}
+
+function ResilientImage({
+  sources,
+  alt,
+  className,
+  loading,
+  fallback,
+}: {
+  sources: Array<string | undefined>;
+  alt: string;
+  className?: string;
+  loading?: "eager" | "lazy";
+  fallback: ReactNode;
+}) {
+  const urls = [...new Set(sources.filter((source): source is string => Boolean(source)))];
+  const [index, setIndex] = useState(0);
+
+  if (!urls[index]) return <>{fallback}</>;
+  return (
+    <img
+      className={className}
+      src={urls[index]}
+      alt={alt}
+      loading={loading}
+      onError={() => setIndex((current) => current + 1)}
+    />
+  );
 }
 
 function preloadPosterImages(movies: Movie[]) {
@@ -2324,11 +2365,12 @@ function MovieCard({
       <div className="poster-wrap">
         <button className="poster-hit" type="button" onClick={() => onOpen(movie)}>
           <span className="poster-frame">
-            {src ? (
-              <img src={src} alt={`Pôster de ${movie.title}`} width={342} height={513} loading="lazy" />
-            ) : (
-              <span className="poster-fallback">{movie.title}</span>
-            )}
+            <ResilientImage
+              sources={[src, imageSrc(movie.backdrop, "w342")]}
+              alt={`Pôster de ${movie.title}`}
+              loading="lazy"
+              fallback={<span className="poster-fallback">{movie.title}</span>}
+            />
             {formatScore(movie.rating) ? <span className="score-badge">{formatScore(movie.rating)}</span> : null}
           </span>
         </button>
@@ -2453,6 +2495,7 @@ function TvEpisodePicker({
           {episodes.map((item) => {
             const isCurrent = hasProgress && savedSeason === season && savedEpisode === item.episode_number;
             const still = imageSrc(item.still, "w780");
+            const activeSeason = seasons.find((item) => item.season_number === season);
             return (
               <button
                 key={item.episode_number}
@@ -2461,7 +2504,18 @@ function TvEpisodePicker({
                 onClick={() => watchEpisode(item.episode_number)}
               >
                 <span className="tv-episode-thumb">
-                  {still ? <img src={still} alt="" loading="lazy" /> : <span>E{item.episode_number}</span>}
+                  <ResilientImage
+                    key={`${season}-${item.episode_number}`}
+                    sources={[
+                      still,
+                      imageSrc(movie.backdrop, "w780"),
+                      imageSrc(activeSeason?.poster, "w780"),
+                      imageSrc(movie.poster, "w780"),
+                    ]}
+                    alt=""
+                    loading="lazy"
+                    fallback={<span>E{item.episode_number}</span>}
+                  />
                   {isCurrent && Number(movie.progress || 0) > 0 ? (
                     <span className="tv-episode-progress" style={{ width: `${Math.min(100, Number(movie.progress))}%` }} />
                   ) : null}
@@ -2559,12 +2613,21 @@ function MovieDetails({
                 allow="autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
               />
-            ) : backdrop ? (
-              <img src={backdrop} alt="" />
-            ) : null}
+            ) : (
+              <ResilientImage
+                sources={[backdrop, imageSrc(details.poster, "w1280")]}
+                alt=""
+                fallback={<div className="details-art-fallback" aria-hidden="true" />}
+              />
+            )}
           </div>
           <div className="details-body">
-            {poster ? <img className="details-poster" src={poster} alt={`Pôster de ${details.title}`} /> : <div className="details-poster" />}
+            <ResilientImage
+              className="details-poster"
+              sources={[poster, imageSrc(details.backdrop, "w780")]}
+              alt={`Pôster de ${details.title}`}
+              fallback={<div className="details-poster details-poster--fallback">{details.title}</div>}
+            />
             <div className="details-copy">
               <p className="eyebrow">{mediaKind(details) === "tv" ? "Série" : "Filme"}</p>
               <h2>{details.title}</h2>
@@ -3016,6 +3079,7 @@ function MoviePlayer({
   const fsHideTimer = useRef<number | null>(null);
   const activeSource = sources.find((source) => source.id === sourceId) ?? sources[0];
   const currentEpisodeInfo = episodes.find((item) => item.episode_number === episode);
+  const currentSeasonInfo = seasons.find((item) => item.season_number === season);
   const episodeLabel = isTv
     ? `T${season} E${episode}${currentEpisodeInfo?.name ? ` · ${currentEpisodeInfo.name}` : ""}`
     : null;
@@ -3312,7 +3376,18 @@ function MoviePlayer({
                         onClick={() => selectEpisode(item.episode_number)}
                       >
                         <span className="tv-episode-thumb">
-                          {still ? <img src={still} alt="" loading="lazy" /> : <span>E{item.episode_number}</span>}
+                          <ResilientImage
+                            key={`${season}-${item.episode_number}`}
+                            sources={[
+                              still,
+                              imageSrc(movie.backdrop, "w780"),
+                              imageSrc(currentSeasonInfo?.poster, "w780"),
+                              imageSrc(movie.poster, "w780"),
+                            ]}
+                            alt=""
+                            loading="lazy"
+                            fallback={<span>E{item.episode_number}</span>}
+                          />
                         </span>
                         <span className="tv-episode-copy">
                           <strong>
