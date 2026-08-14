@@ -4,15 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 
 type MediaKind = "movie" | "tv";
 
-type WatchProvider = {
-  id: number;
-  name: string;
-  logo: string;
-  access: "Assinatura" | "Grátis" | "Com anúncios" | "Aluguel" | "Compra";
-  url: string;
-  preferredForPtBr: boolean;
-};
-
 type Movie = {
   id: string;
   source?: string;
@@ -38,7 +29,6 @@ type Movie = {
   available?: boolean;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
-  watchProviders?: WatchProvider[];
 };
 
 type Genre = { id: number; name: string };
@@ -2536,7 +2526,6 @@ function MovieDetails({
   const backdrop = imageSrc(details.backdrop || details.poster, "w1280");
   const poster = imageSrc(details.poster, "w780");
   const watchLabel = Number(details.progress || 0) > 0 ? "Continuar assistindo" : "Assistir agora";
-  const officialProvider = details.watchProviders?.find((provider) => provider.preferredForPtBr) ?? details.watchProviders?.[0];
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={details.title} onClick={onClose}>
@@ -2581,17 +2570,6 @@ function MovieDetails({
                     {watchLabel}
                   </button>
                 ) : null}
-                {officialProvider ? (
-                  <a
-                    className={canWatch(details) ? "secondary-action official-watch-action" : "primary-action official-watch-action"}
-                    href={officialProvider.url}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                  >
-                    Assistir no {officialProvider.name}
-                    <span aria-hidden="true">↗</span>
-                  </a>
-                ) : null}
                 {details.trailer ? (
                   <button className="secondary-action" type="button" onClick={() => setShowTrailer((value) => !value)}>
                     {showTrailer ? "Ocultar trailer" : "Trailer"}
@@ -2613,39 +2591,6 @@ function MovieDetails({
                   </span>
                 ) : null}
               </div>
-              {details.watchProviders?.length ? (
-                <section className="watch-providers" aria-label="Onde assistir oficialmente no Brasil">
-                  <div className="watch-providers-head">
-                    <div>
-                      <p className="eyebrow">Disponibilidade oficial</p>
-                      <h3>Onde assistir no Brasil</h3>
-                    </div>
-                    <span>PT-BR primeiro</span>
-                  </div>
-                  <p className="watch-providers-note">
-                    Priorizamos serviços com catálogo brasileiro. Confirme “Português (Brasil)” na faixa de áudio antes de reproduzir.
-                  </p>
-                  <div className="watch-provider-grid">
-                    {details.watchProviders.map((provider) => (
-                      <a
-                        key={provider.id}
-                        className={`watch-provider ${provider.preferredForPtBr ? "is-preferred" : ""}`}
-                        href={provider.url}
-                        target="_blank"
-                        rel="noopener noreferrer nofollow"
-                      >
-                        {provider.logo ? <img src={provider.logo} alt="" /> : <span className="watch-provider-fallback" />}
-                        <span className="watch-provider-copy">
-                          <strong>{provider.name}</strong>
-                          <small>{provider.preferredForPtBr ? "Assistir · prioridade para este título" : `Assistir · ${provider.access}`}</small>
-                        </span>
-                        <span className="watch-provider-arrow" aria-hidden="true">↗</span>
-                      </a>
-                    ))}
-                  </div>
-                  <small className="watch-provider-credit">Disponibilidade por JustWatch via TMDB.</small>
-                </section>
-              ) : null}
             </div>
           </div>
           {similar.length ? (

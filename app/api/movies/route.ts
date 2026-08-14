@@ -4,15 +4,6 @@ export const dynamic = "force-dynamic";
 
 type MediaKind = "movie" | "tv";
 
-type WatchProvider = {
-  id: number;
-  name: string;
-  logo: string;
-  access: "Assinatura" | "Grátis" | "Com anúncios" | "Aluguel" | "Compra";
-  url: string;
-  preferredForPtBr: boolean;
-};
-
 type CatalogMovie = {
   id: string;
   source: string;
@@ -32,10 +23,9 @@ type CatalogMovie = {
   director?: string;
   cast?: string[];
   trailer?: string;
-  available: boolean;
+  available: true;
   playback_locale: "pt-BR";
   is_brazilian?: boolean;
-  watchProviders?: WatchProvider[];
 };
 
 type Genre = { id: number; name: string };
@@ -201,81 +191,12 @@ function describeFetchError(error: unknown) {
   return message;
 }
 
-function tmdbImageUrl(path: unknown, size: "w92" | "w342" | "w780" | "w1280") {
+function tmdbImageUrl(path: unknown, size: "w342" | "w780" | "w1280") {
   const text = asString(path);
   if (!text) return null;
   if (text.startsWith("http://") || text.startsWith("https://")) return text;
   if (text.startsWith("//")) return `https:${text}`;
   return `${TMDB_IMAGE}/${size}${text.startsWith("/") ? text : `/${text}`}`;
-}
-
-function normalizedTitle(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-
-function featuredProviderUrl(title: string, providerName: string, fallback: string, tmdbId: string) {
-  const normalized = normalizedTitle(title);
-  const provider = normalizedTitle(providerName);
-  if (provider === "disney plus" && (tmdbId === "1434" || normalized.includes("family guy"))) {
-    return "https://www.disneyplus.com/pt-br/browse/entity-3c3c0f8b-7366-4d15-88ab-18050285978e";
-  }
-  if (provider === "disney plus" && (tmdbId === "456" || normalized.includes("simpson"))) {
-    return "https://www.disneyplus.com/pt-br/browse/entity-cac75c8f-a9e2-4d95-ac73-1cf1cc7b9568";
-  }
-  if (provider === "paramount plus" && (tmdbId === "2190" || normalized.includes("south park"))) {
-    return "https://www.paramountplus.com/shows/south-park/";
-  }
-  return fallback;
-}
-
-function providerPriority(title: string, providerName: string, tmdbId: string) {
-  const normalized = normalizedTitle(title);
-  const provider = normalizedTitle(providerName);
-  if ((tmdbId === "1434" || tmdbId === "456" || normalized.includes("family guy") || normalized.includes("simpson")) && provider === "disney plus") return 0;
-  if ((tmdbId === "2190" || normalized.includes("south park")) && provider === "paramount plus") return 0;
-
-  const preferred = ["globoplay", "disney", "paramount", "netflix", "prime video", "max", "apple tv"];
-  const index = preferred.findIndex((name) => provider.includes(name));
-  return index >= 0 ? 10 + index : 100;
-}
-
-function tmdbWatchProviders(data: Record<string, unknown>, title: string): WatchProvider[] {
-  const watchData = asRecord(data["watch/providers"]);
-  const results = asRecord(watchData?.results);
-  const brazil = asRecord(results?.BR);
-  const fallbackUrl = firstString(brazil?.link) || "https://www.themoviedb.org/";
-  const tmdbId = String(asNumber(data.id) ?? "");
-  const groups: Array<{ key: string; access: WatchProvider["access"] }> = [
-    { key: "flatrate", access: "Assinatura" },
-    { key: "free", access: "Grátis" },
-    { key: "ads", access: "Com anúncios" },
-    { key: "rent", access: "Aluguel" },
-    { key: "buy", access: "Compra" },
-  ];
-  const providers = new Map<number, WatchProvider>();
-
-  for (const group of groups) {
-    const items = Array.isArray(brazil?.[group.key]) ? brazil[group.key] : [];
-    for (const value of items) {
-      const item = asRecord(value);
-      const id = asNumber(item?.provider_id);
-      const name = firstString(item?.provider_name);
-      if (id == null || !name || providers.has(id)) continue;
-      providers.set(id, {
-        id,
-        name,
-        logo: tmdbImageUrl(item?.logo_path, "w92") || "",
-        access: group.access,
-        url: featuredProviderUrl(title, name, fallbackUrl, tmdbId),
-        preferredForPtBr: providerPriority(title, name, tmdbId) === 0,
-      });
-    }
-  }
-
-  return [...providers.values()].sort((a, b) => {
-    const priority = providerPriority(title, a.name, tmdbId) - providerPriority(title, b.name, tmdbId);
-    return priority || a.name.localeCompare(b.name, "pt-BR");
-  });
 }
 
 function tmdbGenreNames(movie: Record<string, unknown>, genreMap: Map<number, string>) {
@@ -399,43 +320,30 @@ function mapTmdbMovie(
     director,
     cast,
     trailer: tmdbTrailer(movie),
-    available: false,
+    available: true,
     playback_locale: "pt-BR",
     is_brazilian: isBrazilianProduction(movie) || undefined,
   };
 }
 
-async function annotateProviderAvailability(movies: CatalogMovie[]) {
+async function retainAvailableTitles(movies: CatalogMovie[]) {
   if (movies.length === 0) return [];
   const kinds = [...new Set(movies.map((movie) => movie.kind))];
   const inventories = new Map<MediaKind, Set<string>>();
   await Promise.all(
     kinds.map(async (kind) => {
-      try {
-        inventories.set(kind, await getProviderInventory(kind));
-      } catch {
-        inventories.set(kind, new Set());
-      }
+      inventories.set(kind, await getProviderInventory(kind));
     }),
   );
 
   const seen = new Set<string>();
-  return movies
-    .filter((movie) => {
-      const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
-      const key = `${movie.kind}:${id}`;
-      if (!/^\d+$/.test(id) || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .map((movie) => {
-      const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
-      return { ...movie, available: inventories.get(movie.kind)?.has(id) === true };
-    });
-}
-
-async function retainAvailableTitles(movies: CatalogMovie[]) {
-  return (await annotateProviderAvailability(movies)).filter((movie) => movie.available);
+  return movies.filter((movie) => {
+    const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
+    const key = `${movie.kind}:${id}`;
+    if (!/^\d+$/.test(id) || !inventories.get(movie.kind)?.has(id) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function tmdbRequest(path: string, params: Record<string, string> = {}) {
@@ -583,7 +491,7 @@ async function searchTmdb(query: string) {
       tmdbRequest("/search/tv", { query, include_adult: "false", page: "1" }),
     ]);
 
-    const movies = await annotateProviderAvailability([
+    const movies = await retainAvailableTitles([
       ...findMovieItems(movieData).map((movie) =>
         mapTmdbMovie(movie, "Busca", movieGenres.map, "movie"),
       ),
@@ -617,10 +525,17 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
   }
 
   try {
-    const playerAvailable = await isProviderTitleAvailable(kind, id).catch(() => false);
+    if (!(await isProviderTitleAvailable(kind, id))) {
+      return {
+        movie: null,
+        similar: [] as CatalogMovie[],
+        seasons: [],
+        error: "Título indisponível no catálogo verificado do player",
+      };
+    }
     const path = kind === "tv" ? `/tv/${id}` : `/movie/${id}`;
     const data = asRecord(
-      await tmdbRequest(path, { append_to_response: "credits,videos,external_ids,similar,watch/providers" }),
+      await tmdbRequest(path, { append_to_response: "credits,videos,external_ids,similar" }),
     );
     if (!data) {
       return { movie: null, similar: [] as CatalogMovie[], error: "TMDB: Sem resultados" };
@@ -628,10 +543,6 @@ async function getTmdbDetails(movieId: string, kind: MediaKind) {
 
     const genreMap = new Map<number, string>();
     const movie = mapTmdbMovie(data, kind === "tv" ? "Série" : "Filme", genreMap, kind);
-    if (movie) {
-      movie.available = playerAvailable;
-      movie.watchProviders = tmdbWatchProviders(data, movie.title);
-    }
     const similar = await retainAvailableTitles(findMovieItems(asRecord(data.similar))
       .map((item) => mapTmdbMovie(item, "Semelhantes", genreMap, kind))
       .filter((item): item is CatalogMovie => Boolean(item))
