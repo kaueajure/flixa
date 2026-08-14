@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
-  const title = "Caderno Collie — fórum documental";
-  const description = "História, comportamento e curiosidades verificadas sobre Border Collies.";
+  const title = "Colliepédia — fórum sobre Border Collies";
+  const description = "Artigos, curiosidades verificadas e discussões simples sobre Border Collies.";
 
   return {
     title,
@@ -21,13 +16,11 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       type: "website",
-      images: [{ url: `${origin}/og-caderno-collie.png`, width: 1200, height: 630, alt: "Caderno Collie" }],
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title,
       description,
-      images: [`${origin}/og-caderno-collie.png`],
     },
   };
 }
