@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-test("renders the finalized Flixa opening and metadata", async () => {
+test("renders the public Caderno Collie metadata before authentication", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -27,9 +27,9 @@ test("renders the finalized Flixa opening and metadata", async () => {
     /^text\/html\b/i,
   );
   const html = await response.text();
-  assert.match(html, /<title>Flixa<\/title>/i);
-  assert.match(html, /<meta(?=[^>]*property=["']og:image["'])(?=[^>]*content=["'][^"']*\/og\.png["'])[^>]*>/i);
-  assert.match(html, /<video(?=[^>]*class=["']site-intro-video["'])(?=[^>]*src=["']\/intro\.mp4["'])[^>]*>/i);
+  assert.match(html, /<title>Caderno Collie[^<]*<\/title>/i);
+  assert.match(html, /<meta(?=[^>]*property=["']og:image["'])(?=[^>]*content=["'][^"']*\/og-caderno-collie\.png["'])[^>]*>/i);
+  assert.doesNotMatch(html, /class=["']site-intro-video["']/i);
   assert.match(html, /<img(?=[^>]*class=["']boot-logo["'])(?=[^>]*src=["']\/logo-transparent\.png["'])[^>]*>/i);
   assert.doesNotMatch(html, /name=["']codex-preview["']/i);
 });

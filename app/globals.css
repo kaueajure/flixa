@@ -194,6 +194,673 @@ img {
   }
 }
 
+/* Fórum documental público — exibido antes da autenticação. */
+.bc-forum {
+  --bc-ink: #172018;
+  --bc-muted: #647064;
+  --bc-paper: #fff;
+  --bc-soft: #f1f3ed;
+  --bc-line: #d9ded5;
+  --bc-green: #1f4c36;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--bc-paper);
+  color: var(--bc-ink);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+.bc-forum ::selection {
+  background: #dce8d4;
+  color: var(--bc-ink);
+}
+
+.bc-header {
+  display: grid;
+  width: min(92rem, 100%);
+  min-height: 5.4rem;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 2rem;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 4vw, 4.5rem);
+  border-bottom: 1px solid var(--bc-line);
+}
+
+.bc-wordmark {
+  width: max-content;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+
+.bc-wordmark span {
+  color: var(--bc-green);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.bc-header nav {
+  display: flex;
+  align-items: center;
+  gap: 1.8rem;
+  color: #384238;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.bc-header nav a,
+.bc-footer a {
+  text-underline-offset: 0.28em;
+}
+
+.bc-header nav a:hover,
+.bc-header nav a:focus-visible,
+.bc-footer a:hover,
+.bc-footer a:focus-visible {
+  color: var(--bc-green);
+  text-decoration: underline;
+}
+
+.bc-issue {
+  justify-self: end;
+  color: var(--bc-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bc-hero {
+  display: grid;
+  width: min(92rem, 100%);
+  grid-template-columns: minmax(0, 0.94fr) minmax(24rem, 1.06fr);
+  align-items: stretch;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 5.25rem) clamp(1.25rem, 4vw, 4.5rem) clamp(2.8rem, 6vw, 6rem);
+}
+
+.bc-hero-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: clamp(1rem, 3vw, 3.5rem) clamp(2rem, 6vw, 7rem) 0 0;
+}
+
+.bc-kicker {
+  margin: 0;
+  color: var(--bc-green);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bc-hero h1 {
+  max-width: 9ch;
+  margin: 1.35rem 0 1.6rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(3.4rem, 7.3vw, 7.4rem);
+  font-weight: 400;
+  letter-spacing: -0.065em;
+  line-height: 0.88;
+}
+
+.bc-deck {
+  max-width: 37rem;
+  margin: 0;
+  color: #4f594f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.05rem, 1.6vw, 1.32rem);
+  line-height: 1.58;
+}
+
+.bc-byline {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: auto;
+  padding-top: 3rem;
+  color: var(--bc-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bc-byline strong {
+  color: var(--bc-ink);
+  font-size: 0.76rem;
+}
+
+.bc-cover {
+  position: relative;
+  min-height: clamp(31rem, 52vw, 48rem);
+  overflow: hidden;
+  margin: 0;
+  background: #d9ddd3;
+}
+
+.bc-cover::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 58%, rgba(13, 22, 15, 0.7));
+  content: "";
+  pointer-events: none;
+}
+
+.bc-cover > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 42%;
+  filter: saturate(0.74) contrast(1.04);
+  transition: filter 500ms ease, transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.bc-cover:hover > img {
+  filter: saturate(0.92) contrast(1.02);
+  transform: scale(1.015);
+}
+
+.bc-cover figcaption {
+  position: absolute;
+  right: clamp(1.2rem, 3vw, 2.4rem);
+  bottom: clamp(1.2rem, 3vw, 2.4rem);
+  left: clamp(1.2rem, 3vw, 2.4rem);
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  color: #fff;
+}
+
+.bc-cover figcaption > span {
+  grid-column: 1 / -1;
+  margin-bottom: 0.2rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.bc-cover figcaption a {
+  width: max-content;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.6rem, 5vw, 5.25rem);
+  font-style: italic;
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.45);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.13em;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.bc-cover figcaption a:hover,
+.bc-cover figcaption a:focus-visible {
+  color: #dceccf;
+  outline: none;
+  text-decoration-color: currentColor;
+}
+
+.bc-cover figcaption small {
+  justify-self: end;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 0.65rem;
+}
+
+.bc-intro {
+  display: grid;
+  width: min(92rem, 100%);
+  grid-template-columns: minmax(8rem, 0.6fr) minmax(20rem, 2fr) minmax(15rem, 0.86fr);
+  gap: clamp(2rem, 5vw, 6rem);
+  margin: 0 auto;
+  padding: clamp(4rem, 8vw, 8rem) clamp(1.25rem, 4vw, 4.5rem);
+  border-top: 1px solid var(--bc-line);
+}
+
+.bc-section-number {
+  margin: 0;
+  color: var(--bc-green);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bc-intro h2,
+.bc-section-head h2,
+.bc-sources h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.045em;
+}
+
+.bc-intro h2 {
+  max-width: 13ch;
+  font-size: clamp(2.4rem, 5vw, 5.1rem);
+  line-height: 0.98;
+}
+
+.bc-dropcap {
+  max-width: 49rem;
+  margin: 2rem 0 0;
+  color: #445044;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.04rem, 1.6vw, 1.26rem);
+  line-height: 1.7;
+}
+
+.bc-dropcap::first-letter {
+  float: left;
+  margin: 0.07em 0.11em 0 0;
+  color: var(--bc-green);
+  font-size: 4.1em;
+  line-height: 0.74;
+}
+
+.bc-intro aside {
+  align-self: start;
+  padding-top: 0.15rem;
+  border-top: 3px solid var(--bc-ink);
+}
+
+.bc-intro aside > span {
+  display: block;
+  margin: 0.85rem 0 1.1rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bc-intro dl {
+  margin: 0;
+}
+
+.bc-intro dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--bc-line);
+  font-size: 0.78rem;
+}
+
+.bc-intro dt {
+  color: var(--bc-muted);
+}
+
+.bc-intro dd {
+  margin: 0;
+  text-align: right;
+}
+
+.bc-facts {
+  padding: clamp(4rem, 8vw, 8rem) max(clamp(1.25rem, 4vw, 4.5rem), calc((100% - 92rem) / 2 + clamp(1.25rem, 4vw, 4.5rem)));
+  background: var(--bc-soft);
+}
+
+.bc-section-head {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.6fr) minmax(0, 2.86fr);
+  gap: clamp(2rem, 5vw, 6rem);
+  margin-bottom: clamp(2.5rem, 5vw, 5rem);
+}
+
+.bc-section-head > p {
+  margin: 0;
+  color: var(--bc-green);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bc-section-head h2 {
+  max-width: 19ch;
+  font-size: clamp(2.4rem, 5vw, 5rem);
+  line-height: 1;
+}
+
+.bc-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid #cbd1c7;
+  border-left: 1px solid #cbd1c7;
+}
+
+.bc-fact {
+  min-height: 21rem;
+  padding: clamp(1.4rem, 3vw, 2.5rem);
+  border-right: 1px solid #cbd1c7;
+  border-bottom: 1px solid #cbd1c7;
+}
+
+.bc-fact > span {
+  display: inline-grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  border: 1px solid #b5beb1;
+  border-radius: 50%;
+  color: var(--bc-green);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.bc-fact h3 {
+  max-width: 17ch;
+  margin: 3.6rem 0 1rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.bc-fact p {
+  max-width: 37ch;
+  margin: 0;
+  color: #596459;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.bc-thread {
+  display: grid;
+  width: min(82rem, calc(100% - 2.5rem));
+  grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.65fr);
+  gap: clamp(2rem, 7vw, 8rem);
+  margin: 0 auto;
+  padding: clamp(4rem, 8vw, 8rem) 0;
+}
+
+.bc-thread-title span {
+  color: var(--bc-green);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bc-thread-title h2 {
+  max-width: 9ch;
+  margin: 1.2rem 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.2rem, 4.5vw, 4.5rem);
+  font-weight: 400;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.bc-posts {
+  border-top: 3px solid var(--bc-ink);
+}
+
+.bc-posts article {
+  display: grid;
+  grid-template-columns: 2.8rem minmax(0, 1fr);
+  gap: 1.15rem;
+  padding: 2rem 0;
+  border-bottom: 1px solid var(--bc-line);
+}
+
+.bc-avatar {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #27352b;
+  color: #fff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
+}
+
+.bc-avatar--green {
+  background: #b9c9ad;
+  color: #172018;
+}
+
+.bc-posts header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+
+.bc-posts header strong {
+  font-size: 0.92rem;
+}
+
+.bc-posts header span {
+  color: var(--bc-muted);
+  font-size: 0.7rem;
+}
+
+.bc-posts p {
+  margin: 0.75rem 0 0;
+  color: #4d584d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+.bc-note {
+  grid-column: 2;
+  margin: -0.6rem 0 0;
+  color: var(--bc-muted);
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+.bc-sources {
+  display: grid;
+  grid-template-columns: 0.8fr 1.65fr;
+  gap: clamp(2rem, 7vw, 8rem);
+  padding: clamp(4rem, 7vw, 7rem) max(clamp(1.25rem, 7vw, 7rem), calc((100% - 82rem) / 2));
+  background: var(--bc-green);
+  color: #fff;
+}
+
+.bc-sources .bc-kicker {
+  color: #bcd3af;
+}
+
+.bc-sources h2 {
+  max-width: 10ch;
+  margin-top: 1rem;
+  font-size: clamp(2.2rem, 4vw, 4rem);
+  line-height: 1;
+}
+
+.bc-sources ol {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  list-style: none;
+}
+
+.bc-sources li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-height: 4.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.bc-sources li span {
+  color: #bcd3af;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.bc-sources li a {
+  width: fit-content;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 0.25em;
+}
+
+.bc-sources li a:hover,
+.bc-sources li a:focus-visible {
+  color: #dceccf;
+  text-decoration-color: currentColor;
+}
+
+.bc-footer {
+  display: grid;
+  min-height: 6.5rem;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 2rem;
+  padding: 1.5rem max(clamp(1.25rem, 4vw, 4.5rem), calc((100% - 92rem) / 2 + clamp(1.25rem, 4vw, 4.5rem)));
+  background: #fff;
+  color: var(--bc-muted);
+  font-size: 0.72rem;
+}
+
+.bc-footer p {
+  margin: 0;
+  color: var(--bc-ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+}
+
+.bc-footer a {
+  justify-self: end;
+  color: var(--bc-ink);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .bc-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .bc-header nav {
+    display: none;
+  }
+
+  .bc-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .bc-hero-copy {
+    min-height: 32rem;
+    padding-right: 0;
+  }
+
+  .bc-cover {
+    min-height: min(115vw, 46rem);
+  }
+
+  .bc-intro {
+    grid-template-columns: 1fr 2.5fr;
+  }
+
+  .bc-intro aside {
+    grid-column: 2;
+  }
+
+  .bc-fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bc-thread,
+  .bc-sources {
+    grid-template-columns: 1fr;
+  }
+
+  .bc-thread-title h2,
+  .bc-sources h2 {
+    max-width: 15ch;
+  }
+
+  .bc-note {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .bc-header {
+    min-height: 4.5rem;
+    gap: 1rem;
+  }
+
+  .bc-issue {
+    max-width: 9rem;
+    text-align: right;
+  }
+
+  .bc-hero {
+    padding-top: 1.25rem;
+  }
+
+  .bc-hero-copy {
+    min-height: 29rem;
+  }
+
+  .bc-hero h1 {
+    font-size: clamp(3.25rem, 18vw, 5.2rem);
+  }
+
+  .bc-cover {
+    min-height: 34rem;
+  }
+
+  .bc-intro,
+  .bc-section-head {
+    grid-template-columns: 1fr;
+  }
+
+  .bc-intro aside {
+    grid-column: 1;
+  }
+
+  .bc-fact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bc-fact {
+    min-height: 18rem;
+  }
+
+  .bc-fact h3 {
+    margin-top: 2.8rem;
+  }
+
+  .bc-thread {
+    width: calc(100% - 2.5rem);
+  }
+
+  .bc-posts article {
+    grid-template-columns: 2.4rem minmax(0, 1fr);
+    gap: 0.85rem;
+  }
+
+  .bc-avatar {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+
+  .bc-footer {
+    grid-template-columns: 1fr auto;
+  }
+
+  .bc-footer p {
+    display: none;
+  }
+}
+
 .flixa-shell {
   min-height: 100dvh;
   background:

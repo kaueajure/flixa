@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import BorderCollieForum from "./border-collie-forum";
+import SiteIntro from "./site-intro";
 
 type MediaKind = "movie" | "tv";
 
@@ -483,7 +485,7 @@ export default function Home() {
       .then(async (usuario) => {
         if (!ativo) return;
         if (!usuario) {
-          window.location.href = "/login";
+          setAuthChecking(false);
           return;
         }
         setAuthUser(usuario);
@@ -534,7 +536,7 @@ export default function Home() {
       })
       .catch(() => {
         if (!ativo) return;
-        window.location.href = "/login";
+        setAuthChecking(false);
       })
       .finally(() => {
         window.clearTimeout(timeoutId);
@@ -1022,6 +1024,10 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [playerMovie, selectedMovie, searchOpen, closeDetails, closePlayer]);
 
+  if (!authChecking && !authUser) {
+    return <BorderCollieForum />;
+  }
+
   if (authChecking || loading) {
     return (
       <main className="flixa-shell">
@@ -1040,6 +1046,7 @@ export default function Home() {
 
   return (
     <main className="flixa-shell has-mobile-nav">
+      <SiteIntro />
       <header className={`flixa-header ${scrolled || searchOpen || view !== "home" ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" onClick={() => goTo("home")} aria-label="Flixa início">
           <img className="brand-logo" src="/logo-transparent.png" alt="Flixa" />
