@@ -27,6 +27,7 @@ type Movie = {
   episode?: number;
   positionSeconds?: number;
   available?: boolean;
+  provider_available?: boolean;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
 };
@@ -128,12 +129,21 @@ function movieMeta(movie: Movie) {
   ].filter((item) => item != null && String(item).trim() !== "");
 }
 
+function playbackId(movie: Movie) {
+  const tmdbId = String(movie.tmdb_id || "").trim();
+  if (/^\d+$/.test(tmdbId)) return tmdbId;
+  const imdbId = String(movie.imdb_id || "").trim();
+  if (/^tt\d+$/i.test(imdbId)) return imdbId;
+  const id = titleId(movie);
+  return /^\d+$|^tt\d+$/i.test(id) ? id : "";
+}
+
 function canWatch(movie: Movie) {
-  return movie.available === true && /^\d+$/.test(titleId(movie));
+  return movie.available !== false && Boolean(playbackId(movie));
 }
 
 function availabilityKey(movie: Movie) {
-  return `${mediaKind(movie)}:${titleId(movie)}`;
+  return `${mediaKind(movie)}:${playbackId(movie)}`;
 }
 
 async function retainAvailableMovies(items: Movie[], signal?: AbortSignal) {
@@ -149,17 +159,24 @@ async function retainAvailableMovies(items: Movie[], signal?: AbortSignal) {
         items: movies.map((movie) => ({
           kind: mediaKind(movie),
           tmdb_id: movie.tmdb_id,
+          imdb_id: movie.imdb_id,
           id: movie.id,
         })),
       }),
       signal,
     });
     if (!response.ok) return [];
-    const data = (await response.json()) as { available?: string[] };
+    const data = (await response.json()) as { available?: string[]; provider_available?: string[] };
     const available = new Set(Array.isArray(data.available) ? data.available : []);
+    const providerAvailable = new Set(Array.isArray(data.provider_available) ? data.provider_available : []);
     return movies
       .filter((movie) => available.has(availabilityKey(movie)))
-      .map((movie) => ({ ...movie, available: true, playback_locale: "pt-BR" as const }));
+      .map((movie) => ({
+        ...movie,
+        available: true,
+        provider_available: providerAvailable.has(availabilityKey(movie)),
+        playback_locale: "pt-BR" as const,
+      }));
   } catch {
     return [];
   }
@@ -246,10 +263,9 @@ function detailsHash(movie: Movie) {
 
 function playerHash(movie: Movie, season?: number, episode?: number) {
   const base = `player/${detailsHash(movie)}`;
-  // O provedor verificado gerencia os episódios que realmente possui.
-  // Não criamos uma URL de episódio usando a lista mais ampla da TMDB.
-  void season;
-  void episode;
+  if (mediaKind(movie) === "tv" && season && episode) {
+    return `${base}/s/${season}/e/${episode}`;
+  }
   return base;
 }
 
@@ -516,7 +532,7 @@ export default function Home() {
         setGenres(Array.isArray(data.genres) ? data.genres : []);
         if (next.length === 0) {
           setMovies([]);
-          setLoadError("Nenhum título disponível no catálogo brasileiro verificado neste momento.");
+          setLoadError("Nenhum título foi encontrado no catálogo neste momento.");
           return;
         }
         setMovies(next);
@@ -825,7 +841,7 @@ export default function Home() {
 
   function openDetails(movie: Movie) {
     if (!canWatch(movie)) {
-      showToast("Título indisponível no catálogo verificado");
+      showToast("Título sem ID válido para reprodução");
       return;
     }
     setSearchOpen(false);
@@ -897,13 +913,13 @@ export default function Home() {
 
   function openPlayer(movie: Movie, pick?: { season?: number; episode?: number }) {
     if (!canWatch(movie)) {
-      showToast("Título indisponível no catálogo verificado");
+      showToast("Título sem ID válido para reprodução");
       return;
     }
     const merged = mergeMovieProgress(movie, continueMovies);
     const isTv = mediaKind(merged) === "tv";
-    const season = isTv ? undefined : pick?.season ?? merged.season;
-    const episode = isTv ? undefined : pick?.episode ?? merged.episode;
+    const season = isTv ? pick?.season ?? merged.season ?? 1 : undefined;
+    const episode = isTv ? pick?.episode ?? merged.episode ?? 1 : undefined;
     const payload: Movie = { ...merged, season, episode };
 
     setSearchOpen(false);
@@ -913,8 +929,8 @@ export default function Home() {
     saveProgress(payload, {
       progresso: Math.max(Number(payload.progress || 0), 5),
       posicao_segundos: payload.positionSeconds || 0,
-      temporada: null,
-      episodio: null,
+      temporada: season ?? null,
+      episodio: episode ?? null,
     });
     goTo(playerHash(payload, season, episode));
   }
@@ -1159,10 +1175,10 @@ export default function Home() {
                 {browseTotal
                   ? `${browseTotal.toLocaleString("pt-BR")} ${view === "series" ? "séries" : "filmes"} disponíveis nesta página${
                       activeGenre ? ` em ${activeGenre.name}` : ""
-                    } · Catálogo brasileiro verificado.`
+                    } · Catálogo ampliado.`
                   : browseLoading
                     ? "Carregando o catálogo…"
-                    : "Nenhum título verificado disponível nesta página."}
+                    : "Nenhum título disponível nesta página."}
               </p>
             </div>
             {browsePages > 1 ? (
@@ -2593,6 +2609,7 @@ function MovieDetails({
               </div>
             </div>
           </div>
+          {mediaKind(details) === "tv" ? <TvEpisodePicker movie={details} onWatch={onWatch} /> : null}
           {similar.length ? (
             <div className="similar-block">
               <MovieRow
@@ -2614,7 +2631,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
+  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -2751,60 +2768,113 @@ function buildPlayerSources(movie: Movie, season?: number, episode?: number): Pl
   const isTv = kind === "tv";
   const path = isTv ? "serie" : "filme";
   const episodeSuffix = isTv && season && episode ? `/${season}/${episode}` : "";
+  const fallbackId = /^\d+$/.test(tmdbId) ? tmdbId : (/^tt\d+$/i.test(imdbId) ? imdbId : "");
+  const fallbackIdType = fallbackId.startsWith("tt") ? "IMDb" : "TMDB";
   const sources: PlayerSource[] = [];
 
   if (movie.available === true && /^\d+$/.test(tmdbId)) {
-    sources.push({
-      id: "cdn-tmdb",
-      name: "CDN Brasil",
-      hint: "PT-BR · TMDB · rápido",
-      theme: "cyan",
-      src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
-    });
-    sources.push({
-      id: "superflix-pro",
-      name: "SuperFlix",
-      hint: "PT-BR · dublado/legendado",
-      theme: "gold",
-      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
-    });
-    sources.push({
-      id: "superflix-help",
-      name: "SuperFlix Alt",
-      hint: "PT-BR · espelho oficial",
-      theme: "violet",
-      src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
-    });
-    sources.push({
-      id: "warez-tmdb",
-      name: "WarezCDN",
-      hint: "PT-BR · TMDB",
-      theme: "emerald",
-      src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
-    });
+    if (!isTv) {
+      sources.push({
+        id: "cdn-tmdb",
+        name: "CDN Brasil",
+        hint: "PT-BR · TMDB · rápido",
+        theme: "cyan",
+        src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
+      });
+    }
+    if (!isTv || movie.provider_available === true) {
+      sources.push({
+        id: "superflix-pro",
+        name: "SuperFlix",
+        hint: isTv ? "PT-BR · série verificada" : "PT-BR · dublado/legendado",
+        theme: "gold",
+        src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
+      });
+      sources.push({
+        id: "superflix-help",
+        name: "SuperFlix Alt",
+        hint: isTv ? "PT-BR · espelho verificado" : "PT-BR · espelho oficial",
+        theme: "violet",
+        src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
+      });
+    }
+    if (!isTv) {
+      sources.push({
+        id: "warez-tmdb",
+        name: "WarezCDN",
+        hint: "PT-BR · TMDB",
+        theme: "emerald",
+        src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
+      });
+    }
   }
 
   if (movie.available === true && /^tt\d+$/i.test(imdbId)) {
+    if (!isTv) {
+      sources.push({
+        id: "cdn-imdb",
+        name: "CDN IMDb",
+        hint: "PT-BR · IMDb",
+        theme: "sky",
+        src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
+      });
+    }
+    if (!isTv || movie.provider_available === true) {
+      sources.push({
+        id: "superflix-imdb",
+        name: "SuperFlix IMDb",
+        hint: isTv ? "PT-BR · série verificada" : "PT-BR · IMDb",
+        theme: "rose",
+        src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
+      });
+    }
+    if (!isTv) {
+      sources.push({
+        id: "warez-imdb",
+        name: "WarezCDN IMDb",
+        hint: "PT-BR · IMDb",
+        theme: "emerald",
+        src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
+      });
+    }
+  }
+
+  if (!isTv) {
+    if (fallbackId) {
+      sources.push({
+        id: "111movies",
+        name: "111Movies",
+        hint: `Alternativo · ${fallbackIdType}`,
+        theme: "violet",
+        src: `https://111movies.net/movie/${fallbackId}`,
+      });
+      sources.push({
+        id: "2embed",
+        name: "2Embed",
+        hint: `Alternativo · ${fallbackIdType}`,
+        theme: "rose",
+        src: `https://www.2embed.online/embed/movie/${fallbackId}`,
+      });
+    }
+  }
+
+  if (fallbackId) {
     sources.push({
-      id: "cdn-imdb",
-      name: "CDN IMDb",
-      hint: "PT-BR · IMDb",
+      id: "myembed",
+      name: "MyEmbed",
+      hint: `Alternativo · ${fallbackIdType}`,
       theme: "sky",
-      src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
+      src: `https://myembed.biz/${path}/${fallbackId}${episodeSuffix}`,
     });
+  }
+
+  if (!isTv && /^tt\d+$/i.test(imdbId)) {
     sources.push({
-      id: "superflix-imdb",
-      name: "SuperFlix IMDb",
-      hint: "PT-BR · IMDb",
-      theme: "rose",
-      src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
-    });
-    sources.push({
-      id: "warez-imdb",
-      name: "WarezCDN IMDb",
-      hint: "PT-BR · IMDb",
-      theme: "emerald",
-      src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
+      id: "filmesyseries",
+      name: "Filmes & Séries",
+      hint: `Alternativo · IMDb`,
+      theme: "gold",
+      src: `https://filmesyseries.epizy.com/embed-2/?type=movies&imdb=${imdbId}`,
     });
   }
 
@@ -2880,8 +2950,8 @@ function PlayerServerMenu({
       </button>
 
       {open ? (
-        <div className="player-server-dropdown" role="listbox" aria-label="Servidores PT-BR">
-          <p className="player-server-heading">Servidores em português</p>
+        <div className="player-server-dropdown" role="listbox" aria-label="Servidores disponíveis">
+          <p className="player-server-heading">Servidores disponíveis</p>
           {sources.map((source) => {
             const selected = source.id === active.id;
             return (

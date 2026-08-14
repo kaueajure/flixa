@@ -25,6 +25,7 @@ export type TituloPayload = {
   episode?: number;
   positionSeconds?: number;
   available?: boolean;
+  provider_available?: boolean;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
 };
@@ -89,6 +90,7 @@ function movieFromRow(row: {
     season: row.temporada ?? fromJson?.season,
     episode: row.episodio ?? fromJson?.episode,
     available: fromJson?.available,
+    provider_available: fromJson?.provider_available,
     playback_locale: fromJson?.playback_locale,
     is_brazilian: fromJson?.is_brazilian,
     positionSeconds: row.posicao_segundos ?? fromJson?.positionSeconds,
