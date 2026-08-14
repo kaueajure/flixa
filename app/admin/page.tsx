@@ -30,6 +30,8 @@ type AdminServer = {
   supportsTv: boolean;
   audioProfile: "pt-BR" | "legendado";
   priority: number;
+  protectedEmbedCompatible: boolean;
+  compatibilityMessage?: string;
   enabled: boolean;
   disabled_until: string | null;
   last_status: ServerStatus;
@@ -405,13 +407,13 @@ export default function AdminPage() {
                 {servidores.map((server) => (
                   <tr key={server.id} className={!server.enabled ? "is-disabled" : ""}>
                     <td><span className={`server-status is-${server.last_status}`}><i aria-hidden="true" />{server.last_status === "online" ? "Online" : server.last_status === "offline" ? "Falhou" : "Não testado"}</span></td>
-                    <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small></td>
+                    <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{!server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Bloqueia proteção anti-pop-up</small> : null}</td>
                     <td>{[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}<small className={`server-audio-profile is-${server.audioProfile === "pt-BR" ? "ptbr" : "sub"}`}>{server.audioProfile === "pt-BR" ? "PT-BR prioritário" : "Legendado"}</small></td>
                     <td className="server-last-test"><strong>{formatDate(server.last_tested_at)}</strong><small>{server.last_latency_ms != null ? `${server.last_latency_ms} ms · ` : ""}{server.last_http_status ? `HTTP ${server.last_http_status} · ` : ""}{server.last_message || "Aguardando teste"}</small></td>
                     <td><span className={`server-enabled ${server.enabled ? "is-on" : "is-off"}`}>{server.enabled ? "Habilitado" : "Desativado"}</span>{!server.enabled && server.disabled_until ? <small className="server-domain">até {formatDate(server.disabled_until)}</small> : null}</td>
                     <td className="admin-actions server-actions">
                       <button type="button" disabled={busyId === `test:${server.id}` || testingAll} onClick={() => void testarServidor(server)}>{busyId === `test:${server.id}` ? "Testando…" : "Testar"}</button>
-                      <button type="button" className={server.enabled ? "is-danger" : "is-enable"} disabled={busyId === `toggle:${server.id}`} onClick={() => void setServerEnabled(server, !server.enabled)}>{server.enabled ? "Desativar" : "Habilitar"}</button>
+                      <button type="button" className={server.enabled ? "is-danger" : "is-enable"} disabled={busyId === `toggle:${server.id}` || !server.protectedEmbedCompatible} title={!server.protectedEmbedCompatible ? server.compatibilityMessage : undefined} onClick={() => void setServerEnabled(server, !server.enabled)}>{!server.protectedEmbedCompatible ? "Incompatível" : server.enabled ? "Desativar" : "Habilitar"}</button>
                     </td>
                   </tr>
                 ))}

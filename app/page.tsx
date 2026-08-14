@@ -3231,7 +3231,8 @@ function buildPlayerSources(
   const seenServers = new Set<string>();
   return sources.filter((source) => {
     const serverId = playerServerIdForSource(source.id);
-    if (!source.src || seen.has(source.src) || seenServers.has(serverId) || disabledServerIds.has(serverId)) return false;
+    const server = getPlayerServer(serverId);
+    if (!source.src || seen.has(source.src) || seenServers.has(serverId) || disabledServerIds.has(serverId) || server?.protectedEmbedCompatible === false) return false;
     seen.add(source.src);
     seenServers.add(serverId);
     return true;

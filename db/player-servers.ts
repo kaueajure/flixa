@@ -13,7 +13,11 @@ function parseSqlDate(value: string | null) {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function effectiveEnabled(row: typeof servidores_player.$inferSelect | undefined) {
+function effectiveEnabled(
+  row: typeof servidores_player.$inferSelect | undefined,
+  server?: (typeof PLAYER_SERVERS)[number],
+) {
+  if (server && !server.protectedEmbedCompatible) return false;
   if (!row || Number(row.habilitado) === 1) return true;
   const disabledUntil = parseSqlDate(row.desabilitado_ate);
   return disabledUntil != null && disabledUntil <= Date.now();
@@ -28,7 +32,7 @@ export async function listarServidoresAdmin() {
     const row = byId.get(server.id);
     return {
       ...server,
-      enabled: effectiveEnabled(row),
+      enabled: effectiveEnabled(row, server),
       disabled_until: row?.desabilitado_ate ?? null,
       last_status: (row?.ultimo_status ?? "unknown") as PlayerServerStatus,
       last_http_status: row?.ultimo_http_status ?? null,
@@ -42,7 +46,10 @@ export async function listarServidoresAdmin() {
 export async function listarServidoresDesabilitados() {
   const db = await getDb();
   const rows = await db.select().from(servidores_player);
-  return rows.filter((row) => !effectiveEnabled(row)).map((row) => row.servidor_id);
+  const byId = new Map(rows.map((row) => [row.servidor_id, row]));
+  return PLAYER_SERVERS
+    .filter((server) => !effectiveEnabled(byId.get(server.id), server))
+    .map((server) => server.id);
 }
 
 export async function definirServidorHabilitado(
@@ -51,7 +58,11 @@ export async function definirServidorHabilitado(
   adminId: number,
   minutes?: number | null,
 ) {
-  if (!getPlayerServer(serverId)) throw new Error("Servidor desconhecido.");
+  const server = getPlayerServer(serverId);
+  if (!server) throw new Error("Servidor desconhecido.");
+  if (enabled && !server.protectedEmbedCompatible) {
+    throw new Error(server.compatibilityMessage || "Este servidor não aceita o iframe protegido.");
+  }
   const now = new Date();
   const disabledUntil = !enabled && minutes && minutes > 0
     ? dateToSql(new Date(now.getTime() + Math.min(minutes, 30 * 24 * 60) * 60_000))

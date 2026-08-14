@@ -51,6 +51,10 @@ async function testEndpoint(
       headers: {
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7",
+        Referer: "https://flixa.app/",
+        "Sec-Fetch-Dest": "iframe",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
       },
       signal: controller.signal,
     });
@@ -136,6 +140,22 @@ async function testEndpoint(
 }
 
 export async function testPlayerServer(server: PlayerServerDefinition): Promise<PlayerServerHealthResult> {
+  if (!server.protectedEmbedCompatible) {
+    const checks: PlayerServerEndpointCheck[] = [
+      ...(server.supportsMovie ? [{ kind: "movie" as const, status: "offline" as const, httpStatus: null, latencyMs: 0, message: server.compatibilityMessage || "Incompatível com o player protegido", finalUrl: server.testUrl }] : []),
+      ...(server.supportsTv ? [{ kind: "tv" as const, status: "offline" as const, httpStatus: null, latencyMs: 0, message: server.compatibilityMessage || "Incompatível com o player protegido", finalUrl: server.testTvUrl }] : []),
+    ];
+    return {
+      id: server.id,
+      status: "offline",
+      httpStatus: null,
+      latencyMs: 0,
+      message: `Proteção incompatível · ${server.compatibilityMessage || "o servidor rejeita o iframe seguro"}`,
+      finalUrl: server.testUrl,
+      checks,
+    };
+  }
+
   const targets: Array<{ kind: "movie" | "tv"; url: string }> = [];
   if (server.supportsMovie && server.testUrl) targets.push({ kind: "movie", url: server.testUrl });
   if (server.supportsTv && server.testTvUrl) targets.push({ kind: "tv", url: server.testTvUrl });
