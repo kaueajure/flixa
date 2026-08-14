@@ -2701,7 +2701,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
+  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|vidlink\.pro|vidsrc|vidfast\.vc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -2841,6 +2841,113 @@ function buildPlayerSources(movie: Movie, season?: number, episode?: number): Pl
   const fallbackId = /^\d+$/.test(tmdbId) ? tmdbId : (/^tt\d+$/i.test(imdbId) ? imdbId : "");
   const fallbackIdType = fallbackId.startsWith("tt") ? "IMDb" : "TMDB";
   const sources: PlayerSource[] = [];
+
+  const episodePath = `${season ?? 1}/${episode ?? 1}`;
+  const episodeDashPath = `${season ?? 1}-${episode ?? 1}`;
+  const tmdbOnlyId = /^\d+$/.test(tmdbId) ? tmdbId : "";
+
+  // Reservas independentes verificadas em filme e episódio. Elas ficam antes
+  // dos provedores legados para que uma origem ativa seja aberta por padrão.
+  if (tmdbOnlyId) {
+    sources.push(
+      {
+        id: "vidlink",
+        name: "VidLink",
+        hint: "Reserva · múltiplos servidores",
+        theme: "cyan",
+        src: isTv
+          ? `https://vidlink.pro/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://vidlink.pro/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "vidsrc-wiki",
+        name: "VidSrc Wiki",
+        hint: "Reserva · TMDB",
+        theme: "violet",
+        src: isTv
+          ? `https://vidsrc.wiki/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://vidsrc.wiki/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "vidphantom",
+        name: "VidPhantom",
+        hint: "Reserva · player alternativo",
+        theme: "rose",
+        src: isTv
+          ? `https://vidphantom.com/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://vidphantom.com/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "yapgrid",
+        name: "YapGrid",
+        hint: "Reserva · multi-CDN",
+        theme: "emerald",
+        src: isTv
+          ? `https://yapgrid.com/embed/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://yapgrid.com/embed/movie/${tmdbOnlyId}`,
+      },
+      {
+        id: "videasy",
+        name: "Videasy",
+        hint: "Reserva · legendas",
+        theme: "sky",
+        src: isTv
+          ? `https://player.videasy.net/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://player.videasy.net/movie/${tmdbOnlyId}`,
+      },
+    );
+  }
+
+  if (fallbackId) {
+    const autoEmbedKind = fallbackId.startsWith("tt") ? "imdb" : "tmdb";
+    sources.push(
+      {
+        id: "moviesapi",
+        name: "MoviesAPI",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "gold",
+        src: isTv
+          ? `https://moviesapi.to/tv/${fallbackId}/${episodePath}`
+          : `https://moviesapi.to/movie/${fallbackId}`,
+      },
+      {
+        id: "vidfast",
+        name: "VidFast",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "emerald",
+        src: isTv
+          ? `https://vidfast.vc/tv/${fallbackId}/${episodePath}?autoPlay=false`
+          : `https://vidfast.vc/movie/${fallbackId}?autoPlay=false`,
+      },
+      {
+        id: "autoembed-co",
+        name: "AutoEmbed",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "gold",
+        src: isTv
+          ? `https://autoembed.co/tv/${autoEmbedKind}/${fallbackId}-${episodeDashPath}`
+          : `https://autoembed.co/movie/${autoEmbedKind}/${fallbackId}`,
+      },
+      {
+        id: "vidsrc-link",
+        name: "VidSrc Link",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "violet",
+        src: isTv
+          ? `https://vidsrc.link/embed/tv/${fallbackId}/${episodePath}`
+          : `https://vidsrc.link/embed/movie/${fallbackId}`,
+      },
+      {
+        id: "vidsrcme",
+        name: "VidSrcMe",
+        hint: `Reserva · ${fallbackIdType}`,
+        theme: "sky",
+        src: isTv
+          ? `https://vidsrcme.su/embed/tv/${fallbackId}/${episodeDashPath}`
+          : `https://vidsrcme.su/embed/movie/${fallbackId}`,
+      },
+    );
+  }
 
   if (movie.available === true && /^\d+$/.test(tmdbId)) {
     if (!isTv) {
