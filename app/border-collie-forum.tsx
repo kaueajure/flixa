@@ -24,7 +24,11 @@ const references = [
   },
 ];
 
-export default function BorderCollieForum() {
+type BorderCollieForumProps = {
+  onPhilpClick?: () => void;
+};
+
+export default function BorderCollieForum({ onPhilpClick }: BorderCollieForumProps) {
   return (
     <main className="wiki-forum">
       <header className="wiki-topbar">
@@ -121,7 +125,17 @@ export default function BorderCollieForum() {
                   {dogs.map((dog) => (
                     <tr key={dog.name}>
                       <td>
-                        {dog.name === "Philp" ? <a href="/login">{dog.name}</a> : <a href="#comunidade">{dog.name}</a>}
+                        {dog.name === "Philp" ? (
+                          <a
+                            href="#philp"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              onPhilpClick?.();
+                            }}
+                          >
+                            {dog.name}
+                          </a>
+                        ) : <a href="#comunidade">{dog.name}</a>}
                       </td>
                       <td>{dog.age}</td>
                       <td>{dog.coat}</td>

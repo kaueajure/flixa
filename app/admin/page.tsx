@@ -93,7 +93,7 @@ export default function AdminPage() {
 
   function handleUnauthorized(status: number) {
     if (status === 401 || status === 403) {
-      router.replace(status === 401 ? "/login" : "/");
+      router.replace("/");
       return true;
     }
     return false;

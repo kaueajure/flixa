@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { getPlayerServer, playerServerIdForSource } from "../lib/player-servers";
 import BorderCollieForum from "./border-collie-forum";
+import LoginForm from "./login-form";
 import SiteIntro from "./site-intro";
 
 type MediaKind = "movie" | "tv";
@@ -432,6 +433,7 @@ function useFocusTrap(active: boolean, ref: RefObject<HTMLElement | null>) {
 export default function Home() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -554,7 +556,7 @@ export default function Home() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
-      window.location.href = "/login";
+      window.location.href = "/";
     }
   }
 
@@ -1027,7 +1029,8 @@ export default function Home() {
   }, [playerMovie, selectedMovie, searchOpen, closeDetails, closePlayer]);
 
   if (!authChecking && !authUser) {
-    return <BorderCollieForum />;
+    if (loginOpen) return <LoginForm />;
+    return <BorderCollieForum onPhilpClick={() => setLoginOpen(true)} />;
   }
 
   if (authChecking || loading) {
