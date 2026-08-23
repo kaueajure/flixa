@@ -25,6 +25,7 @@ const UNSAFE_EMBED_MESSAGE = "Exige iframe sem sandbox; ficaria livre para abrir
 const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
   { id: "vidlink", name: "VidLink", domain: "vidlink.pro", testUrl: "https://vidlink.pro/movie/550", testTvUrl: "https://vidlink.pro/tv/1399/1/1", supportsMovie: true, supportsTv: true, protectedEmbedCompatible: false, compatibilityMessage: UNSAFE_EMBED_MESSAGE },
   { id: "moviesapi", name: "MoviesAPI", domain: "moviesapi.to", testUrl: "https://moviesapi.to/movie/550", testTvUrl: "https://moviesapi.to/tv/1399/1/1", supportsMovie: true, supportsTv: true },
+  { id: "vidzen", name: "VidZen", domain: "vidzen.fun", testUrl: "https://vidzen.fun/movie/550", testTvUrl: "https://vidzen.fun/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "vidfast", name: "VidFast", domain: "vidfast.vc", testUrl: "https://vidfast.vc/movie/550?autoPlay=false&sub=pt", testTvUrl: "https://vidfast.vc/tv/1399/1/1?autoPlay=false&sub=pt", supportsMovie: true, supportsTv: true, protectedEmbedCompatible: false, compatibilityMessage: UNSAFE_EMBED_MESSAGE },
   { id: "autoembed-co", name: "AutoEmbed", domain: "autoembed.co", testUrl: "https://autoembed.co/movie/tmdb/550", testTvUrl: "https://autoembed.co/tv/tmdb/1399-1-1", supportsMovie: true, supportsTv: true },
   { id: "vidsrc-link", name: "VidSrc Link", domain: "vidsrc.link", testUrl: "https://vidsrc.link/embed/movie/550", testTvUrl: "https://vidsrc.link/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
@@ -81,7 +82,7 @@ const BLOCKED_SERVER_REASONS: Record<string, string> = {
 const SERVER_PRIORITY = [
   "megaembed-br", "cdn-embed", "superflix-pro", "superflix-help", "warezcdn",
   "pomfy", "betterflix", "pipocacine", "redeflix", "megaembedapi",
-  "myembed", "filmesyseries", "vidlink", "moviesapi", "autoembed-co",
+  "myembed", "filmesyseries", "vidlink", "moviesapi", "vidzen", "autoembed-co",
   "vidsrc-link", "vidsrcme", "vidphantom", "ezvidapi", "vidcore",
   "cinesrc", "vidsrc-mov", "cinextream", "embed-api", "vidapi",
   "1embed", "iembed", "mapple", "111movies", "2embed",

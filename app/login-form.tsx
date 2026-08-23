@@ -115,8 +115,15 @@ export default function LoginForm() {
         return;
       }
 
-      // Navegação full page para garantir que o cookie de sessão vá junto.
-      window.location.assign("/");
+      // Navegação full page para garantir que o cookie de sessão vá junto e
+      // preservar um convite de sessão compartilhada recebido antes do login.
+      const atual = new URL(window.location.href);
+      const destino = new URL("/", window.location.origin);
+      destino.searchParams.set("welcome", "1");
+      const sala = atual.searchParams.get("party");
+      if (sala) destino.searchParams.set("party", sala);
+      destino.hash = atual.hash;
+      window.location.assign(`${destino.pathname}${destino.search}${destino.hash}`);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         setErro("Demorou demais para responder. Confira o MySQL/env na Hostinger.");

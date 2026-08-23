@@ -216,6 +216,16 @@ export async function obterProgresso(usuarioId: number, chave: string) {
   return rows[0] ? movieFromRow(rows[0]) : null;
 }
 
+export async function removerProgresso(usuarioId: number, chave: string) {
+  await withDb(async (db) => {
+    await db
+      .delete(progresso_reproducao)
+      .where(
+        and(eq(progresso_reproducao.usuario_id, usuarioId), eq(progresso_reproducao.chave_titulo, chave)),
+      );
+  });
+}
+
 export async function salvarProgresso(
   usuarioId: number,
   movie: TituloPayload,

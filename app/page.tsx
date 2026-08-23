@@ -9,6 +9,7 @@ import {
 import BorderCollieForum from "./border-collie-forum";
 import LoginForm from "./login-form";
 import SiteIntro from "./site-intro";
+import WatchPartyControls from "./watch-party-controls";
 
 type MediaKind = "movie" | "tv";
 
@@ -43,7 +44,7 @@ type Movie = {
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "lista" | "surpreenda-me";
+type View = "home" | "filmes" | "series" | "lista" | "surpreenda-me" | "grupo";
 type AuthUser = {
   id: number;
   nome: string;
@@ -362,6 +363,7 @@ function parseRoute(hash: string) {
   }
   if (raw === "minha-lista" || raw === "lista") return { view: "lista" as View };
   if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
+  if (raw === "assistir-em-grupo" || raw === "grupo") return { view: "grupo" as View };
 
   const genre = raw.match(/^genero\/(\d+)$/);
   if (genre) {
@@ -684,7 +686,8 @@ export default function Home() {
         route.view === "filmes" ||
         route.view === "series" ||
         route.view === "lista" ||
-        route.view === "surpreenda-me"
+        route.view === "surpreenda-me" ||
+        route.view === "grupo"
       ) {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -823,6 +826,12 @@ export default function Home() {
   }, [heroPaused, heroPool.length, view]);
 
   const featuredMovie = heroPool[heroIndex] ?? heroPool[0] ?? null;
+  const groupCandidates = useMemo(() => dedupeMovies([
+    ...continueMovies,
+    ...listMovies,
+    ...uniqueMovies,
+    ...uniqueSeries,
+  ]).filter(canWatch).slice(0, 18), [continueMovies, listMovies, uniqueMovies, uniqueSeries]);
 
   const catalogRows = useMemo(() => {
     const order = Array.from(new Set(movies.map((movie) => movie.source).filter((source): source is string => Boolean(source))));
@@ -885,6 +894,24 @@ export default function Home() {
       }
     })();
   };
+
+  function removeFromContinue(movie: Movie) {
+    const key = movieKey(movie);
+    setContinueMovies((current) => current.filter((item) => movieKey(item) !== key));
+    showToast(`${movie.title} saiu de Continuar assistindo`);
+
+    void fetch(`/api/progresso?chave=${encodeURIComponent(key)}`, {
+      method: "DELETE",
+      credentials: "include",
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("Falha ao remover progresso");
+      })
+      .catch(() => {
+        setContinueMovies((current) => dedupeMovies([movie, ...current]).slice(0, 16));
+        showToast("Não foi possível remover. Tente novamente.");
+      });
+  }
 
   function goTo(hash: string) {
     const next = `#${hash}`;
@@ -989,6 +1016,13 @@ export default function Home() {
     goTo(playerHash(payload, season, episode));
   }
 
+  function createGroupSession(movie: Movie) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("party", "create");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    openPlayer(movie);
+  }
+
   const syncPlayerEpisode = useCallback((movie: Movie, season: number, episode: number) => {
     const next = { ...movie, season, episode };
     setPlayerMovie(next);
@@ -1002,6 +1036,9 @@ export default function Home() {
   const closePlayer = useCallback(() => {
     setPlayerMovie(null);
     setSelectedMovie(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("party");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     goTo(catalogReturnHash(lastCatalogHash.current));
   }, []);
 
@@ -1058,7 +1095,7 @@ export default function Home() {
 
   return (
     <main className="flixa-shell has-mobile-nav">
-      <SiteIntro />
+      <SiteIntro name={authUser.nome} />
       <header className={`flixa-header ${scrolled || searchOpen || view !== "home" ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" onClick={() => goTo("home")} aria-label="Flixa início">
           <img className="brand-logo" src="/logo-transparent.png" alt="Flixa" />
@@ -1080,6 +1117,14 @@ export default function Home() {
             onClick={() => goTo("surpreenda-me")}
           >
             Surpreenda-me
+          </a>
+          <a
+            href="#assistir-em-grupo"
+            className={`nav-group-link ${view === "grupo" ? "is-active" : ""}`}
+            onClick={() => goTo("assistir-em-grupo")}
+          >
+            <span aria-hidden="true">◉</span>
+            Assistir em grupo
           </a>
           <a
             href="#minha-lista"
@@ -1172,7 +1217,13 @@ export default function Home() {
         </div>
       ) : null}
 
-      {view === "lista" ? (
+      {view === "grupo" ? (
+        <GroupWatchView
+          movies={groupCandidates}
+          onCreate={createGroupSession}
+          onExplore={() => goTo("filmes")}
+        />
+      ) : view === "lista" ? (
         <section className="list-view" id="minha-lista">
           <div className="list-view-head">
             <div>
@@ -1458,6 +1509,7 @@ export default function Home() {
                 listed={listMovies}
                 onOpen={(movie) => openPlayer(movie)}
                 onToggleList={toggleList}
+                onRemoveProgress={removeFromContinue}
               />
             ) : recentMovies.length ? (
               <MovieRow
@@ -1534,11 +1586,11 @@ export default function Home() {
           Séries
         </a>
         <a
-          href="#surpreenda-me"
-          className={view === "surpreenda-me" ? "is-active" : ""}
-          onClick={() => goTo("surpreenda-me")}
+          href="#assistir-em-grupo"
+          className={view === "grupo" ? "is-active" : ""}
+          onClick={() => goTo("assistir-em-grupo")}
         >
-          Surpreenda-me
+          Grupo
         </a>
         <a href="#minha-lista" className={view === "lista" ? "is-active" : ""} onClick={() => goTo("minha-lista")}>
           Lista
@@ -2254,6 +2306,67 @@ function MovieThumb({ movie }: { movie: Movie }) {
   );
 }
 
+function GroupWatchView({
+  movies,
+  onCreate,
+  onExplore,
+}: {
+  movies: Movie[];
+  onCreate: (movie: Movie) => void;
+  onExplore: () => void;
+}) {
+  return (
+    <section className="list-view group-watch-view" id="assistir-em-grupo">
+      <div className="list-view-head">
+        <div>
+          <p className="eyebrow">Flixa Party</p>
+          <h1>Assistir em grupo</h1>
+          <p className="hero-description">
+            Todo mundo no mesmo segundo. Você cria a sala, envia o link e controla play, pausa e avanço para o grupo inteiro.
+          </p>
+        </div>
+        <button className="secondary-action" type="button" onClick={onExplore}>Explorar catálogo</button>
+      </div>
+
+      <div className="group-watch-guide" aria-label="Como criar uma sessão">
+        <div className="group-watch-status"><span /> Salas em tempo real · até 12 pessoas</div>
+        <ol>
+          <li><b>1</b><span><strong>Escolha um título</strong><small>Filme ou episódio.</small></span></li>
+          <li><b>2</b><span><strong>Copie o convite</strong><small>A sala abre automaticamente.</small></span></li>
+          <li><b>3</b><span><strong>Assista junto</strong><small>O anfitrião controla para todos.</small></span></li>
+        </ol>
+      </div>
+
+      <div className="group-watch-picker-head">
+        <div>
+          <p className="eyebrow">Começar agora</p>
+          <h2>O que vocês vão assistir?</h2>
+        </div>
+      </div>
+
+      {movies.length ? (
+        <div className="poster-grid">
+          {movies.map((movie) => (
+            <MovieCard
+              key={movieKey(movie)}
+              movie={movie}
+              inList={false}
+              onOpen={onCreate}
+              onToggleList={onCreate}
+              actionLabel="Criar sala"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <p>Nenhum título disponível para criar uma sala agora.</p>
+          <button className="primary-action" type="button" onClick={onExplore}>Explorar catálogo</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function MovieRow({
   title,
   items,
@@ -2261,6 +2374,7 @@ function MovieRow({
   listId,
   onOpen,
   onToggleList,
+  onRemoveProgress,
   onSeeAll,
 }: {
   title: string;
@@ -2269,6 +2383,7 @@ function MovieRow({
   listId?: string;
   onOpen: (movie: Movie) => void;
   onToggleList: (movie: Movie) => void;
+  onRemoveProgress?: (movie: Movie) => void;
   onSeeAll?: () => void;
 }) {
   const railRef = useRef<HTMLDivElement>(null);
@@ -2359,6 +2474,7 @@ function MovieRow({
             inList={isListed(listed, movie)}
             onOpen={onOpen}
             onToggleList={onToggleList}
+            onRemoveProgress={onRemoveProgress}
           />
         ))}
       </div>
@@ -2371,11 +2487,15 @@ function MovieCard({
   inList,
   onOpen,
   onToggleList,
+  onRemoveProgress,
+  actionLabel,
 }: {
   movie: Movie;
   inList: boolean;
   onOpen: (movie: Movie) => void;
   onToggleList: (movie: Movie) => void;
+  onRemoveProgress?: (movie: Movie) => void;
+  actionLabel?: string;
 }) {
   const src = imageSrc(movie.poster);
 
@@ -2393,12 +2513,22 @@ function MovieCard({
             {formatScore(movie.rating) ? <span className="score-badge">{formatScore(movie.rating)}</span> : null}
           </span>
         </button>
+        {onRemoveProgress ? (
+          <button
+            className="card-remove-progress"
+            type="button"
+            aria-label={`Remover ${movie.title} de Continuar assistindo`}
+            onClick={() => onRemoveProgress(movie)}
+          >
+            <span aria-hidden="true">×</span> Remover
+          </button>
+        ) : null}
         <button
           className={`card-list-btn ${inList ? "is-on" : ""}`}
           type="button"
           onClick={() => onToggleList(movie)}
         >
-          {inList ? "Remover da lista" : "Adicionar a Lista"}
+          {actionLabel ?? (inList ? "Remover da lista" : "Adicionar a Lista")}
         </button>
       </div>
       <div className="card-meta">
@@ -2924,6 +3054,15 @@ function buildPlayerSources(
           : `https://vidlink.pro/movie/${tmdbOnlyId}`,
       },
       {
+        id: "vidzen",
+        name: "VidZen",
+        hint: "Sessão sincronizada",
+        theme: "rose",
+        src: isTv
+          ? `https://vidzen.fun/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://vidzen.fun/movie/${tmdbOnlyId}`,
+      },
+      {
         id: "vidsrc-wiki",
         name: "VidSrc Wiki",
         hint: "Compatível com TMDB",
@@ -3389,19 +3528,36 @@ function MoviePlayer({
   const [disabledServerIds, setDisabledServerIds] = useState<Set<string>>(
     () => new Set(DEFAULT_DISABLED_PLAYER_SERVER_IDS),
   );
-  const sources = buildPlayerSources(
+  const [sourceOrder, setSourceOrder] = useState<string[]>([]);
+  const [sourceId, setSourceId] = useState<PlayerSourceId>("");
+  const [serverPreparing, setServerPreparing] = useState(true);
+  const [failedSourceIds, setFailedSourceIds] = useState<Set<string>>(() => new Set());
+  const [serverNotice, setServerNotice] = useState("");
+  const [partyProviderId, setPartyProviderId] = useState<string | null>(null);
+  const availableSources = useMemo(() => buildPlayerSources(
     movie,
     isTv ? season : undefined,
     isTv ? episode : undefined,
     disabledServerIds,
-  );
-  const [sourceId, setSourceId] = useState<PlayerSourceId>(sources[0]?.id ?? "vidlink");
+  ), [movie, isTv, season, episode, disabledServerIds]);
+  const sources = useMemo(() => {
+    const sourceOrderIndex = new Map(sourceOrder.map((id, index) => [id, index]));
+    return [...availableSources].sort((left, right) => {
+      const leftIndex = sourceOrderIndex.get(left.id) ?? 999;
+      const rightIndex = sourceOrderIndex.get(right.id) ?? 999;
+      return leftIndex - rightIndex || (left.priority ?? 999) - (right.priority ?? 999);
+    });
+  }, [availableSources, sourceOrder]);
   const [menuPinned, setMenuPinned] = useState(false);
   const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
   const onProgressRef = useRef(onProgress);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const playerIframeRef = useRef<HTMLIFrameElement | null>(null);
   const fsHideTimer = useRef<number | null>(null);
-  const activeSource = sources.find((source) => source.id === sourceId) ?? sources[0];
+  const iframeLoadedRef = useRef(false);
+  const activeSource = serverPreparing || !sourceId
+    ? undefined
+    : sources.find((source) => source.id === sourceId);
   const currentEpisodeInfo = episodes.find((item) => item.episode_number === episode);
   const currentSeasonInfo = seasons.find((item) => item.season_number === season);
   const episodeLabel = isTv
@@ -3428,29 +3584,136 @@ function MoviePlayer({
   }, [isTv, movie.id, movie.season, movie.episode, movie.progress]);
 
   useEffect(() => {
-    const nextSources = buildPlayerSources(
+    const controller = new AbortController();
+    const candidates = buildPlayerSources(
       movie,
       isTv ? season : undefined,
       isTv ? episode : undefined,
-      disabledServerIds,
+      new Set(),
     );
-    setSourceId((current) => (nextSources.some((source) => source.id === current) ? current : (nextSources[0]?.id ?? "vidlink")));
-  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv, disabledServerIds]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/movies/servers", { cache: "no-store", signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { disabled?: string[] } | null) => {
-        if (!controller.signal.aborted) {
-          setDisabledServerIds(new Set(Array.isArray(data?.disabled) ? data.disabled : []));
-        }
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      setServerPreparing(true);
+      setServerNotice("Analisando os servidores para este título…");
+      setFailedSourceIds(new Set());
+      setSourceOrder([]);
+      setSourceId("");
+    });
+    fetch("/api/movies/servers", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: isTv ? "tv" : "movie",
+        sources: candidates.map((source) => ({ id: source.id, url: source.src })),
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Não foi possível avaliar os servidores.");
+        return response.json() as Promise<{ disabled?: string[]; order?: string[] }>;
+      })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        const disabled = new Set(Array.isArray(data.disabled) ? data.disabled : []);
+        const enabledCandidates = candidates.filter(
+          (source) => !disabled.has(playerServerIdForSource(source.id)),
+        );
+        const requestedOrder = Array.isArray(data.order) ? data.order : [];
+        const knownIds = new Set(enabledCandidates.map((source) => source.id));
+        const order = [
+          ...requestedOrder.filter((id) => knownIds.has(id)),
+          ...enabledCandidates.map((source) => source.id).filter((id) => !requestedOrder.includes(id)),
+        ];
+        setDisabledServerIds(disabled);
+        setSourceOrder(order);
+        setSourceId(order[0] ?? "");
+        setServerNotice(order.length ? "Melhor servidor disponível selecionado." : "Nenhum servidor disponível para este título.");
       })
       .catch(() => {
-        // Falha aberta: se o controle estiver indisponível, preserva as fontes.
+        if (controller.signal.aborted) return;
+        const fallbackDisabled = new Set(DEFAULT_DISABLED_PLAYER_SERVER_IDS);
+        const fallback = candidates.filter(
+          (source) => !fallbackDisabled.has(playerServerIdForSource(source.id)),
+        );
+        setDisabledServerIds(fallbackDisabled);
+        setSourceOrder(fallback.map((source) => source.id));
+        setSourceId(fallback[0]?.id ?? "");
+        setServerNotice("A avaliação automática falhou; usando a ordem de segurança.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setServerPreparing(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [movie.id, movie.tmdb_id, movie.imdb_id, movie.kind, season, episode, isTv]);
+
+  const switchToNextSource = useCallback((failedId: string, reason: string) => {
+    if (partyProviderId) {
+      setServerNotice(`O player da sessão falhou (${reason}). O anfitrião pode usar “Trocar para todos” na sala.`);
+      return;
+    }
+    const failed = new Set(failedSourceIds);
+    if (failedId) failed.add(failedId);
+    const next = sources.find((source) => !failed.has(source.id));
+    setFailedSourceIds(failed);
+    if (next) {
+      const failedName = sources.find((source) => source.id === failedId)?.name ?? "O servidor atual";
+      setSourceId(next.id);
+      setServerNotice(`${failedName} falhou (${reason}). Trocando automaticamente para ${next.name}.`);
+      return;
+    }
+    setSourceId("");
+    setServerNotice("Todos os servidores disponíveis falharam para este título.");
+  }, [failedSourceIds, partyProviderId, sources]);
+
+  function selectPlayerSource(id: string) {
+    setFailedSourceIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setSourceId(id);
+    setServerNotice("");
+  }
+
+  useEffect(() => {
+    if (!activeSource) return;
+    iframeLoadedRef.current = false;
+    const timer = window.setTimeout(() => {
+      if (!iframeLoadedRef.current) switchToNextSource(activeSource.id, "tempo limite ao carregar");
+    }, 15_000);
+    return () => window.clearTimeout(timer);
+  }, [activeSource, switchToNextSource]);
+
+  useEffect(() => {
+    if (!activeSource) return;
+    let expectedOrigin = "";
+    try {
+      expectedOrigin = new URL(activeSource.src).origin;
+    } catch {
+      return;
+    }
+    const failureSignals = new Set(["error", "fatal", "fatal-error", "playback-error", "player-error", "not-found"]);
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== expectedOrigin) return;
+      const data = event.data;
+      const signal = typeof data === "string"
+        ? data
+        : data && typeof data === "object"
+          ? [data.type, data.event, data.status, data.code].find((value) => typeof value === "string")
+          : "";
+      const normalized = typeof signal === "string" ? signal.trim().toLowerCase().replaceAll("_", "-") : "";
+      if (failureSignals.has(normalized)) switchToNextSource(activeSource.id, "erro informado pelo player");
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [activeSource, switchToNextSource]);
+
+  useEffect(() => {
+    if (serverPreparing || !sourceId || !serverNotice) return;
+    const timer = window.setTimeout(() => setServerNotice(""), 6_000);
+    return () => window.clearTimeout(timer);
+  }, [serverNotice, serverPreparing, sourceId]);
 
   useEffect(() => {
     if (!isTv || !localEpisodeControls) return;
@@ -3607,6 +3870,9 @@ function MoviePlayer({
 
   const canGoPrev = Boolean(prevEpisode || prevSeason);
   const canGoNext = Boolean(nextEpisode || nextSeason);
+  const playerMenuSources = partyProviderId
+    ? sources.filter((source) => playerServerIdForSource(source.id) === partyProviderId)
+    : sources;
 
   const playerChrome = (
     <>
@@ -3628,7 +3894,7 @@ function MoviePlayer({
               type="button"
               className="player-icon-btn"
               aria-label="Episódio anterior"
-              disabled={!canGoPrev || seasonLoading}
+              disabled={!canGoPrev || seasonLoading || Boolean(partyProviderId)}
               onClick={goPrevEpisode}
             >
               ‹
@@ -3638,6 +3904,7 @@ function MoviePlayer({
               className={`player-icon-btn ${episodePanelOpen ? "is-active" : ""}`}
               aria-expanded={episodePanelOpen}
               aria-label="Episódios"
+              disabled={Boolean(partyProviderId)}
               onClick={() => setEpisodePanelOpen((value) => !value)}
             >
               Eps
@@ -3646,7 +3913,7 @@ function MoviePlayer({
               type="button"
               className="player-icon-btn"
               aria-label="Próximo episódio"
-              disabled={!canGoNext || seasonLoading}
+              disabled={!canGoNext || seasonLoading || Boolean(partyProviderId)}
               onClick={goNextEpisode}
             >
               ›
@@ -3655,9 +3922,9 @@ function MoviePlayer({
         ) : null}
         <PlayerServerMenu
           compact
-          sources={sources}
+          sources={serverPreparing ? [] : playerMenuSources}
           activeId={activeSource?.id ?? ""}
-          onSelect={setSourceId}
+          onSelect={selectPlayerSource}
           onOpenChange={setMenuPinned}
         />
         <button
@@ -3750,6 +4017,23 @@ function MoviePlayer({
       ) : null}
 
       <div className="player-stage-wrap" ref={stageRef}>
+        <div className="watch-party-layer">
+          <WatchPartyControls
+            media={{
+              id: titleId(movie),
+              title: movie.title,
+              kind: isTv ? "tv" : "movie",
+              season: isTv ? season : undefined,
+              episode: isTv ? episode : undefined,
+            }}
+            sources={serverPreparing ? [] : sources}
+            activeSource={activeSource}
+            playerRef={playerIframeRef}
+            onSelectSource={selectPlayerSource}
+            onOpenChange={setMenuPinned}
+            onSessionProviderChange={setPartyProviderId}
+          />
+        </div>
         {isFullscreen ? (
           <div className={`player-fs-dock ${fsDockVisible || menuPinned || episodePanelOpen ? "is-visible" : ""}`}>
             <div className="player-bar player-bar--dock">{playerChrome}</div>
@@ -3800,20 +4084,38 @@ function MoviePlayer({
           </div>
         ) : null}
 
+        {serverNotice ? (
+          <div className={`player-auto-notice ${serverPreparing ? "is-loading" : ""}`} role="status">
+            <span aria-hidden="true" />
+            {serverNotice}
+          </div>
+        ) : null}
+
         {activeSource ? (
           <iframe
             key={activeSource.src}
+            ref={playerIframeRef}
             className="video-stage"
             src={activeSource.src}
+            onLoad={() => {
+              iframeLoadedRef.current = true;
+            }}
+            onError={() => switchToNextSource(activeSource.id, "erro ao abrir o iframe")}
             allowFullScreen
             allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen"
             title={movie.title}
           />
+        ) : serverPreparing ? (
+          <div className="video-stage video-empty player-server-search">
+            <span className="player-search-spinner" aria-hidden="true" />
+            <strong>Buscando o melhor servidor</strong>
+            <p>Testando este título antes de abrir o player…</p>
+          </div>
         ) : (
           <div className="video-stage video-empty">
-            <p>Este título ainda não tem um ID válido para reprodução.</p>
+            <p>{sources.length ? "Nenhum servidor conseguiu carregar este título." : "Este título ainda não tem um ID válido para reprodução."}</p>
           </div>
         )}
       </div>

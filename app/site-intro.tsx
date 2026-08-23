@@ -2,40 +2,41 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const INTRO_SESSION_KEY = "flixa-intro-seen-v1";
+const INTRO_DURATION_MS = 9_200;
 
-export default function SiteIntro() {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export default function SiteIntro({ name }: { name: string }) {
   const finishingRef = useRef(false);
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const [started, setStarted] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const displayName = name.trim().split(/\s+/)[0] || "Cinéfilo";
+  const brandLetters = "FLIXA".split("");
 
   const finish = useCallback(() => {
     if (finishingRef.current) return;
     finishingRef.current = true;
-    try {
-      window.sessionStorage.setItem(INTRO_SESSION_KEY, "1");
-    } catch {
-      // A abertura continua funcionando mesmo com o armazenamento bloqueado.
-    }
     setLeaving(true);
-    window.setTimeout(() => setVisible(false), 700);
+    window.setTimeout(() => setVisible(false), 780);
   }, []);
 
   useEffect(() => {
-    try {
-      if (window.sessionStorage.getItem(INTRO_SESSION_KEY) === "1") {
-        setVisible(false);
-        return;
-      }
-    } catch {
-      // Sem armazenamento, mostramos a abertura normalmente.
-    }
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("welcome") !== "1") return;
+    url.searchParams.delete("welcome");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 
-    const safetyTimer = window.setTimeout(finish, 30000);
-    return () => window.clearTimeout(safetyTimer);
+    let animationFrame = 0;
+    const showFrame = window.requestAnimationFrame(() => {
+      setVisible(true);
+      animationFrame = window.requestAnimationFrame(() => setStarted(true));
+    });
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const finishTimer = window.setTimeout(finish, reducedMotion ? 2_200 : INTRO_DURATION_MS);
+    return () => {
+      window.cancelAnimationFrame(showFrame);
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(finishTimer);
+    };
   }, [finish]);
 
   useEffect(() => {
@@ -49,45 +50,47 @@ export default function SiteIntro() {
 
   if (!visible) return null;
 
-  function toggleSound() {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setMuted(video.muted);
-    void video.play().catch(() => undefined);
-  }
-
   return (
     <div
-      className={`site-intro ${ready ? "is-ready" : ""} ${leaving ? "is-leaving" : ""}`}
+      className={`site-intro ${started ? "is-started" : ""} ${leaving ? "is-leaving" : ""}`}
       role="dialog"
-      aria-label="Abertura Flixa"
+      aria-label={`Seja bem-vindo ao Flixa, ${displayName}`}
       aria-modal="true"
     >
-      <video
-        ref={videoRef}
-        className="site-intro-video"
-        src="/intro.mp4"
-        autoPlay
-        muted
-        playsInline
-        preload="auto"
-        poster="/logo-transparent.png"
-        onCanPlay={() => setReady(true)}
-        onEnded={finish}
-        onError={finish}
-      />
-      <div className="site-intro-vignette" aria-hidden="true" />
-      <div className="site-intro-loading" aria-hidden={ready}>
-        <img src="/logo-transparent.png" alt="" />
-        <span />
+      <div className="site-intro-aurora" aria-hidden="true" />
+      <div className="site-intro-grid" aria-hidden="true" />
+      <div className="site-intro-orbits" aria-hidden="true">
+        <i /><i /><i />
       </div>
-      <div className="site-intro-actions">
-        <button type="button" onClick={toggleSound} aria-label={muted ? "Ativar som" : "Desativar som"}>
-          <span aria-hidden="true">{muted ? "Som desligado" : "Som ligado"}</span>
-        </button>
-        <button type="button" onClick={finish}>Pular abertura</button>
+      <div className="site-intro-flare" aria-hidden="true" />
+
+      <div className="site-intro-scene">
+        <div className="site-intro-brand" data-text="FLIXA" aria-label="Flixa">
+          {brandLetters.map((letter, index) => (
+            <span key={letter} style={{ "--letter-index": index } as React.CSSProperties} aria-hidden="true">
+              {letter}
+            </span>
+          ))}
+        </div>
+
+        <div className="site-intro-greeting">
+          <p className="site-intro-kicker"><i aria-hidden="true" /> Sessão reconhecida</p>
+          <h1>
+            <span className="site-intro-welcome">Seja bem-vindo,</span>
+            <span className="site-intro-name" data-text={displayName}>{displayName}</span>
+          </h1>
+          <p className="site-intro-tagline">A próxima história começa com você.</p>
+        </div>
+
+        <div className="site-intro-progress" aria-hidden="true">
+          <span><i /></span>
+          <small>Preparando sua experiência</small>
+        </div>
       </div>
+
+      <button className="site-intro-skip" type="button" onClick={finish}>
+        Entrar agora <span aria-hidden="true">→</span>
+      </button>
     </div>
   );
 }

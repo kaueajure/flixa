@@ -3,6 +3,7 @@ import {
   chaveTitulo,
   listarProgresso,
   obterProgresso,
+  removerProgresso,
   salvarProgresso,
   type TituloPayload,
 } from "../../../db/library";
@@ -58,6 +59,29 @@ export async function PUT(request: Request) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao salvar progresso";
+    return Response.json({ erro: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const usuario = await requireUsuario(request);
+    if (!usuario) {
+      return Response.json({ erro: "Não autenticado." }, { status: 401 });
+    }
+    const { searchParams } = new URL(request.url);
+    let chave = searchParams.get("chave")?.trim() || "";
+    if (!chave) {
+      const body = (await request.json().catch(() => null)) as { chave?: string; movie?: TituloPayload } | null;
+      chave = body?.chave?.trim() || (body?.movie ? chaveTitulo(body.movie) : "");
+    }
+    if (!chave) {
+      return Response.json({ erro: "Informe a chave do título." }, { status: 400 });
+    }
+    await removerProgresso(usuario.id, chave);
+    return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao remover o progresso";
     return Response.json({ erro: message }, { status: 500 });
   }
 }

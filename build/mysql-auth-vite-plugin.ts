@@ -1,6 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createRequire } from "node:module";
 import type { Connect, Plugin } from "vite";
 import { config as loadEnv } from "dotenv";
+
+const require = createRequire(import.meta.url);
+const { attachWatchPartyServer } = require("../realtime/watch-party.cjs") as {
+  attachWatchPartyServer: (server: object) => void;
+};
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -26,7 +32,8 @@ function isMysqlApiPath(pathname: string) {
     pathname === "/api/admin/catalogo" ||
     pathname === "/api/movies" ||
     pathname === "/api/movies/availability" ||
-    pathname === "/api/movies/servers"
+    pathname === "/api/movies/servers" ||
+    pathname === "/api/watch-party/ticket"
   );
 }
 
@@ -88,6 +95,7 @@ async function loadRouteModule(pathname: string): Promise<RouteModule | null> {
   if (pathname === "/api/movies") return import("../app/api/movies/route");
   if (pathname === "/api/movies/availability") return import("../app/api/movies/availability/route");
   if (pathname === "/api/movies/servers") return import("../app/api/movies/servers/route");
+  if (pathname === "/api/watch-party/ticket") return import("../app/api/watch-party/ticket/route");
   return null;
 }
 
@@ -101,6 +109,7 @@ export function mysqlAuth(): Plugin {
     configureServer(server) {
       loadEnv({ path: ".env.local", override: false });
       loadEnv({ path: ".env", override: false });
+      if (server.httpServer) attachWatchPartyServer(server.httpServer);
 
       const handler: Connect.NextHandleFunction = async (req, res, next) => {
         const pathname = requestPath(req.url);

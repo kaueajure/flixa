@@ -163,6 +163,21 @@ function uniqueUrls(values: string[], base: string, limit: number) {
   return result;
 }
 
+async function fetchFollowingPublicRedirects(url: string, init: RequestInit) {
+  let current = publicHttpUrl(url, url);
+  if (!current) throw new Error("URL pública inválida");
+  for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+    const response = await fetch(current, { ...init, redirect: "manual" });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    await response.body?.cancel().catch(() => undefined);
+    const next = location ? publicHttpUrl(location, current.href) : null;
+    if (!next) throw new Error("O servidor redirecionou para um endereço inválido");
+    current = next;
+  }
+  throw new Error("O servidor excedeu o limite de redirecionamentos");
+}
+
 function extractResourceEvidence(html: string, base: string) {
   const normalized = normalizeEmbeddedText(html);
   const iframeCandidates = [...normalized.matchAll(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)]
@@ -256,9 +271,8 @@ async function fetchMediaPrefix(url: string, referer: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
-    const response = await fetch(url, {
+    const response = await fetchFollowingPublicRedirects(url, {
       method: "GET",
-      redirect: "follow",
       cache: "no-store",
       headers: {
         Accept: "application/vnd.apple.mpegurl,application/dash+xml,video/mp4,video/*;q=0.9,*/*;q=0.5",
@@ -278,9 +292,8 @@ async function inspectNestedFrame(url: string, parentUrl: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
-    const response = await fetch(url, {
+    const response = await fetchFollowingPublicRedirects(url, {
       method: "GET",
-      redirect: "follow",
       cache: "no-store",
       headers: {
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
@@ -449,9 +462,8 @@ async function testEndpoint(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(url, {
+    const response = await fetchFollowingPublicRedirects(url, {
       method: "GET",
-      redirect: "follow",
       cache: "no-store",
       headers: {
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
@@ -536,8 +548,24 @@ async function testEndpoint(
     }
 
     if (resources.mediaUrls.length > 0) {
-      evidence.mediaProbe = await probeMedia(resources.mediaUrls[0], response.url || url);
-      if (evidence.mediaProbe.status === "passed") {
+      const mediaProbes: PlayerServerMediaProbe[] = [];
+      for (const mediaUrl of resources.mediaUrls.slice(0, 3)) {
+        const probe = await probeMedia(mediaUrl, response.url || url);
+        mediaProbes.push(probe);
+        if (probe.status === "passed") break;
+      }
+      evidence.mediaProbe = mediaProbes.find((probe) => probe.status === "passed") ?? mediaProbes[0] ?? null;
+      const failedBeforeSuccess = mediaProbes.findIndex((probe) => probe.status === "passed");
+      if (evidence.mediaProbe?.status === "passed") {
+        if (failedBeforeSuccess > 0) {
+          issues.push(issue(
+            "PRIMARY_MEDIA_FAILED",
+            "media",
+            "warning",
+            "A primeira mídia falhou; o provedor depende de uma fonte interna reserva",
+            mediaProbes[0]?.message,
+          ));
+        }
         evidence.confidence = "high";
         return {
           kind,
@@ -550,7 +578,9 @@ async function testEndpoint(
           evidence,
         };
       }
-      issues.push(issue("MEDIA_PROBE_FAILED", "media", "warning", evidence.mediaProbe.message, evidence.mediaProbe.url));
+      if (evidence.mediaProbe) {
+        issues.push(issue("MEDIA_PROBE_FAILED", "media", "warning", evidence.mediaProbe.message, evidence.mediaProbe.url));
+      }
     }
 
     const genericOnly = resources.playerSignals.length === 1 && resources.playerSignals[0] === "marcador genérico de player";
@@ -585,6 +615,15 @@ async function testEndpoint(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Valida uma URL concreta de filme/episódio sem gravar o resultado no banco. */
+export function testPlayerSource(
+  server: PlayerServerDefinition,
+  kind: "movie" | "tv",
+  url: string,
+) {
+  return testEndpoint(server, kind, url);
 }
 
 function aggregateStatus(checks: PlayerServerEndpointCheck[]): PlayerServerStatus {
