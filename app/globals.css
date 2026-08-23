@@ -3776,8 +3776,17 @@ body.player-open > div[style*="z-index"] {
   color: #ff7d86;
 }
 
+.admin-server-stats .is-degraded {
+  border-color: rgba(247, 217, 132, 0.28);
+  background: rgba(247, 217, 132, 0.07);
+}
+
+.admin-server-stats .is-degraded strong {
+  color: #f7d984;
+}
+
 .admin-server-stats {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   max-width: 1420px;
 }
 
@@ -3995,6 +4004,11 @@ body.player-open > div[style*="z-index"] {
   color: #ff7d86;
 }
 
+.server-status.is-degraded {
+  background: rgba(247, 217, 132, 0.12);
+  color: #f7d984;
+}
+
 .server-status.is-unknown {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.55);
@@ -4007,6 +4021,151 @@ body.player-open > div[style*="z-index"] {
 
 .server-actions {
   min-width: 11.5rem;
+}
+
+.server-status-breakdown {
+  display: grid;
+  min-width: 18rem;
+  gap: 0.45rem;
+}
+
+.server-status-breakdown > strong {
+  color: rgba(244, 241, 234, 0.82);
+  font-size: 0.76rem;
+}
+
+.server-status-breakdown > small {
+  max-width: 18rem;
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.server-kind-result {
+  display: grid;
+  grid-template-columns: 3.1rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  max-width: 25rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.18);
+  padding-left: 0.45rem;
+}
+
+.server-kind-result > span {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.15rem 0.35rem;
+  color: rgba(244, 241, 234, 0.8);
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.server-kind-result p {
+  margin: 0;
+  color: rgba(244, 241, 234, 0.67);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.server-kind-result.is-online {
+  border-left-color: #70e7a2;
+}
+
+.server-kind-result.is-degraded {
+  border-left-color: #f7d984;
+}
+
+.server-kind-result.is-offline {
+  border-left-color: #ff7d86;
+}
+
+.server-kind-result.is-offline p {
+  color: #ffabb1;
+}
+
+.server-kind-result.is-degraded p {
+  color: #f7d984;
+}
+
+.server-diagnostic {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.server-diagnostic details {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.55rem 0.65rem;
+}
+
+.server-diagnostic summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.server-diagnostic summary::-webkit-details-marker {
+  display: none;
+}
+
+.server-diagnostic p,
+.server-diagnostic ul {
+  margin: 0.55rem 0 0;
+}
+
+.server-diagnostic p,
+.server-diagnostic small,
+.server-diagnostic li {
+  color: rgba(244, 241, 234, 0.66);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.server-diagnostic ul {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.1rem;
+}
+
+.server-diagnostic li.is-error {
+  color: #ff9ca3;
+}
+
+.server-diagnostic li.is-warning {
+  color: #f7d984;
+}
+
+.server-diagnostic li small {
+  display: block;
+  overflow-wrap: anywhere;
+  color: rgba(244, 241, 234, 0.48);
+}
+
+.server-diagnostic li code {
+  display: block;
+  width: fit-content;
+  margin-top: 0.2rem;
+  border-radius: 0.3rem;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0.1rem 0.3rem;
+  color: rgba(244, 241, 234, 0.45);
+  font-size: 0.62rem;
+}
+
+.server-diagnostic.is-compact details {
+  max-width: 32rem;
+  padding: 0.4rem 0.5rem;
+}
+
+.server-diagnostic.is-compact .server-status {
+  font-size: 0.66rem;
 }
 
 .server-test-modal {
@@ -4038,6 +4197,21 @@ body.player-open > div[style*="z-index"] {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.9rem 1rem;
+}
+
+.server-test-diagnostic {
+  max-height: 14rem;
+  overflow: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #111319;
+  padding: 0.8rem 1rem;
+}
+
+.server-test-diagnostic > strong,
+.server-test-diagnostic > small {
+  display: block;
+  color: rgba(244, 241, 234, 0.76);
+  font-size: 0.78rem;
 }
 
 .server-test-dialog header {

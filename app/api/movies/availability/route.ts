@@ -1,6 +1,6 @@
 import { getProviderInventory } from "../provider";
 import { listarServidoresDesabilitados } from "../../../../db/player-servers";
-import { PLAYER_SERVERS } from "../../../../lib/player-servers";
+import { DEFAULT_DISABLED_PLAYER_SERVER_IDS, PLAYER_SERVERS } from "../../../../lib/player-servers";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   try {
     disabledIds = await listarServidoresDesabilitados();
   } catch {
-    // Falha aberta: a indisponibilidade do controle não deve invalidar o catálogo inteiro.
+    disabledIds = [...DEFAULT_DISABLED_PLAYER_SERVER_IDS];
   }
   const disabled = new Set(disabledIds);
   const enabledByKind = {

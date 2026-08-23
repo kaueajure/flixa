@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { getDb } from "./index";
+import { withDb } from "./index";
 import { historico_assistidos, lista_titulos, progresso_reproducao, usuarios } from "./schema";
 
 export type TituloPayload = {
@@ -98,36 +98,23 @@ function movieFromRow(row: {
 }
 
 export async function listarMinhaLista(usuarioId: number) {
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(lista_titulos)
-    .where(eq(lista_titulos.usuario_id, usuarioId))
-    .orderBy(desc(lista_titulos.criado_em));
+  const rows = await withDb((db) => db
+      .select()
+      .from(lista_titulos)
+      .where(eq(lista_titulos.usuario_id, usuarioId))
+      .orderBy(desc(lista_titulos.criado_em)));
   return rows.map(movieFromRow);
 }
 
 export async function adicionarNaLista(usuarioId: number, movie: TituloPayload) {
-  const db = await getDb();
   const chave = chaveTitulo(movie);
   const agora = agoraSql();
-  await db
-    .insert(lista_titulos)
-    .values({
-      usuario_id: usuarioId,
-      chave_titulo: chave,
-      tmdb_id: movie.tmdb_id || null,
-      imdb_id: movie.imdb_id || null,
-      tipo: tipoTitulo(movie),
-      titulo: movie.title,
-      poster: movie.poster || null,
-      backdrop: movie.backdrop || null,
-      ano: movie.year ?? null,
-      dados_json: movie,
-      criado_em: agora,
-    })
-    .onDuplicateKeyUpdate({
-      set: {
+  await withDb(async (db) => {
+    await db
+      .insert(lista_titulos)
+      .values({
+        usuario_id: usuarioId,
+        chave_titulo: chave,
         tmdb_id: movie.tmdb_id || null,
         imdb_id: movie.imdb_id || null,
         tipo: tipoTitulo(movie),
@@ -136,50 +123,51 @@ export async function adicionarNaLista(usuarioId: number, movie: TituloPayload) 
         backdrop: movie.backdrop || null,
         ano: movie.year ?? null,
         dados_json: movie,
-      },
-    });
+        criado_em: agora,
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          tmdb_id: movie.tmdb_id || null,
+          imdb_id: movie.imdb_id || null,
+          tipo: tipoTitulo(movie),
+          titulo: movie.title,
+          poster: movie.poster || null,
+          backdrop: movie.backdrop || null,
+          ano: movie.year ?? null,
+          dados_json: movie,
+        },
+      });
+  });
   return chave;
 }
 
 export async function removerDaLista(usuarioId: number, chave: string) {
-  const db = await getDb();
-  await db
-    .delete(lista_titulos)
-    .where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave)));
+  await withDb(async (db) => {
+    await db
+      .delete(lista_titulos)
+      .where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave)));
+  });
 }
 
 export async function listarHistorico(usuarioId: number, limite = 24) {
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(historico_assistidos)
-    .where(eq(historico_assistidos.usuario_id, usuarioId))
-    .orderBy(desc(historico_assistidos.assistido_em))
-    .limit(limite);
+  const rows = await withDb((db) => db
+      .select()
+      .from(historico_assistidos)
+      .where(eq(historico_assistidos.usuario_id, usuarioId))
+      .orderBy(desc(historico_assistidos.assistido_em))
+      .limit(limite));
   return rows.map(movieFromRow);
 }
 
 export async function registrarHistorico(usuarioId: number, movie: TituloPayload) {
-  const db = await getDb();
   const chave = chaveTitulo(movie);
   const agora = agoraSql();
-  await db
-    .insert(historico_assistidos)
-    .values({
-      usuario_id: usuarioId,
-      chave_titulo: chave,
-      tmdb_id: movie.tmdb_id || null,
-      imdb_id: movie.imdb_id || null,
-      tipo: tipoTitulo(movie),
-      titulo: movie.title,
-      poster: movie.poster || null,
-      backdrop: movie.backdrop || null,
-      ano: movie.year ?? null,
-      dados_json: movie,
-      assistido_em: agora,
-    })
-    .onDuplicateKeyUpdate({
-      set: {
+  await withDb(async (db) => {
+    await db
+      .insert(historico_assistidos)
+      .values({
+        usuario_id: usuarioId,
+        chave_titulo: chave,
         tmdb_id: movie.tmdb_id || null,
         imdb_id: movie.imdb_id || null,
         tipo: tipoTitulo(movie),
@@ -189,31 +177,42 @@ export async function registrarHistorico(usuarioId: number, movie: TituloPayload
         ano: movie.year ?? null,
         dados_json: movie,
         assistido_em: agora,
-      },
-    });
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          tmdb_id: movie.tmdb_id || null,
+          imdb_id: movie.imdb_id || null,
+          tipo: tipoTitulo(movie),
+          titulo: movie.title,
+          poster: movie.poster || null,
+          backdrop: movie.backdrop || null,
+          ano: movie.year ?? null,
+          dados_json: movie,
+          assistido_em: agora,
+        },
+      });
+  });
   return chave;
 }
 
 export async function listarProgresso(usuarioId: number, limite = 24) {
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(progresso_reproducao)
-    .where(eq(progresso_reproducao.usuario_id, usuarioId))
-    .orderBy(desc(progresso_reproducao.atualizado_em))
-    .limit(limite);
+  const rows = await withDb((db) => db
+      .select()
+      .from(progresso_reproducao)
+      .where(eq(progresso_reproducao.usuario_id, usuarioId))
+      .orderBy(desc(progresso_reproducao.atualizado_em))
+      .limit(limite));
   return rows.map(movieFromRow);
 }
 
 export async function obterProgresso(usuarioId: number, chave: string) {
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(progresso_reproducao)
-    .where(
-      and(eq(progresso_reproducao.usuario_id, usuarioId), eq(progresso_reproducao.chave_titulo, chave)),
-    )
-    .limit(1);
+  const rows = await withDb((db) => db
+      .select()
+      .from(progresso_reproducao)
+      .where(
+        and(eq(progresso_reproducao.usuario_id, usuarioId), eq(progresso_reproducao.chave_titulo, chave)),
+      )
+      .limit(1));
   return rows[0] ? movieFromRow(rows[0]) : null;
 }
 
@@ -227,7 +226,6 @@ export async function salvarProgresso(
     episodio?: number | null;
   },
 ) {
-  const db = await getDb();
   const chave = chaveTitulo(movie);
   const progresso = Math.max(0, Math.min(100, Number(input.progresso ?? movie.progress ?? 0) || 0));
   const posicao = Math.max(0, Math.floor(Number(input.posicao_segundos ?? movie.positionSeconds ?? 0) || 0));
@@ -245,23 +243,12 @@ export async function salvarProgresso(
         : null;
   const agora = agoraSql();
 
-  await db
-    .insert(progresso_reproducao)
-    .values({
-      usuario_id: usuarioId,
-      chave_titulo: chave,
-      tmdb_id: movie.tmdb_id || null,
-      tipo: tipoTitulo(movie),
-      titulo: movie.title,
-      poster: movie.poster || null,
-      progresso: progresso.toFixed(2),
-      posicao_segundos: posicao,
-      temporada,
-      episodio,
-      atualizado_em: agora,
-    })
-    .onDuplicateKeyUpdate({
-      set: {
+  await withDb(async (db) => {
+    await db
+      .insert(progresso_reproducao)
+      .values({
+        usuario_id: usuarioId,
+        chave_titulo: chave,
         tmdb_id: movie.tmdb_id || null,
         tipo: tipoTitulo(movie),
         titulo: movie.title,
@@ -271,22 +258,36 @@ export async function salvarProgresso(
         temporada,
         episodio,
         atualizado_em: agora,
-      },
-    });
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          tmdb_id: movie.tmdb_id || null,
+          tipo: tipoTitulo(movie),
+          titulo: movie.title,
+          poster: movie.poster || null,
+          progresso: progresso.toFixed(2),
+          posicao_segundos: posicao,
+          temporada,
+          episodio,
+          atualizado_em: agora,
+        },
+      });
+  });
 
   return obterProgresso(usuarioId, chave);
 }
 
 export async function estatisticasAdmin() {
-  const db = await getDb();
-  const [usuariosCount] = await db.select({ total: sql<number>`count(*)` }).from(usuarios);
-  const [listaCount] = await db.select({ total: sql<number>`count(*)` }).from(lista_titulos);
-  const [historicoCount] = await db.select({ total: sql<number>`count(*)` }).from(historico_assistidos);
-  const [progressoCount] = await db.select({ total: sql<number>`count(*)` }).from(progresso_reproducao);
-  return {
-    usuarios: Number(usuariosCount?.total || 0),
-    itens_lista: Number(listaCount?.total || 0),
-    itens_historico: Number(historicoCount?.total || 0),
-    itens_progresso: Number(progressoCount?.total || 0),
-  };
+  return withDb(async (db) => {
+    const [usuariosCount] = await db.select({ total: sql<number>`count(*)` }).from(usuarios);
+    const [listaCount] = await db.select({ total: sql<number>`count(*)` }).from(lista_titulos);
+    const [historicoCount] = await db.select({ total: sql<number>`count(*)` }).from(historico_assistidos);
+    const [progressoCount] = await db.select({ total: sql<number>`count(*)` }).from(progresso_reproducao);
+    return {
+      usuarios: Number(usuariosCount?.total || 0),
+      itens_lista: Number(listaCount?.total || 0),
+      itens_historico: Number(historicoCount?.total || 0),
+      itens_progresso: Number(progressoCount?.total || 0),
+    };
+  });
 }

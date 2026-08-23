@@ -1,4 +1,5 @@
 import { listarServidoresDesabilitados } from "../../../../db/player-servers";
+import { DEFAULT_DISABLED_PLAYER_SERVER_IDS } from "../../../../lib/player-servers";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,10 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {
-    // Falha aberta: um problema no controle não deve retirar todo o player.
-    return Response.json({ disabled: [] }, { headers: { "Cache-Control": "no-store" } });
+    // Falha segura: preserva apenas a lista curta revisada no código.
+    return Response.json(
+      { disabled: [...DEFAULT_DISABLED_PLAYER_SERVER_IDS] },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

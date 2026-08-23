@@ -21,7 +21,12 @@ function isMysqlApiPath(pathname: string) {
     pathname === "/api/lista" ||
     pathname === "/api/historico" ||
     pathname === "/api/progresso" ||
-    pathname === "/api/admin/usuarios"
+    pathname === "/api/admin/usuarios" ||
+    pathname === "/api/admin/servidores" ||
+    pathname === "/api/admin/catalogo" ||
+    pathname === "/api/movies" ||
+    pathname === "/api/movies/availability" ||
+    pathname === "/api/movies/servers"
   );
 }
 
@@ -78,6 +83,11 @@ async function loadRouteModule(pathname: string): Promise<RouteModule | null> {
   if (pathname === "/api/historico") return import("../app/api/historico/route");
   if (pathname === "/api/progresso") return import("../app/api/progresso/route");
   if (pathname === "/api/admin/usuarios") return import("../app/api/admin/usuarios/route");
+  if (pathname === "/api/admin/servidores") return import("../app/api/admin/servidores/route");
+  if (pathname === "/api/admin/catalogo") return import("../app/api/admin/catalogo/route");
+  if (pathname === "/api/movies") return import("../app/api/movies/route");
+  if (pathname === "/api/movies/availability") return import("../app/api/movies/availability/route");
+  if (pathname === "/api/movies/servers") return import("../app/api/movies/servers/route");
   return null;
 }
 

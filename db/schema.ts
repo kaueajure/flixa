@@ -140,12 +140,13 @@ export const servidores_player = mysqlTable(
     servidor_id: varchar("servidor_id", { length: 64 }).primaryKey(),
     habilitado: tinyint("habilitado").notNull().default(1),
     desabilitado_ate: datetime("desabilitado_ate", { mode: "string" }),
-    ultimo_status: mysqlEnum("ultimo_status", ["unknown", "online", "offline"])
+    ultimo_status: mysqlEnum("ultimo_status", ["unknown", "online", "degraded", "offline"])
       .notNull()
       .default("unknown"),
     ultimo_http_status: int("ultimo_http_status"),
     ultima_latencia_ms: int("ultima_latencia_ms"),
     ultima_mensagem: varchar("ultima_mensagem", { length: 500 }),
+    ultimo_diagnostico: json("ultimo_diagnostico"),
     ultimo_teste_em: datetime("ultimo_teste_em", { mode: "string" }),
     atualizado_por: int("atualizado_por").references(() => usuarios.id, { onDelete: "set null" }),
     atualizado_em: datetime("atualizado_em", { mode: "string" })

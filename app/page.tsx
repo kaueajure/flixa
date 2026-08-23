@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { getPlayerServer, playerServerIdForSource } from "../lib/player-servers";
+import {
+  DEFAULT_DISABLED_PLAYER_SERVER_IDS,
+  getPlayerServer,
+  playerServerIdForSource,
+} from "../lib/player-servers";
 import BorderCollieForum from "./border-collie-forum";
 import LoginForm from "./login-form";
 import SiteIntro from "./site-intro";
@@ -22,6 +26,7 @@ type Movie = {
   duration?: string;
   year?: number;
   genres: string[];
+  genreIds?: number[];
   rating?: string;
   director?: string;
   cast?: string[];
@@ -834,7 +839,9 @@ export default function Home() {
       .filter((row) => row.items.length > 0);
   }, [movies]);
 
-  const activeGenre = catalogGenres.find((genre) => String(genre.id) === genreId) ?? genres.find((genre) => String(genre.id) === genreId) ?? null;
+  const activeGenre = catalogGenres.find((genre) => String(genre.id) === genreId)
+    ?? (view === "filmes" ? genres.find((genre) => String(genre.id) === genreId) : null)
+    ?? null;
 
   const searchResults = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -1144,7 +1151,7 @@ export default function Home() {
                       <span>
                         <strong>{movie.title}</strong>
                         <small>
-                          {[mediaKind(movie) === "tv" ? "Série" : "Filme", movie.year, movie.genres?.[0]]
+                          {[mediaKind(movie) === "tv" ? "Série" : "Filme", movie.year, movie.genres?.slice(0, 2).join(" · ")]
                             .filter(Boolean)
                             .join(" · ")}
                         </small>
@@ -2399,7 +2406,7 @@ function MovieCard({
         <div className="card-tags">
           {mediaKind(movie) === "tv" ? <span className="card-kind">Série</span> : null}
           {tvProgressLabel(movie) ? <span className="card-progress">{tvProgressLabel(movie)}</span> : null}
-          {movie.genres?.[0] ? <span className="card-genre">{movie.genres[0]}</span> : null}
+          {movie.genres?.[0] ? <span className="card-genre">{movie.genres.slice(0, 2).join(" · ")}</span> : null}
           {movie.year ? <span className="card-year">{movie.year}</span> : null}
         </div>
       </div>
@@ -3134,7 +3141,7 @@ function buildPlayerSources(
         src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
       });
     }
-    if (!isTv || movie.provider_available === true) {
+    if (movie.provider_available === true) {
       sources.push({
         id: "superflix-pro",
         name: "SuperFlix",
@@ -3171,7 +3178,7 @@ function buildPlayerSources(
         src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
       });
     }
-    if (!isTv || movie.provider_available === true) {
+    if (movie.provider_available === true) {
       sources.push({
         id: "superflix-imdb",
         name: "SuperFlix IMDb",
@@ -3234,8 +3241,7 @@ function buildPlayerSources(
   const seenServers = new Set<string>();
   return sources.filter((source) => {
     const serverId = playerServerIdForSource(source.id);
-    const server = getPlayerServer(serverId);
-    if (!source.src || seen.has(source.src) || seenServers.has(serverId) || disabledServerIds.has(serverId) || server?.protectedEmbedCompatible === false) return false;
+    if (!source.src || seen.has(source.src) || seenServers.has(serverId) || disabledServerIds.has(serverId)) return false;
     seen.add(source.src);
     seenServers.add(serverId);
     return true;
@@ -3380,7 +3386,9 @@ function MoviePlayer({
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fsDockVisible, setFsDockVisible] = useState(false);
-  const [disabledServerIds, setDisabledServerIds] = useState<Set<string>>(() => new Set());
+  const [disabledServerIds, setDisabledServerIds] = useState<Set<string>>(
+    () => new Set(DEFAULT_DISABLED_PLAYER_SERVER_IDS),
+  );
   const sources = buildPlayerSources(
     movie,
     isTv ? season : undefined,
@@ -3799,7 +3807,7 @@ function MoviePlayer({
             src={activeSource.src}
             allowFullScreen
             allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
-            referrerPolicy="no-referrer"
+            referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen"
             title={movie.title}
           />

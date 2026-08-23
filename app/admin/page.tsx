@@ -18,7 +18,44 @@ type Stats = {
   itens_progresso: number;
 };
 
-type ServerStatus = "unknown" | "online" | "offline";
+type ServerStatus = "unknown" | "online" | "degraded" | "offline";
+
+type ServerIssue = {
+  code: string;
+  stage: string;
+  severity: "warning" | "error";
+  message: string;
+  evidence?: string;
+};
+
+type ServerEndpointCheck = {
+  kind: "movie" | "tv";
+  status: ServerStatus;
+  httpStatus: number | null;
+  latencyMs: number;
+  message: string;
+  finalUrl: string;
+  issues: ServerIssue[];
+  evidence: {
+    verification: "automatic" | "manual";
+    playbackConfirmed: boolean;
+    confidence: "none" | "low" | "medium" | "high";
+    playerSignals: string[];
+    iframeUrls: string[];
+    mediaUrls: string[];
+    mediaProbe: {
+      status: "passed" | "failed";
+      httpStatus: number | null;
+      message: string;
+    } | null;
+  };
+};
+
+type ServerDiagnostic = {
+  status: ServerStatus;
+  testedAt: string;
+  checks: ServerEndpointCheck[];
+};
 
 type AdminServer = {
   id: string;
@@ -31,13 +68,16 @@ type AdminServer = {
   audioProfile: "pt-BR" | "legendado";
   priority: number;
   protectedEmbedCompatible: boolean;
+  enabledByDefault: boolean;
   compatibilityMessage?: string;
+  blockedReason?: string;
   enabled: boolean;
   disabled_until: string | null;
   last_status: ServerStatus;
   last_http_status: number | null;
   last_latency_ms: number | null;
   last_message: string | null;
+  last_diagnostic: ServerDiagnostic | null;
   last_tested_at: string | null;
 };
 
@@ -59,6 +99,124 @@ function formatDate(value: string | null) {
   const parsed = new Date(`${value.replace(" ", "T")}Z`);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function statusLabel(status: ServerStatus) {
+  if (status === "online") return "Operacional";
+  if (status === "degraded") return "Aguardando confirmação";
+  if (status === "offline") return "Falhou";
+  return "Não testado";
+}
+
+function kindLabel(kind: "movie" | "tv") {
+  return kind === "movie" ? "Filme" : "Série";
+}
+
+const ISSUE_TITLES: Record<string, string> = {
+  SANDBOX_COMPATIBILITY_RISK: "Proteção anti-pop-up possivelmente incompatível",
+  KNOWN_PROVIDER_ISSUE: "Problema conhecido deste provedor",
+  NETWORK_TIMEOUT: "Servidor demorou demais para responder",
+  NETWORK_ERROR: "Falha de rede ou domínio",
+  HTTP_ERROR: "Endpoint respondeu com erro HTTP",
+  ANTI_BOT_CHALLENGE: "CAPTCHA ou proteção anti-bot",
+  INVALID_DOCUMENT: "Página de erro ou bloqueio",
+  UNEXPECTED_CONTENT_TYPE: "Resposta não é uma página de player",
+  EMPTY_DOCUMENT: "Página vazia ou incompleta",
+  IFRAME_BLOCKED_X_FRAME_OPTIONS: "Player bloqueia iframe externo",
+  IFRAME_BLOCKED_CSP: "Política CSP bloqueia o Flixa",
+  NESTED_IFRAME_HTTP_ERROR: "Player interno respondeu com erro HTTP",
+  NESTED_IFRAME_BLOCKED_X_FRAME_OPTIONS: "Player interno bloqueia o iframe",
+  NESTED_IFRAME_BLOCKED_CSP: "CSP bloqueia o player interno",
+  NESTED_IFRAME_INVALID: "Player interno abriu página inválida",
+  NESTED_IFRAME_CONTENT_TYPE: "Player interno retornou conteúdo inesperado",
+  NESTED_IFRAME_TIMEOUT: "Player interno excedeu o tempo limite",
+  NESTED_IFRAME_NETWORK_ERROR: "Falha de rede no player interno",
+  PLAYER_NOT_FOUND: "Nenhum player encontrado",
+  WEAK_PLAYER_EVIDENCE: "Player não pôde ser comprovado",
+  PLAYBACK_NOT_CONFIRMED: "Player abriu, mas o Play não foi confirmado",
+  MEDIA_PROBE_FAILED: "Manifesto, arquivo ou segmento de vídeo falhou",
+  MANUAL_PLAYBACK_FAILED: "Reprodução falhou no teste manual",
+};
+
+function issueTitle(code: string) {
+  return ISSUE_TITLES[code] ?? code.replaceAll("_", " ").toLocaleLowerCase("pt-BR");
+}
+
+function checkSummary(check: ServerEndpointCheck) {
+  if (check.evidence.playbackConfirmed) return "Reprodução confirmada pelo administrador";
+  const blockingIssue = check.issues.find((item) => item.severity === "error");
+  if (blockingIssue) return `${issueTitle(blockingIssue.code)}: ${blockingIssue.message}`;
+  if (check.evidence.mediaProbe?.status === "passed") {
+    return check.issues.length > 0
+      ? `${check.evidence.mediaProbe.message}; há alertas adicionais`
+      : check.evidence.mediaProbe.message;
+  }
+  const mainWarning = check.issues.find((item) => !["KNOWN_PROVIDER_ISSUE", "SANDBOX_COMPATIBILITY_RISK"].includes(item.code))
+    ?? check.issues[0];
+  return mainWarning ? `${issueTitle(mainWarning.code)}: ${mainWarning.message}` : check.message;
+}
+
+function diagnosticSummary(diagnostic: ServerDiagnostic) {
+  const total = diagnostic.checks.length;
+  const online = diagnostic.checks.filter((check) => check.status === "online").length;
+  const waiting = diagnostic.checks.filter((check) => check.status === "degraded").length;
+  const failed = diagnostic.checks.filter((check) => check.status === "offline").length;
+  return [
+    `${online}/${total} ${total === 1 ? "operacional" : "operacionais"}`,
+    waiting ? `${waiting} aguardando Play` : null,
+    failed ? `${failed} com falha` : null,
+  ].filter(Boolean).join(" · ");
+}
+
+function ServerStatusBreakdown({ server }: { server: AdminServer }) {
+  const diagnostic = server.last_diagnostic;
+  if (!diagnostic?.checks?.length) {
+    return (
+      <div className="server-status-breakdown">
+        <span className={`server-status is-${server.last_status}`}><i aria-hidden="true" />{statusLabel(server.last_status)}</span>
+        <small>Teste antigo sem detalhes; execute novamente.</small>
+      </div>
+    );
+  }
+  return (
+    <div className="server-status-breakdown">
+      <strong>{diagnosticSummary(diagnostic)}</strong>
+      {diagnostic.checks.map((check) => (
+        <div className={`server-kind-result is-${check.status}`} key={check.kind}>
+          <span>{kindLabel(check.kind)}</span>
+          <p>{checkSummary(check)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ServerDiagnosticDetails({ diagnostic, compact = false }: { diagnostic: ServerDiagnostic | null; compact?: boolean }) {
+  if (!diagnostic?.checks?.length) return null;
+  return (
+    <div className={`server-diagnostic ${compact ? "is-compact" : ""}`}>
+      {diagnostic.checks.map((check) => (
+        <details key={check.kind} open={!compact && check.status !== "online"}>
+          <summary>
+            <span className={`server-status is-${check.status}`}><i aria-hidden="true" />{kindLabel(check.kind)}: {statusLabel(check.status)}</span>
+            <small>{check.evidence.playbackConfirmed ? "Play confirmado" : `Confiança ${check.evidence.confidence}`}</small>
+          </summary>
+          <p>{check.message}</p>
+          {check.evidence.playerSignals?.length ? <small>Sinais: {check.evidence.playerSignals.join(", ")}</small> : null}
+          {check.evidence.mediaProbe ? <small>Mídia: {check.evidence.mediaProbe.message}</small> : null}
+          {check.issues?.length ? (
+            <ul>
+              {check.issues.map((item, index) => (
+                <li key={`${item.code}:${index}`} className={`is-${item.severity}`}>
+                  <strong>{issueTitle(item.code)}</strong> — {item.message}<code>{item.code}</code>{item.evidence ? <small>{item.evidence}</small> : null}
+                </li>
+              ))}
+            </ul>
+          ) : <small>Nenhum problema detectado.</small>}
+        </details>
+      ))}
+    </div>
+  );
 }
 
 async function responseJson<T>(response: Response): Promise<T & { erro?: string }> {
@@ -85,6 +243,7 @@ export default function AdminPage() {
 
   const serverStats = useMemo(() => ({
     online: servidores.filter((server) => server.last_status === "online").length,
+    degraded: servidores.filter((server) => server.last_status === "degraded").length,
     offline: servidores.filter((server) => server.last_status === "offline").length,
     enabled: servidores.filter((server) => server.enabled).length,
     ptbr: servidores.filter((server) => server.audioProfile === "pt-BR").length,
@@ -240,17 +399,21 @@ export default function AdminPage() {
       for (let index = 0; index < servidores.length; index += 5) {
         batches.push(servidores.slice(index, index + 5).map((server) => server.id));
       }
-      const testedBatches = await Promise.all(batches.map(async (ids) => {
-        const response = await fetch("/api/admin/servidores", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "test", ids }),
-        });
-        const data = await responseJson<{ servidores?: AdminServer[] }>(response);
-        if (!response.ok || !Array.isArray(data.servidores)) throw new Error(data.erro || "Teste em lote não concluído");
-        return data.servidores;
-      }));
+      const testedBatches: AdminServer[][] = [];
+      for (let index = 0; index < batches.length; index += 2) {
+        const wave = await Promise.all(batches.slice(index, index + 2).map(async (ids) => {
+          const response = await fetch("/api/admin/servidores", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "test", ids }),
+          });
+          const data = await responseJson<{ servidores?: AdminServer[] }>(response);
+          if (!response.ok || !Array.isArray(data.servidores)) throw new Error(data.erro || "Teste em lote não concluído");
+          return data.servidores;
+        }));
+        testedBatches.push(...wave);
+      }
       const tested = new Map(testedBatches.flat().map((server) => [server.id, server]));
       setServidores((current) => current.map((server) => tested.get(server.id) ?? server));
     } catch (error) {
@@ -288,7 +451,7 @@ export default function AdminPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "confirm", id: modalServer.id, ok }),
+        body: JSON.stringify({ action: "confirm", id: modalServer.id, kind: modalKind, ok }),
       });
       const data = await responseJson<{ servidor?: AdminServer }>(response);
       if (!response.ok || !data.servidor) throw new Error(data.erro || "Confirmação não concluída");
@@ -310,6 +473,7 @@ export default function AdminPage() {
       ? modalServer.testTvUrl
       : modalServer.testUrl
     : "";
+  const modalCheck = modalServer?.last_diagnostic?.checks.find((check) => check.kind === modalKind) ?? null;
 
   return (
     <main className="admin-shell">
@@ -368,6 +532,7 @@ export default function AdminPage() {
             <article className="is-ptbr"><strong>{serverStats.ptbr}</strong><span>Prioridade PT-BR</span></article>
             <article className="is-subtitled"><strong>{serverStats.subtitled}</strong><span>Legendados</span></article>
             <article className="is-online"><strong>{serverStats.online}</strong><span>Verdes</span></article>
+            <article className="is-degraded"><strong>{serverStats.degraded}</strong><span>Aguardam confirmação</span></article>
             <article className="is-offline"><strong>{serverStats.offline}</strong><span>Vermelhos</span></article>
             <article><strong>{serverStats.enabled}</strong><span>Habilitados</span></article>
           </section>
@@ -406,14 +571,14 @@ export default function AdminPage() {
               <tbody>
                 {servidores.map((server) => (
                   <tr key={server.id} className={!server.enabled ? "is-disabled" : ""}>
-                    <td><span className={`server-status is-${server.last_status}`}><i aria-hidden="true" />{server.last_status === "online" ? "Online" : server.last_status === "offline" ? "Falhou" : "Não testado"}</span></td>
-                    <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{!server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Bloqueia proteção anti-pop-up</small> : null}</td>
+                    <td><ServerStatusBreakdown server={server} /></td>
+                    <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{server.blockedReason || !server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Alerta: {server.blockedReason || server.compatibilityMessage || "pode ser incompatível com a proteção anti-pop-up"}</small> : null}</td>
                     <td>{[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}<small className={`server-audio-profile is-${server.audioProfile === "pt-BR" ? "ptbr" : "sub"}`}>{server.audioProfile === "pt-BR" ? "PT-BR prioritário" : "Legendado"}</small></td>
-                    <td className="server-last-test"><strong>{formatDate(server.last_tested_at)}</strong><small>{server.last_latency_ms != null ? `${server.last_latency_ms} ms · ` : ""}{server.last_http_status ? `HTTP ${server.last_http_status} · ` : ""}{server.last_message || "Aguardando teste"}</small></td>
+                    <td className="server-last-test"><strong>{formatDate(server.last_tested_at)}</strong><small>{server.last_latency_ms != null ? `${server.last_latency_ms} ms · ` : ""}{server.last_http_status ? `HTTP ${server.last_http_status} · ` : ""}{server.last_message || "Aguardando teste"}</small><ServerDiagnosticDetails diagnostic={server.last_diagnostic} compact /></td>
                     <td><span className={`server-enabled ${server.enabled ? "is-on" : "is-off"}`}>{server.enabled ? "Habilitado" : "Desativado"}</span>{!server.enabled && server.disabled_until ? <small className="server-domain">até {formatDate(server.disabled_until)}</small> : null}</td>
                     <td className="admin-actions server-actions">
                       <button type="button" disabled={busyId === `test:${server.id}` || testingAll} onClick={() => void testarServidor(server)}>{busyId === `test:${server.id}` ? "Testando…" : "Testar"}</button>
-                      <button type="button" className={server.enabled ? "is-danger" : "is-enable"} disabled={busyId === `toggle:${server.id}` || !server.protectedEmbedCompatible} title={!server.protectedEmbedCompatible ? server.compatibilityMessage : undefined} onClick={() => void setServerEnabled(server, !server.enabled)}>{!server.protectedEmbedCompatible ? "Incompatível" : server.enabled ? "Desativar" : "Habilitar"}</button>
+                      <button type="button" className={server.enabled ? "is-danger" : "is-enable"} disabled={busyId === `toggle:${server.id}`} title={server.blockedReason || server.compatibilityMessage} onClick={() => void setServerEnabled(server, !server.enabled)}>{server.enabled ? "Desativar" : "Habilitar"}</button>
                     </td>
                   </tr>
                 ))}
@@ -435,7 +600,11 @@ export default function AdminPage() {
             ) : null}
             <div className="server-test-frame-wrap">
               {!modalLoaded ? <div className="server-test-loading">Carregando o player real…</div> : null}
-              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen" onLoad={() => setModalLoaded(true)} />
+              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen" onLoad={() => setModalLoaded(true)} />
+            </div>
+            <div className="server-test-diagnostic">
+              <strong>Diagnóstico automático de {kindLabel(modalKind)}</strong>
+              {modalCheck ? <ServerDiagnosticDetails diagnostic={{ status: modalCheck.status, testedAt: modalServer.last_diagnostic?.testedAt ?? "", checks: [modalCheck] }} /> : <small>Execute o teste automático para gerar os detalhes.</small>}
             </div>
             <footer><p>Pressione Play. Pop-ups e novas abas estão bloqueados neste teste.</p><div><button type="button" className="is-danger" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(false)}>Não funciona</button><button type="button" className="is-success" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(true)}>Funciona</button></div></footer>
           </div>

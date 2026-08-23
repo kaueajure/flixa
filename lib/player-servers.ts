@@ -1,4 +1,4 @@
-export type PlayerServerStatus = "unknown" | "online" | "offline";
+export type PlayerServerStatus = "unknown" | "online" | "degraded" | "offline";
 
 export type PlayerServerDefinition = {
   id: string;
@@ -11,10 +11,12 @@ export type PlayerServerDefinition = {
   audioProfile: "pt-BR" | "legendado";
   priority: number;
   protectedEmbedCompatible: boolean;
+  enabledByDefault: boolean;
   compatibilityMessage?: string;
+  blockedReason?: string;
 };
 
-type BasePlayerServer = Omit<PlayerServerDefinition, "audioProfile" | "priority" | "protectedEmbedCompatible"> & {
+type BasePlayerServer = Omit<PlayerServerDefinition, "audioProfile" | "priority" | "protectedEmbedCompatible" | "enabledByDefault"> & {
   protectedEmbedCompatible?: boolean;
 };
 
@@ -63,6 +65,19 @@ const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
 
 const SUBTITLED_SERVER_IDS = new Set(["vidfast", "vidsrc-wiki", "yapgrid", "videasy", "vidsrc-fyi"]);
 
+/** Problemas conhecidos exibidos como alerta; o administrador mantém o controle de uso. */
+const BLOCKED_SERVER_REASONS: Record<string, string> = {
+  "ezvidapi": "Retorna erro 502 e restringe o iframe ao próprio domínio",
+  "cinextream": "Domínio indisponível",
+  "superflix-pro": "A verificação anti-bot impede a reprodução embutida",
+  "superflix-help": "Domínio indisponível",
+  "warezcdn": "Domínio indisponível",
+  "filmesyseries": "A URL configurada não retorna um player",
+  "pomfy": "O endpoint de reprodução retorna HTTP 403",
+  "betterflix": "A URL redireciona para uma página comum em vez de um embed",
+  "megaembedapi": "Restringe o iframe ao próprio domínio",
+};
+
 const SERVER_PRIORITY = [
   "megaembed-br", "cdn-embed", "superflix-pro", "superflix-help", "warezcdn",
   "pomfy", "betterflix", "pipocacine", "redeflix", "megaembedapi",
@@ -81,8 +96,12 @@ export const PLAYER_SERVERS: PlayerServerDefinition[] = BASE_PLAYER_SERVERS
     audioProfile: SUBTITLED_SERVER_IDS.has(server.id) ? "legendado" as const : "pt-BR" as const,
     priority: PRIORITY_BY_ID.get(server.id) ?? 999,
     protectedEmbedCompatible: server.protectedEmbedCompatible !== false,
+    enabledByDefault: true,
+    blockedReason: BLOCKED_SERVER_REASONS[server.id],
   }))
   .sort((a, b) => a.priority - b.priority);
+
+export const DEFAULT_DISABLED_PLAYER_SERVER_IDS = new Set<string>();
 
 const SERVER_IDS = new Set(PLAYER_SERVERS.map((server) => server.id));
 

@@ -1,6 +1,6 @@
 import { getProviderInventory } from "./provider";
 import { listarServidoresDesabilitados } from "../../../db/player-servers";
-import { PLAYER_SERVERS } from "../../../lib/player-servers";
+import { DEFAULT_DISABLED_PLAYER_SERVER_IDS, PLAYER_SERVERS } from "../../../lib/player-servers";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,7 @@ type CatalogMovie = {
   durationSeconds?: number;
   year?: number;
   genres: string[];
+  genreIds: number[];
   rating?: string;
   director?: string;
   cast?: string[];
@@ -33,6 +34,48 @@ type CatalogMovie = {
 };
 
 type Genre = { id: number; name: string };
+
+const CANONICAL_GENRE_NAMES: Record<MediaKind, Record<number, string>> = {
+  movie: {
+    12: "Aventura",
+    14: "Fantasia",
+    16: "Animação",
+    18: "Drama",
+    27: "Terror",
+    28: "Ação",
+    35: "Comédia",
+    36: "História",
+    37: "Faroeste",
+    53: "Suspense",
+    80: "Crime",
+    99: "Documentário",
+    878: "Ficção científica",
+    9648: "Mistério",
+    10402: "Música",
+    10749: "Romance",
+    10751: "Família",
+    10752: "Guerra",
+    10770: "Cinema TV",
+  },
+  tv: {
+    16: "Animação",
+    18: "Drama",
+    35: "Comédia",
+    37: "Faroeste",
+    80: "Crime",
+    99: "Documentário",
+    9648: "Mistério",
+    10751: "Família",
+    10759: "Ação e Aventura",
+    10762: "Infantil",
+    10763: "Notícias",
+    10764: "Reality show",
+    10765: "Ficção científica e Fantasia",
+    10766: "Novela",
+    10767: "Talk show",
+    10768: "Guerra e Política",
+  },
+};
 
 const TMDB_API = "https://api.themoviedb.org/3";
 const TMDB_IMAGE = "https://image.tmdb.org/t/p";
@@ -214,15 +257,37 @@ function tmdbImagePath(value: unknown) {
   return null;
 }
 
-function tmdbGenreNames(movie: Record<string, unknown>, genreMap: Map<number, string>) {
-  const named = asGenres(movie.genres);
-  if (named.length > 0) return named;
+function tmdbGenreIds(movie: Record<string, unknown>) {
+  const rawIds = Array.isArray(movie.genre_ids)
+    ? movie.genre_ids
+    : Array.isArray(movie.genres)
+      ? movie.genres.map((genre) => asRecord(genre)?.id)
+      : [];
 
-  const ids = movie.genre_ids;
-  if (!Array.isArray(ids)) return [];
-  return ids
-    .map((id) => genreMap.get(Number(id)))
-    .filter((name): name is string => Boolean(name));
+  return [...new Set(
+    rawIds
+      .map((id) => asNumber(id))
+      .filter((id): id is number => id != null && Number.isInteger(id) && id > 0),
+  )];
+}
+
+function canonicalGenreName(kind: MediaKind, id: number, fallback?: string) {
+  return CANONICAL_GENRE_NAMES[kind][id] || fallback || null;
+}
+
+function tmdbGenreNames(
+  movie: Record<string, unknown>,
+  genreMap: Map<number, string>,
+  kind: MediaKind,
+  genreIds: number[],
+) {
+  const named = asGenres(movie.genres);
+  if (genreIds.length > 0) {
+    return genreIds
+      .map((id, index) => canonicalGenreName(kind, id, genreMap.get(id) || named[index]))
+      .filter((name): name is string => Boolean(name));
+  }
+  return named;
 }
 
 function isBrazilianProduction(movie: Record<string, unknown>) {
@@ -318,6 +383,7 @@ function mapTmdbMovie(
       ? { duration: `${seasons} ${seasons === 1 ? "temp." : "temps."}`, durationSeconds: undefined }
       : asDuration(movie.runtime ?? episodeRuntime);
   const { director, cast } = tmdbCredits(movie, kind);
+  const genreIds = tmdbGenreIds(movie);
 
   return {
     id: `${kind}-${tmdbId}`,
@@ -333,7 +399,8 @@ function mapTmdbMovie(
     duration,
     durationSeconds,
     year: asYear(movie, kind),
-    genres: tmdbGenreNames(movie, genreMap),
+    genres: tmdbGenreNames(movie, genreMap, kind, genreIds),
+    genreIds,
     rating: asRating(movie),
     director,
     cast,
@@ -364,7 +431,7 @@ async function markProviderAvailability(movies: CatalogMovie[]) {
   try {
     disabledIds = await listarServidoresDesabilitados();
   } catch {
-    // Falha aberta: preserva o catálogo quando o controle administrativo estiver indisponível.
+    disabledIds = [...DEFAULT_DISABLED_PLAYER_SERVER_IDS];
   }
   const disabled = new Set(disabledIds);
   const enabledServerCount = {
@@ -451,7 +518,8 @@ async function fetchTmdbGenreMap(kind: MediaKind) {
   for (const item of genres) {
     const genre = asRecord(item);
     const id = asNumber(genre?.id);
-    const name = firstString(genre?.name);
+    const providerName = firstString(genre?.name);
+    const name = id != null ? canonicalGenreName(kind, id, providerName || undefined) : null;
     if (id != null && name) {
       map.set(id, name);
       list.push({ id, name });
@@ -687,6 +755,7 @@ const TMDB_DISCOVER_CAP = 10000;
 
 async function browseCatalog(kind: MediaKind, page: number, genreId?: string) {
   const hasGenre = Boolean(genreId && /^\d+$/.test(genreId));
+  const selectedGenreId = hasGenre ? Number(genreId) : null;
   const start = (page - 1) * BROWSE_PAGE_SIZE;
   const firstTmdbPage = Math.floor(start / TMDB_PAGE_SIZE) + 1;
   const lastTmdbPage = Math.ceil((start + BROWSE_PAGE_SIZE) / TMDB_PAGE_SIZE);
@@ -720,7 +789,20 @@ async function browseCatalog(kind: MediaKind, page: number, genreId?: string) {
     const movies = results.flatMap((data) =>
       findMovieItems(data)
         .map((item) => mapTmdbMovie(item, label, map, kind, listId))
-        .filter((item): item is CatalogMovie => Boolean(item?.poster)),
+        .filter((item): item is CatalogMovie => Boolean(
+          item?.poster &&
+          item.kind === kind &&
+          (selectedGenreId == null || item.genreIds.includes(selectedGenreId))
+        ))
+        .map((item) => {
+          if (selectedGenreId == null) return item;
+          const selectedName = map.get(selectedGenreId);
+          if (!selectedName) return item;
+          return {
+            ...item,
+            genres: [selectedName, ...item.genres.filter((name) => name !== selectedName)],
+          };
+        }),
     );
     const offset = start - (firstTmdbPage - 1) * TMDB_PAGE_SIZE;
     const candidates = movies.slice(offset, offset + BROWSE_PAGE_SIZE);

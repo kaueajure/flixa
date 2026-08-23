@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { and, asc, eq, gt } from "drizzle-orm";
-import { getDb } from "./index";
+import { withDb } from "./index";
+import { describeDatabaseFailure, safeDatabaseError } from "./errors";
 import { sessoes, usuarios, type Usuario } from "./schema";
 
 export const SESSAO_COOKIE = "flixa_sessao";
@@ -94,13 +95,14 @@ export function montarCookieLogout(request?: Request) {
 }
 
 export async function autenticarUsuario(email: string, senha: string) {
-  const db = await getDb();
-  const rows = await db.select().from(usuarios).where(eq(usuarios.email, email.trim().toLowerCase())).limit(1);
-  const usuario = rows[0];
-  if (!usuario || !verificarSenha(senha, usuario.senha)) {
-    return null;
-  }
-  return usuario;
+  return withDb(async (db) => {
+    const rows = await db.select().from(usuarios).where(eq(usuarios.email, email.trim().toLowerCase())).limit(1);
+    const usuario = rows[0];
+    if (!usuario || !verificarSenha(senha, usuario.senha)) {
+      return null;
+    }
+    return usuario;
+  });
 }
 
 export async function cadastrarUsuario(input: { nome: string; email: string; senha: string }) {
@@ -118,47 +120,48 @@ export async function cadastrarUsuario(input: { nome: string; email: string; sen
     return { erro: "A senha precisa ter pelo menos 6 caracteres.", usuario: null as Usuario | null };
   }
 
-  const db = await getDb();
-  const existentes = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.email, email)).limit(1);
-  if (existentes[0]) {
-    return { erro: "Este e-mail já está cadastrado.", usuario: null as Usuario | null };
-  }
+  return withDb(async (db) => {
+    const existentes = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.email, email)).limit(1);
+    if (existentes[0]) {
+      return { erro: "Este e-mail já está cadastrado.", usuario: null as Usuario | null };
+    }
 
-  const agora = agoraSql();
-  await db.insert(usuarios).values({
-    nome,
-    email,
-    senha: hashSenha(senha),
-    administrador: 0,
-    criado_em: agora,
-    atualizado_em: agora,
+    const agora = agoraSql();
+    await db.insert(usuarios).values({
+      nome,
+      email,
+      senha: hashSenha(senha),
+      administrador: 0,
+      criado_em: agora,
+      atualizado_em: agora,
+    });
+
+    const criados = await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1);
+    const usuario = criados[0] ?? null;
+    if (!usuario) {
+      return { erro: "Não foi possível concluir o cadastro.", usuario: null as Usuario | null };
+    }
+
+    return { erro: null as string | null, usuario };
   });
-
-  const criados = await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1);
-  const usuario = criados[0] ?? null;
-  if (!usuario) {
-    return { erro: "Não foi possível concluir o cadastro.", usuario: null as Usuario | null };
-  }
-
-  return { erro: null as string | null, usuario };
 }
 
 export async function criarSessao(usuarioId: number) {
-  const db = await getDb();
   const token = gerarTokenSessao();
-  await db.insert(sessoes).values({
-    usuario_id: usuarioId,
-    token,
-    expira_em: expiraEmSql(),
-    criado_em: agoraSql(),
+  await withDb(async (db) => {
+    await db.insert(sessoes).values({
+      usuario_id: usuarioId,
+      token,
+      expira_em: expiraEmSql(),
+      criado_em: agoraSql(),
+    });
   });
   return token;
 }
 
 export async function obterUsuarioPorToken(token: string | null) {
   if (!token) return null;
-  const db = await getDb();
-  const rows = await db
+  const selectSession = () => withDb((db) => db
     .select({
       id: usuarios.id,
       nome: usuarios.nome,
@@ -171,7 +174,22 @@ export async function obterUsuarioPorToken(token: string | null) {
     .from(sessoes)
     .innerJoin(usuarios, eq(sessoes.usuario_id, usuarios.id))
     .where(and(eq(sessoes.token, token), gt(sessoes.expira_em, agoraSql())))
-    .limit(1);
+    .limit(1));
+
+  let rows;
+  try {
+    rows = await selectSession();
+  } catch (error) {
+    if (describeDatabaseFailure(error).transient) {
+      try {
+        rows = await selectSession();
+      } catch (retryError) {
+        throw safeDatabaseError(retryError, "validar sessão após nova tentativa");
+      }
+    } else {
+      throw safeDatabaseError(error, "validar sessão");
+    }
+  }
 
   return rows[0] ?? null;
 }
@@ -191,29 +209,31 @@ export async function requireAdmin(request: Request) {
 
 export async function encerrarSessao(token: string | null) {
   if (!token) return;
-  const db = await getDb();
-  await db.delete(sessoes).where(eq(sessoes.token, token));
+  await withDb(async (db) => {
+    await db.delete(sessoes).where(eq(sessoes.token, token));
+  });
 }
 
 export async function listarUsuariosAdmin() {
-  const db = await getDb();
-  const rows = await db
-    .select({
-      id: usuarios.id,
-      nome: usuarios.nome,
-      email: usuarios.email,
-      administrador: usuarios.administrador,
-      criado_em: usuarios.criado_em,
-    })
-    .from(usuarios)
-    .orderBy(asc(usuarios.id));
-  return rows.map((row) => ({
-    id: row.id,
-    nome: row.nome,
-    email: row.email,
-    administrador: Number(row.administrador) === 1,
-    criado_em: row.criado_em,
-  }));
+  return withDb(async (db) => {
+    const rows = await db
+      .select({
+        id: usuarios.id,
+        nome: usuarios.nome,
+        email: usuarios.email,
+        administrador: usuarios.administrador,
+        criado_em: usuarios.criado_em,
+      })
+      .from(usuarios)
+      .orderBy(asc(usuarios.id));
+    return rows.map((row) => ({
+      id: row.id,
+      nome: row.nome,
+      email: row.email,
+      administrador: Number(row.administrador) === 1,
+      criado_em: row.criado_em,
+    }));
+  });
 }
 
 export async function atualizarUsuarioAdmin(
@@ -221,40 +241,42 @@ export async function atualizarUsuarioAdmin(
   input: { administrador?: boolean; nome?: string },
   adminId: number,
 ) {
-  const db = await getDb();
-  const rows = await db.select().from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
-  const alvo = rows[0];
-  if (!alvo) return { erro: "Usuário não encontrado.", usuario: null as Usuario | null };
+  return withDb(async (db) => {
+    const rows = await db.select().from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
+    const alvo = rows[0];
+    if (!alvo) return { erro: "Usuário não encontrado.", usuario: null as Usuario | null };
 
-  if (input.administrador === false && alvoId === adminId) {
-    return { erro: "Você não pode remover seu próprio acesso de administrador.", usuario: null as Usuario | null };
-  }
+    if (input.administrador === false && alvoId === adminId) {
+      return { erro: "Você não pode remover seu próprio acesso de administrador.", usuario: null as Usuario | null };
+    }
 
-  const patch: {
-    atualizado_em: string;
-    administrador?: number;
-    nome?: string;
-  } = { atualizado_em: agoraSql() };
+    const patch: {
+      atualizado_em: string;
+      administrador?: number;
+      nome?: string;
+    } = { atualizado_em: agoraSql() };
 
-  if (typeof input.administrador === "boolean") {
-    patch.administrador = input.administrador ? 1 : 0;
-  }
-  if (typeof input.nome === "string" && input.nome.trim().length >= 2) {
-    patch.nome = input.nome.trim().replace(/\s+/g, " ");
-  }
+    if (typeof input.administrador === "boolean") {
+      patch.administrador = input.administrador ? 1 : 0;
+    }
+    if (typeof input.nome === "string" && input.nome.trim().length >= 2) {
+      patch.nome = input.nome.trim().replace(/\s+/g, " ");
+    }
 
-  await db.update(usuarios).set(patch).where(eq(usuarios.id, alvoId));
-  const atualizados = await db.select().from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
-  return { erro: null as string | null, usuario: atualizados[0] ?? null };
+    await db.update(usuarios).set(patch).where(eq(usuarios.id, alvoId));
+    const atualizados = await db.select().from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
+    return { erro: null as string | null, usuario: atualizados[0] ?? null };
+  });
 }
 
 export async function excluirUsuarioAdmin(alvoId: number, adminId: number) {
   if (alvoId === adminId) {
     return { erro: "Você não pode excluir a própria conta por aqui." };
   }
-  const db = await getDb();
-  const rows = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
-  if (!rows[0]) return { erro: "Usuário não encontrado." };
-  await db.delete(usuarios).where(eq(usuarios.id, alvoId));
-  return { erro: null as string | null };
+  return withDb(async (db) => {
+    const rows = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.id, alvoId)).limit(1);
+    if (!rows[0]) return { erro: "Usuário não encontrado." };
+    await db.delete(usuarios).where(eq(usuarios.id, alvoId));
+    return { erro: null as string | null };
+  });
 }
