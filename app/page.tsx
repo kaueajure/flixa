@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import {
   DEFAULT_DISABLED_PLAYER_SERVER_IDS,
   getPlayerServer,
+  PLAYER_SERVERS,
   playerServerIdForSource,
 } from "../lib/player-servers";
 import BorderCollieForum from "./border-collie-forum";
@@ -14,6 +15,7 @@ import SiteIntro from "./site-intro";
 import SportsView from "./sports-view";
 import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
+import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 
 type MediaKind = "movie" | "tv";
 
@@ -42,7 +44,6 @@ type Movie = {
   positionSeconds?: number;
   available?: boolean;
   server_count?: number;
-  provider_available?: boolean;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
 };
@@ -223,15 +224,13 @@ async function retainAvailableMovies(items: Movie[], signal?: AbortSignal) {
       signal,
     });
     if (!response.ok) return [];
-    const data = (await response.json()) as { available?: string[]; provider_available?: string[] };
+    const data = (await response.json()) as { available?: string[] };
     const available = new Set(Array.isArray(data.available) ? data.available : []);
-    const providerAvailable = new Set(Array.isArray(data.provider_available) ? data.provider_available : []);
     return movies
       .filter((movie) => available.has(availabilityKey(movie)))
       .map((movie) => ({
         ...movie,
         available: true,
-        provider_available: providerAvailable.has(availabilityKey(movie)),
         playback_locale: "pt-BR" as const,
       }));
   } catch {
@@ -617,6 +616,14 @@ export default function Home() {
     }
     return () => window.clearTimeout(boot);
   }, [authChecking, authUser]);
+
+  useEffect(() => {
+    if (WATCH_PARTY_ENABLED) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("party")) return;
+    url.searchParams.delete("party");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   useEffect(() => {
     let frame = 0;
@@ -1061,6 +1068,10 @@ export default function Home() {
   }
 
   function createGroupSession(movie: Movie) {
+    if (!WATCH_PARTY_ENABLED) {
+      showToast("O Assistir em grupo está temporariamente indisponível.");
+      return;
+    }
     const url = new URL(window.location.href);
     url.searchParams.set("party", "create");
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
@@ -1169,8 +1180,9 @@ export default function Home() {
           </a>
           <a
             href="#assistir-em-grupo"
-            className={`nav-group-link ${view === "grupo" ? "is-active" : ""}`}
+            className={`nav-group-link ${view === "grupo" ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
             onClick={() => goTo("assistir-em-grupo")}
+            aria-disabled={!WATCH_PARTY_ENABLED}
           >
             <span aria-hidden="true">◉</span>
             Assistir em grupo
@@ -1662,8 +1674,9 @@ export default function Home() {
         </a>
         <a
           href="#assistir-em-grupo"
-          className={view === "grupo" ? "is-active" : ""}
+          className={`${view === "grupo" ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
           onClick={() => goTo("assistir-em-grupo")}
+          aria-disabled={!WATCH_PARTY_ENABLED}
         >
           Grupo
         </a>
@@ -2391,6 +2404,20 @@ function GroupWatchView({
   onCreate: (movie: Movie) => void;
   onExplore: () => void;
 }) {
+  if (!WATCH_PARTY_ENABLED) {
+    return (
+      <section className="list-view group-watch-view is-disabled" id="assistir-em-grupo">
+        <div className="group-watch-disabled-card">
+          <div className="group-watch-disabled-icon" aria-hidden="true"><span>◉</span><i /></div>
+          <p className="eyebrow">Flixa Party</p>
+          <span className="group-watch-disabled-badge"><i /> Recurso inativo</span>
+          <h1>Assistir em grupo está temporariamente indisponível.</h1>
+          <p>As salas, convites e controles compartilhados foram bloqueados enquanto a integração dos players é revisada. Nenhuma sala pode ser criada ou acessada neste momento.</p>
+          <button className="primary-action" type="button" onClick={onExplore}>Voltar para o catálogo</button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="list-view group-watch-view" id="assistir-em-grupo">
       <div className="list-view-head">
@@ -2919,7 +2946,13 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /pipocacine\.lat|cdn-embed\.com|yapgrid\.com|screenscape\.me|play\.xpass\.top|cinesrc\.st|unlimplay\.com|vidsrc\.wiki|videasy\.(?:net|to)|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|pomfy\.stream|megaembed\.com|superflixapi\.sbs|warezcdn\.lat|redeflixapi\.store|betterflix\.cfd|myembed\.biz|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
+  try {
+    const host = new URL(src, window.location.href).hostname.toLowerCase();
+    if (/themoviedb|image\.tmdb|youtube|googlevideo/.test(host)) return true;
+    return PLAYER_SERVERS.some((server) => host === server.domain || host.endsWith(`.${server.domain}`));
+  } catch {
+    return false;
+  }
 }
 
 function isOverlayAd(node: Element) {
@@ -2944,7 +2977,7 @@ function isOverlayAd(node: Element) {
     if (node instanceof HTMLIFrameElement && !node.classList.contains("video-stage")) return true;
     if (node instanceof HTMLImageElement) return true;
     if (/position:\s*(fixed|absolute)/i.test(style) || /z-index:\s*\d{3,}/i.test(style)) return true;
-    if (/embedmovies|superflix|warez|cdn-embed|popads|exoclick|juicyads/i.test(`${text} ${className}`)) return true;
+    if (/embedmovies|warez|cdn-embed|popads|exoclick|juicyads/i.test(`${text} ${className}`)) return true;
     // Badges/pill flutuantes injetados no body pelo embed
     if (node.childElementCount <= 3 && text.length > 0 && text.length < 80) {
       if (/embed|ads?|anúncios|premium|claim|congratulations|jackpot/i.test(text)) return true;
@@ -3063,32 +3096,36 @@ function writePreferredPlayerServer(serverId: string) {
   }
 }
 
-type AdditionalPlayerSource = {
-  id: string;
-  name: string;
-  theme: PlayerTheme;
-  movieUrl: (tmdbId: string) => string;
-  tvUrl: (tmdbId: string, season: number, episode: number) => string;
-};
+const PLAYER_THEMES: PlayerTheme[] = ["rose", "cyan", "gold", "violet", "emerald", "sky"];
 
-const ADDITIONAL_PLAYER_SOURCES: AdditionalPlayerSource[] = [
-  { id: "pipocacine", name: "PipocaCine", theme: "rose", movieUrl: (id) => `https://pipocacine.lat/embed/${id}`, tvUrl: (id, season, episode) => `https://pipocacine.lat/embed/${id}/${season}/${episode}` },
-  { id: "cdn-embed", name: "CDN Brasil", theme: "emerald", movieUrl: (id) => `https://cdn-embed.com/filme/${id}`, tvUrl: (id, season, episode) => `https://cdn-embed.com/serie/${id}/${season}/${episode}` },
-  { id: "screenscape", name: "ScreenScape PT", theme: "violet", movieUrl: (id) => `https://screenscape.me/embed?tmdb=${id}&type=movie&lan=por`, tvUrl: (id, season, episode) => `https://screenscape.me/embed?tmdb=${id}&type=tv&s=${season}&e=${episode}&lan=por` },
-  { id: "unlimplay", name: "UnlimPlay", theme: "rose", movieUrl: (id) => `https://unlimplay.com/f/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://unlimplay.com/f/embed/tv/${id}/${season}/${episode}` },
-  { id: "redeflix", name: "RedeFlix Brasil", theme: "rose", movieUrl: (id) => `https://redeflixapi.store/filme/${id}`, tvUrl: (id, season, episode) => `https://redeflixapi.store/serie/${id}/${season}/${episode}` },
-  { id: "betterflix", name: "BetterFlix Brasil", theme: "gold", movieUrl: (id) => `https://betterflix.cfd/api/player?id=${id}&type=movie`, tvUrl: (id, season, episode) => `https://betterflix.cfd/api/player?id=${id}&type=tv&season=${season}&episode=${episode}` },
-  { id: "embedmovies", name: "EmbedMovies Brasil", theme: "violet", movieUrl: (id) => `https://myembed.biz/filme/${id}`, tvUrl: (id, season, episode) => `https://myembed.biz/serie/${id}/${season}/${episode}` },
-  { id: "superflix", name: "SuperFlix Brasil", theme: "gold", movieUrl: (id) => `https://superflixapi.sbs/filme/${id}`, tvUrl: (id, season, episode) => `https://superflixapi.sbs/serie/${id}/${season}/${episode}` },
-  { id: "warezcdn", name: "WarezCDN Brasil", theme: "emerald", movieUrl: (id) => `https://warezcdn.lat/filme/${id}`, tvUrl: (id, season, episode) => `https://warezcdn.lat/serie/${id}/${season}/${episode}` },
-  { id: "megaembed", name: "MegaEmbed Dublado", theme: "cyan", movieUrl: (id) => `https://megaembed.com/embed/${id}`, tvUrl: (id, season, episode) => `https://megaembed.com/embed/${id}/${season}/${episode}` },
-];
+function historicalSourceUrl(
+  server: (typeof PLAYER_SERVERS)[number],
+  tmdbId: string,
+  imdbId: string,
+  isTv: boolean,
+  season: number,
+  episode: number,
+) {
+  if (isTv ? !server.supportsTv : !server.supportsMovie) return "";
+  let src = isTv ? server.testTvUrl : server.testUrl;
+  if (!src) return "";
 
-function withSuperflixFlags(url: string, isTv: boolean) {
-  const base = url.split("#")[0];
-  const flags = ["noLink", "transparent"];
-  if (isTv) flags.push("noEpList");
-  return `${base}#${flags.join("#")}`;
+  const requiresImdb = server.id === "filmesyseries";
+  if (requiresImdb && !/^tt\d+$/i.test(imdbId)) return "";
+  src = src
+    .replace(/tt0137523|tt0944947/gi, imdbId)
+    .replace(/550|1399/g, tmdbId);
+
+  if (!isTv) return src;
+  return src
+    .replace(/\/1\/1(?=([?#]|$))/g, `/${season}/${episode}`)
+    .replace(/-1-1(?=([?#]|$))/g, `-${season}-${episode}`)
+    .replace(/([?&])s=1(?=(&|$))/g, `$1s=${season}`)
+    .replace(/([?&])e=1(?=(&|$))/g, `$1e=${episode}`)
+    .replace(/([?&])season=1(?=(&|$))/g, `$1season=${season}`)
+    .replace(/([?&])episode=1(?=(&|$))/g, `$1episode=${episode}`)
+    .replace(/([?&])sea=1(?=(&|$))/g, `$1sea=${season}`)
+    .replace(/([?&])epi=1(?=(&|$))/g, `$1epi=${episode}`);
 }
 
 function buildPlayerSources(
@@ -3099,259 +3136,20 @@ function buildPlayerSources(
 ): PlayerSource[] {
   const imdbId = movie.imdb_id && movie.imdb_id !== "N/A" ? movie.imdb_id : (movie.id.startsWith("tt") ? movie.id : "");
   const tmdbId = movie.tmdb_id && movie.tmdb_id !== "N/A" ? movie.tmdb_id : titleId(movie);
-  const kind = mediaKind(movie);
-  const isTv = kind === "tv";
-  const path = isTv ? "serie" : "filme";
-  const episodeSuffix = isTv && season && episode ? `/${season}/${episode}` : "";
-  const fallbackId = /^\d+$/.test(tmdbId) ? tmdbId : (/^tt\d+$/i.test(imdbId) ? imdbId : "");
-  const sources: PlayerSource[] = [];
-
-  const episodePath = `${season ?? 1}/${episode ?? 1}`;
-  const episodeDashPath = `${season ?? 1}-${episode ?? 1}`;
+  const isTv = mediaKind(movie) === "tv";
   const tmdbOnlyId = /^\d+$/.test(tmdbId) ? tmdbId : "";
+  if (!tmdbOnlyId) return [];
 
-  // Fontes independentes verificadas em filme e episódio. Elas ficam antes
-  // dos provedores legados para que uma origem ativa seja aberta por padrão.
-  if (tmdbOnlyId) {
-    sources.push(
-      {
-        id: "pomfy",
-        name: "Pomfy",
-        theme: "cyan",
-        src: isTv
-          ? `https://api.pomfy.stream/serie/${tmdbOnlyId}/${episodePath}`
-          : `https://api.pomfy.stream/filme/${tmdbOnlyId}`,
-      },
-      {
-        id: "pipocacine",
-        name: "PipocaCine",
-        theme: "rose",
-        src: isTv
-          ? `https://pipocacine.lat/embed/${tmdbOnlyId}/${episodePath}`
-          : `https://pipocacine.lat/embed/${tmdbOnlyId}`,
-      },
-      {
-        id: "vidsrc-wiki",
-        name: "VidSrc Wiki",
-        theme: "violet",
-        src: isTv
-          ? `https://vidsrc.wiki/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://vidsrc.wiki/embed/movie/${tmdbOnlyId}`,
-      },
-      {
-        id: "vidphantom",
-        name: "VidPhantom",
-        theme: "rose",
-        src: isTv
-          ? `https://vidphantom.com/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://vidphantom.com/movie/${tmdbOnlyId}`,
-      },
-      {
-        id: "yapgrid",
-        name: "YapGrid",
-        theme: "emerald",
-        src: isTv
-          ? `https://yapgrid.com/embed/tv/${tmdbOnlyId}/${episodePath}?lang=pt`
-          : `https://yapgrid.com/embed/movie/${tmdbOnlyId}?lang=pt`,
-      },
-      {
-        id: "videasy",
-        name: "Videasy",
-        theme: "sky",
-        src: isTv
-          ? `https://player.videasy.net/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://player.videasy.net/movie/${tmdbOnlyId}`,
-      },
-    );
-
-    sources.push(...ADDITIONAL_PLAYER_SOURCES.map((source) => ({
-      id: source.id,
-      name: source.name,
-      theme: source.theme,
-      src: isTv
-        ? source.tvUrl(tmdbOnlyId, season ?? 1, episode ?? 1)
-        : source.movieUrl(tmdbOnlyId),
-    })));
-  }
-
-  if (fallbackId) {
-    const autoEmbedKind = fallbackId.startsWith("tt") ? "imdb" : "tmdb";
-    sources.push(
-      {
-        id: "autoembed-co",
-        name: "AutoEmbed",
-        theme: "gold",
-        src: isTv
-          ? `https://autoembed.co/tv/${autoEmbedKind}/${fallbackId}-${episodeDashPath}`
-          : `https://autoembed.co/movie/${autoEmbedKind}/${fallbackId}`,
-      },
-      {
-        id: "megaembedapi",
-        name: "MegaEmbedAPI",
-        theme: "gold",
-        src: isTv && /^tt\d+$/i.test(imdbId)
-          ? `https://megaembedapi.site/embed/series?imdb=${imdbId}&sea=${season ?? 1}&epi=${episode ?? 1}`
-          : `https://megaembedapi.site/embed/${fallbackId}`,
-      },
-    );
-  }
-
-  if (tmdbOnlyId) {
-    sources.push(
-      {
-        id: "ezvidapi",
-        name: "EZVidAPI",
-        theme: "cyan",
-        src: isTv
-          ? `https://ezvidapi.com/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://ezvidapi.com/embed/movie/${tmdbOnlyId}`,
-      },
-      {
-        id: "xpass",
-        name: "XPass Grupo",
-        theme: "gold",
-        src: isTv
-          ? `https://play.xpass.top/e/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://play.xpass.top/e/movie/${tmdbOnlyId}`,
-      },
-      {
-        id: "cinesrc",
-        name: "CineSrc Grupo",
-        theme: "rose",
-        src: isTv
-          ? `https://cinesrc.st/embed/tv/${tmdbOnlyId}?s=${season ?? 1}&e=${episode ?? 1}&autoplay=false`
-          : `https://cinesrc.st/embed/movie/${tmdbOnlyId}?autoplay=false`,
-      },
-      {
-        id: "cinextream",
-        name: "CineXtream",
-        theme: "emerald",
-        src: isTv
-          ? `https://cinextream.net/api/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://cinextream.net/api/embed/movie/${tmdbOnlyId}`,
-      },
-      {
-        id: "embed-api",
-        name: "Embed API",
-        theme: "violet",
-        src: isTv
-          ? `https://player.embed-api.stream/?id=${tmdbOnlyId}&s=${season ?? 1}&e=${episode ?? 1}`
-          : `https://player.embed-api.stream/?id=${tmdbOnlyId}&type=movie`,
-      },
-      {
-        id: "iembed",
-        name: "iEmbed",
-        theme: "cyan",
-        src: isTv
-          ? `https://iembed.codeera.dev/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://iembed.codeera.dev/embed/movie/${tmdbOnlyId}`,
-      },
-    );
-  }
-
-  if (movie.available === true && /^\d+$/.test(tmdbId)) {
-    if (!isTv) {
-      sources.push({
-        id: "cdn-tmdb",
-        name: "CDN Brasil",
-        theme: "cyan",
-        src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
-      });
-    }
-    if (movie.provider_available === true) {
-      sources.push({
-        id: "superflix-pro",
-        name: "SuperFlix",
-        theme: "gold",
-        src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
-      });
-      sources.push({
-        id: "superflix-help",
-        name: "SuperFlix Alt",
-        theme: "violet",
-        src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
-      });
-    }
-    if (!isTv) {
-      sources.push({
-        id: "warez-tmdb",
-        name: "WarezCDN",
-        theme: "emerald",
-        src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
-      });
-    }
-  }
-
-  if (movie.available === true && /^tt\d+$/i.test(imdbId)) {
-    if (!isTv) {
-      sources.push({
-        id: "cdn-imdb",
-        name: "CDN IMDb",
-        theme: "sky",
-        src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
-      });
-    }
-    if (movie.provider_available === true) {
-      sources.push({
-        id: "superflix-imdb",
-        name: "SuperFlix IMDb",
-        theme: "rose",
-        src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
-      });
-    }
-    if (!isTv) {
-      sources.push({
-        id: "warez-imdb",
-        name: "WarezCDN IMDb",
-        theme: "emerald",
-        src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
-      });
-    }
-  }
-
-  if (!isTv) {
-    if (fallbackId) {
-      sources.push({
-        id: "2embed",
-        name: "2Embed",
-        theme: "rose",
-        src: `https://www.2embed.online/embed/movie/${fallbackId}`,
-      });
-    }
-  }
-
-  if (!isTv && /^tt\d+$/i.test(imdbId)) {
-    sources.push({
-      id: "filmesyseries",
-      name: "Filmes & Séries",
-      theme: "gold",
-      src: `https://filmesyseries.epizy.com/embed-2/?type=movies&imdb=${imdbId}`,
-    });
-  }
-
-  const seen = new Set<string>();
-  const seenServers = new Set<string>();
-  return sources.filter((source) => {
-    const serverId = playerServerIdForSource(source.id);
-    const server = getPlayerServer(serverId);
-    if (
-      !server
-      || (isTv ? !server.supportsTv : !server.supportsMovie)
-      || !source.src
-      || seen.has(source.src)
-      || seenServers.has(serverId)
-      || disabledServerIds.has(serverId)
-    ) return false;
-    seen.add(source.src);
-    seenServers.add(serverId);
-    return true;
-  }).map((source) => {
-    const server = getPlayerServer(playerServerIdForSource(source.id));
-    return {
-      ...source,
-      priority: server?.priority ?? 999,
-    };
-  }).sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
+  return PLAYER_SERVERS
+    .filter((server) => !disabledServerIds.has(server.id))
+    .map((server, index) => ({
+      id: server.id,
+      name: server.name,
+      theme: PLAYER_THEMES[index % PLAYER_THEMES.length],
+      src: historicalSourceUrl(server, tmdbOnlyId, imdbId, isTv, season ?? 1, episode ?? 1),
+      priority: server.priority,
+    }))
+    .filter((source) => Boolean(source.src));
 }
 
 function PlayerServerMenu({

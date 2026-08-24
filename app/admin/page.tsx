@@ -114,7 +114,6 @@ type CatalogCheck = {
   total: number;
   valid: number;
   invalid: number;
-  provider_available: number;
   problems: Array<{ key: string; title: string; issues: string[] }>;
   rules: string[];
 };
@@ -168,55 +167,6 @@ function issueTitle(code: string) {
   return ISSUE_TITLES[code] ?? code.replaceAll("_", " ").toLocaleLowerCase("pt-BR");
 }
 
-function checkSummary(check: ServerEndpointCheck) {
-  if (check.evidence.playbackConfirmed) return "Reprodução confirmada pelo administrador";
-  const blockingIssue = check.issues.find((item) => item.severity === "error");
-  if (blockingIssue) return `${issueTitle(blockingIssue.code)}: ${blockingIssue.message}`;
-  if (check.evidence.mediaProbe?.status === "passed") {
-    return check.issues.length > 0
-      ? `${check.evidence.mediaProbe.message}; há alertas adicionais`
-      : check.evidence.mediaProbe.message;
-  }
-  const mainWarning = check.issues.find((item) => !["KNOWN_PROVIDER_ISSUE", "SANDBOX_COMPATIBILITY_RISK"].includes(item.code))
-    ?? check.issues[0];
-  return mainWarning ? `${issueTitle(mainWarning.code)}: ${mainWarning.message}` : check.message;
-}
-
-function diagnosticSummary(diagnostic: ServerDiagnostic) {
-  const total = diagnostic.checks.length;
-  const online = diagnostic.checks.filter((check) => check.status === "online").length;
-  const waiting = diagnostic.checks.filter((check) => check.status === "degraded").length;
-  const failed = diagnostic.checks.filter((check) => check.status === "offline").length;
-  return [
-    `${online}/${total} ${total === 1 ? "operacional" : "operacionais"}`,
-    waiting ? `${waiting} aguardando Play` : null,
-    failed ? `${failed} com falha` : null,
-  ].filter(Boolean).join(" · ");
-}
-
-function ServerStatusBreakdown({ server }: { server: AdminServer }) {
-  const diagnostic = server.last_diagnostic;
-  if (!diagnostic?.checks?.length) {
-    return (
-      <div className="server-status-breakdown">
-        <span className={`server-status is-${server.last_status}`}><i aria-hidden="true" />{statusLabel(server.last_status)}</span>
-        <small>Teste antigo sem detalhes; execute novamente.</small>
-      </div>
-    );
-  }
-  return (
-    <div className="server-status-breakdown">
-      <strong>{diagnosticSummary(diagnostic)}</strong>
-      {diagnostic.checks.map((check) => (
-        <div className={`server-kind-result is-${check.status}`} key={check.kind}>
-          <span>{kindLabel(check.kind)}</span>
-          <p>{checkSummary(check)}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function ServerDiagnosticDetails({ diagnostic, compact = false }: { diagnostic: ServerDiagnostic | null; compact?: boolean }) {
   if (!diagnostic?.checks?.length) return null;
   return (
@@ -245,28 +195,6 @@ function ServerDiagnosticDetails({ diagnostic, compact = false }: { diagnostic: 
         </details>
       ))}
     </div>
-  );
-}
-
-function ServerAudioAudit({ diagnostic }: { diagnostic: ServerDiagnostic | null }) {
-  const samples = diagnostic?.audioAudit ?? [];
-  if (!samples.length) return <span className="audio-audit-empty">3 filmes ainda não auditados</span>;
-  const confirmed = samples.filter((sample) => sample.portugueseAudio === "confirmed").length;
-  return (
-    <details className="server-audio-audit">
-      <summary className={confirmed === samples.length ? "is-confirmed" : "is-pending"}>
-        <span>{confirmed}/{samples.length} com PT-BR comprovado</span>
-        <small>Ver detalhes</small>
-      </summary>
-      <div>
-        {samples.map((sample) => (
-          <article key={sample.tmdbId} className={`is-${sample.portugueseAudio}`}>
-            <i aria-hidden="true" />
-            <span><strong>{sample.title}</strong><small>{sample.message}</small></span>
-          </article>
-        ))}
-      </div>
-    </details>
   );
 }
 
@@ -540,7 +468,7 @@ export default function AdminPage() {
   }
 
   if (carregando) {
-    return <main className="admin-shell"><p>Carregando painel…</p></main>;
+    return <main className="admin-v4-loading"><span className="admin-v4-loader" /><strong>Preparando o Flixa Control</strong><small>Carregando dados operacionais…</small></main>;
   }
 
   const modalUrl = modalServer
@@ -549,136 +477,106 @@ export default function AdminPage() {
       : modalServer.testUrl
     : "";
   const modalCheck = modalServer?.last_diagnostic?.checks.find((check) => check.kind === modalKind) ?? null;
+  const healthPercent = servidores.length
+    ? Math.round(((serverStats.online + serverStats.degraded * 0.5) / servidores.length) * 100)
+    : 0;
 
   return (
-    <main className="admin-shell">
-      <header className="admin-head">
-        <div className="admin-brand-mark" aria-hidden="true">F</div>
-        <div className="admin-head-copy">
-          <p className="eyebrow">Flixa Control</p>
-          <h1>Central de administração</h1>
-          <p>Visão operacional de pessoas, catálogo e provedores de reprodução.</p>
+    <main className="admin-v4-shell">
+      <aside className="admin-v4-sidebar">
+        <div className="admin-v4-brand"><span>F</span><div><strong>Flixa</strong><small>Control center</small></div></div>
+        <div className="admin-v4-nav-label">Gerenciamento</div>
+        <nav aria-label="Seções administrativas">
+          <button type="button" className={tab === "usuarios" ? "is-active" : ""} onClick={() => setTab("usuarios")}><span aria-hidden="true">◎</span><div><strong>Usuários</strong><small>Contas e atividade</small></div><em>{usuarios.length}</em></button>
+          <button type="button" className={tab === "servidores" ? "is-active" : ""} onClick={() => setTab("servidores")}><span aria-hidden="true">◈</span><div><strong>Servidores</strong><small>Saúde e reprodução</small></div><em>{servidores.length}</em></button>
+        </nav>
+        <div className="admin-v4-sidebar-status">
+          <div><span className="is-live" /><strong>Sistema operacional</strong></div>
+          <p>{serverStats.enabled} de {servidores.length} provedores habilitados.</p>
+          <div className="admin-v4-mini-progress"><i style={{ width: `${Math.round((serverStats.enabled / Math.max(servidores.length, 1)) * 100)}%` }} /></div>
         </div>
-        <Link className="admin-back" href="/">Abrir o Flixa <span aria-hidden="true">↗</span></Link>
-      </header>
+        <Link className="admin-v4-exit" href="/"><span aria-hidden="true">←</span> Voltar ao Flixa</Link>
+      </aside>
 
-      {erro ? <p className="login-error">{erro}</p> : null}
+      <section className="admin-v4-workspace">
+        <header className="admin-v4-topbar">
+          <div><small>Administração / {tab === "usuarios" ? "Usuários" : "Servidores"}</small><h1>{tab === "usuarios" ? "Visão de usuários" : "Operação dos servidores"}</h1></div>
+          <div className="admin-v4-top-actions"><span className="admin-v4-live"><i /> Ao vivo</span><div className="admin-v4-avatar">A</div></div>
+        </header>
 
-      <nav className="admin-tabs" aria-label="Seções do painel">
-        <button className={tab === "usuarios" ? "is-active" : ""} type="button" onClick={() => setTab("usuarios")}>Usuários</button>
-        <button className={tab === "servidores" ? "is-active" : ""} type="button" onClick={() => setTab("servidores")}>Servidores <span>{servidores.length}</span></button>
-      </nav>
+        <div className="admin-v4-content">
+          {erro ? <div className="admin-v4-alert" role="alert"><span>!</span><p>{erro}</p><button type="button" onClick={() => setErro("")} aria-label="Fechar alerta">×</button></div> : null}
 
-      {tab === "usuarios" ? (
-        <>
-          {stats ? (
-            <section className="admin-stats" aria-label="Estatísticas">
-              <article><small>Total</small><strong>{stats.usuarios}</strong><span>Usuários cadastrados</span></article>
-              <article><small>Crescimento</small><strong>+{stats.novos_30_dias}</strong><span>Novos em 30 dias</span></article>
-              <article><small>Acesso</small><strong>{stats.administradores}</strong><span>Administradores</span></article>
-              <article><small>Engajamento</small><strong>{stats.usuarios_com_progresso}</strong><span>Assistindo agora/recente</span></article>
-              <article><strong>{stats.itens_lista}</strong><span>Itens na lista</span></article>
-              <article><strong>{stats.itens_historico}</strong><span>Histórico</span></article>
-              <article><strong>{stats.itens_progresso}</strong><span>Reproduções em progresso</span></article>
-            </section>
-          ) : null}
+          {tab === "usuarios" ? (
+            <>
+              <section className="admin-v4-hero admin-v4-user-hero">
+                <div className="admin-v4-hero-copy"><span className="admin-v4-kicker">Comunidade Flixa</span><h2>Entenda quem usa a plataforma.</h2><p>Acompanhe crescimento, atividade e consumo sem sair desta tela.</p></div>
+                <div className="admin-v4-hero-number"><small>Base total</small><strong>{stats?.usuarios ?? usuarios.length}</strong><span>contas cadastradas</span></div>
+              </section>
 
-          <section className="admin-table-wrap">
-            <div className="admin-section-head">
-              <div><p className="eyebrow">Contas</p><h2>Usuários</h2><span>{filteredUsers.length} de {usuarios.length} registros</span></div>
-              <label className="admin-search"><span aria-hidden="true">⌕</span><input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Buscar nome, @username ou e-mail" /></label>
-            </div>
-            <table className="admin-table">
-              <thead><tr><th>Usuário</th><th>Atividade</th><th>Biblioteca</th><th>Acesso</th><th>Ações</th></tr></thead>
-              <tbody>
-                {filteredUsers.map((user) => {
-                  const isSelf = user.id === euId;
-                  return (
-                    <tr key={user.id}>
-                      <td><div className="admin-user-cell"><span>{user.nome.slice(0, 1).toUpperCase()}</span><div><strong>{user.nome}</strong><small>{user.username ? `@${user.username} · ` : ""}{user.email}</small><em>{user.administrador ? "Administrador" : "Membro"}</em></div></div></td>
-                      <td><strong>{formatDate(user.ultima_atividade ?? null)}</strong><small className="server-domain">Criado em {formatDate(user.criado_em ?? null)}</small></td>
-                      <td><div className="admin-user-metrics"><span><strong>{user.itens_lista ?? 0}</strong> lista</span><span><strong>{user.itens_historico ?? 0}</strong> vistos</span><span><strong>{user.itens_progresso ?? 0}</strong> em curso</span></div></td>
-                      <td><span className={`server-enabled ${(user.sessoes_ativas ?? 0) > 0 ? "is-on" : "is-off"}`}>{(user.sessoes_ativas ?? 0) > 0 ? `${user.sessoes_ativas} sessão ativa` : "Sem sessão"}</span></td>
-                      <td className="admin-actions">
-                        <button type="button" disabled={busyId === `user:${user.id}` || (isSelf && user.administrador)} onClick={() => void toggleAdmin(user)}>{user.administrador ? "Remover admin" : "Tornar admin"}</button>
-                        <button type="button" className="is-danger" disabled={busyId === `user:${user.id}` || isSelf} onClick={() => void excluir(user)}>Excluir</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </section>
-        </>
-      ) : (
-        <>
-          <section className="admin-stats admin-server-stats" aria-label="Estado dos servidores">
-            <article><small>Catálogo</small><strong>{servidores.length}</strong><span>Provedores totais</span></article>
-            <article className="is-online"><strong>{serverStats.online}</strong><span>Verdes</span></article>
-            <article className="is-degraded"><strong>{serverStats.degraded}</strong><span>Aguardam confirmação</span></article>
-            <article className="is-offline"><strong>{serverStats.offline}</strong><span>Vermelhos</span></article>
-            <article><strong>{serverStats.enabled}</strong><span>Habilitados</span></article>
-            <article className="is-pt"><strong>{serverStats.ptPriority}</strong><span>Priorizam PT-BR</span></article>
-            <article className="is-pt"><strong>{serverStats.ptConfirmed}</strong><span>3/3 PT-BR comprovados</span></article>
-          </section>
+              <section className="admin-v4-metric-grid" aria-label="Métricas de usuários">
+                <article className="is-red"><div><span aria-hidden="true">↗</span><small>Crescimento</small></div><strong>+{stats?.novos_30_dias ?? 0}</strong><p>novos usuários em 30 dias</p></article>
+                <article className="is-purple"><div><span aria-hidden="true">◐</span><small>Engajamento</small></div><strong>{stats?.usuarios_com_progresso ?? 0}</strong><p>usuários com reprodução</p></article>
+                <article className="is-gold"><div><span aria-hidden="true">★</span><small>Biblioteca</small></div><strong>{stats?.itens_lista ?? 0}</strong><p>títulos salvos em listas</p></article>
+                <article className="is-blue"><div><span aria-hidden="true">●</span><small>Histórico</small></div><strong>{stats?.itens_historico ?? 0}</strong><p>títulos reproduzidos</p></article>
+              </section>
 
-          <section className={`admin-catalog-check ${catalogCheck ? `is-${catalogCheck.status}` : ""}`}>
-            <div>
-              <span className={`server-status is-${catalogCheck?.status ?? "unknown"}`}><i aria-hidden="true" />{catalogCheck ? (catalogCheck.status === "online" ? "Catálogo válido" : "Catálogo com problemas") : "Catálogo não validado"}</span>
-              <h2>Validação do catálogo</h2>
-              <p>Confere IDs, duplicidades, tipo, imagens HTTPS, disponibilidade de servidores e inventário do provedor.</p>
-              {catalogCheck ? (
-                <div className="catalog-check-result">
-                  <strong>{catalogCheck.valid}/{catalogCheck.total} títulos válidos</strong>
-                  <span>{catalogCheck.invalid} inválidos · {catalogCheck.provider_available} confirmados no inventário</span>
-                  {catalogCheck.problems.length ? <small>{catalogCheck.problems.slice(0, 3).map((problem) => `${problem.title}: ${problem.issues.join(", ")}`).join(" · ")}</small> : null}
+              <section className="admin-v4-panel">
+                <header className="admin-v4-panel-head"><div><span className="admin-v4-kicker">Diretório</span><h2>Todos os usuários</h2><p>{filteredUsers.length} resultados encontrados</p></div><label className="admin-v4-search"><span aria-hidden="true">⌕</span><input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Buscar por nome, username ou e-mail" /></label></header>
+                <div className="admin-v4-user-list">
+                  <div className="admin-v4-user-labels"><span>Perfil</span><span>Consumo</span><span>Atividade</span><span>Acesso</span><span>Ações</span></div>
+                  {filteredUsers.map((user) => {
+                    const isSelf = user.id === euId;
+                    return (
+                      <article className="admin-v4-user-row" key={user.id}>
+                        <div className="admin-v4-person"><span>{user.nome.slice(0, 2).toUpperCase()}</span><div><strong>{user.nome}</strong><small>{user.username ? `@${user.username}` : "Sem username"}</small><p>{user.email}</p></div></div>
+                        <div className="admin-v4-consumption"><span><strong>{user.itens_lista ?? 0}</strong><small>na lista</small></span><span><strong>{user.itens_historico ?? 0}</strong><small>assistidos</small></span><span><strong>{user.itens_progresso ?? 0}</strong><small>em curso</small></span></div>
+                        <div className="admin-v4-activity"><strong>{formatDate(user.ultima_atividade ?? null)}</strong><small>Entrou em {formatDate(user.criado_em ?? null)}</small></div>
+                        <div className="admin-v4-access"><span className={(user.sessoes_ativas ?? 0) > 0 ? "is-online" : "is-idle"}><i />{(user.sessoes_ativas ?? 0) > 0 ? "Online" : "Offline"}</span><small>{user.administrador ? "Administrador" : "Membro"}</small></div>
+                        <div className="admin-v4-row-actions"><button type="button" disabled={busyId === `user:${user.id}` || (isSelf && user.administrador)} onClick={() => void toggleAdmin(user)}>{user.administrador ? "Remover admin" : "Promover"}</button><button type="button" className="is-danger" disabled={busyId === `user:${user.id}` || isSelf} onClick={() => void excluir(user)} aria-label={`Excluir ${user.nome}`}>×</button></div>
+                      </article>
+                    );
+                  })}
+                  {!filteredUsers.length ? <div className="admin-v4-empty"><span>⌕</span><strong>Nenhum usuário encontrado</strong><p>Tente outro nome, username ou e-mail.</p></div> : null}
                 </div>
-              ) : null}
-            </div>
-            <button type="button" disabled={catalogChecking} onClick={() => void validarCatalogo()}>{catalogChecking ? "Validando…" : "Validar catálogo"}</button>
-          </section>
+              </section>
+            </>
+          ) : (
+            <>
+              <section className="admin-v4-server-overview">
+                <article className="admin-v4-health-card"><div className="admin-v4-health-ring" style={{ "--health": `${healthPercent * 3.6}deg` } as React.CSSProperties}><span><strong>{healthPercent}%</strong><small>saúde geral</small></span></div><div><span className="admin-v4-kicker">Infraestrutura</span><h2>Visão da rede</h2><p>Estado consolidado dos provedores e auditorias de reprodução.</p><div className="admin-v4-health-legend"><span><i className="is-online" />{serverStats.online} online</span><span><i className="is-warning" />{serverStats.degraded} instáveis</span><span><i className="is-offline" />{serverStats.offline} offline</span></div></div></article>
+                <div className="admin-v4-server-metrics"><article><span>Provedores</span><strong>{servidores.length}</strong><small>{serverStats.enabled} habilitados</small></article><article><span>Foco PT-BR</span><strong>{serverStats.ptPriority}</strong><small>{serverStats.ptConfirmed} com auditoria 3/3</small></article><article><span>Em progresso</span><strong>{stats?.itens_progresso ?? 0}</strong><small>reproduções salvas</small></article><article><span>Latência média</span><strong>{Math.round(servidores.reduce((sum, server) => sum + (server.last_latency_ms ?? 0), 0) / Math.max(servidores.filter((server) => server.last_latency_ms != null).length, 1))}<em>ms</em></strong><small>entre testes registrados</small></article></div>
+              </section>
 
-          <section className="admin-table-wrap admin-servers-wrap">
-            <div className="admin-section-head">
-              <div><p className="eyebrow">Infraestrutura</p><h2>Servidores</h2><p>Teste de filme, série e auditoria de áudio em três títulos conhecidos.</p><span>{filteredServers.length} de {servidores.length} provedores</span></div>
-              <div className="admin-server-toolbar">
-                <label className="admin-search"><span aria-hidden="true">⌕</span><input value={serverSearch} onChange={(event) => setServerSearch(event.target.value)} placeholder="Buscar servidor" /></label>
-                <select aria-label="Filtrar servidores" value={serverFilter} onChange={(event) => setServerFilter(event.target.value as typeof serverFilter)}><option value="all">Todos</option><option value="enabled">Habilitados</option><option value="pt">Prioridade PT-BR</option><option value="online">Operacionais</option><option value="degraded">Pendentes</option><option value="offline">Com falha</option><option value="unknown">Não testados</option></select>
-                <label>Desativar por
-                  <select value={disableMinutes} onChange={(event) => setDisableMinutes(Number(event.target.value))}>
-                    <option value={60}>1 hora</option><option value={360}>6 horas</option><option value={1440}>24 horas</option><option value={0}>Indefinidamente</option>
-                  </select>
-                </label>
-                <button type="button" className="admin-test-all" disabled={testingAll} onClick={() => void testarTodos()}>{testingAll ? "Testando todos…" : "Testar todos"}</button>
-              </div>
-            </div>
+              <section className={`admin-v4-catalog ${catalogCheck ? `is-${catalogCheck.status}` : ""}`}><div className="admin-v4-catalog-icon"><span>✓</span></div><div><span className="admin-v4-kicker">Qualidade do catálogo</span><h3>{catalogCheck ? (catalogCheck.status === "online" ? "Catálogo validado" : "Foram encontrados problemas") : "Validação pendente"}</h3><p>{catalogCheck ? `${catalogCheck.valid}/${catalogCheck.total} títulos válidos nos provedores ativos` : "Verifique IDs, imagens, duplicidades e disponibilidade dos títulos."}</p>{catalogCheck?.problems.length ? <small>{catalogCheck.problems.slice(0, 2).map((problem) => `${problem.title}: ${problem.issues.join(", ")}`).join(" · ")}</small> : null}</div><button type="button" disabled={catalogChecking} onClick={() => void validarCatalogo()}>{catalogChecking ? "Validando…" : "Executar validação"}</button></section>
 
-            <table className="admin-table admin-server-table">
-              <thead><tr><th>Status</th><th>Servidor</th><th>PT-BR · 3 filmes</th><th>Diagnóstico</th><th>Uso</th><th>Ações</th></tr></thead>
-              <tbody>
-                {filteredServers.map((server) => (
-                  <tr key={server.id} className={!server.enabled ? "is-disabled" : ""}>
-                    <td><ServerStatusBreakdown server={server} /></td>
-                    <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{server.blockedReason || server.compatibilityMessage || !server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Alerta: {server.blockedReason || server.compatibilityMessage || "pode ser incompatível com a proteção anti-pop-up"}</small> : null}</td>
-                    <td><ServerAudioAudit diagnostic={server.last_diagnostic} />
-                      {server.prioritizesPortugueseAudio ? <small className="server-audio-profile is-dub">Prioridade dublado/PT</small> : null}
-                      {server.advertisingProfile === "none-declared" ? <small className="server-audio-profile is-low-ads">Sem anúncios (declarado)</small> : null}
-                      {server.advertisingProfile === "minimal-declared" ? <small className="server-audio-profile is-low-ads">Poucos anúncios</small> : null}
-                      {server.watchPartySupport === "full" ? <small className="server-audio-profile is-party">Compatível com grupo</small> : null}
-                    </td>
-                    <td className="server-last-test"><strong>{formatDate(server.last_tested_at)}</strong><small>{server.last_latency_ms != null ? `${server.last_latency_ms} ms · ` : ""}{server.last_http_status ? `HTTP ${server.last_http_status} · ` : ""}{server.last_message || "Aguardando teste"}</small><ServerDiagnosticDetails diagnostic={server.last_diagnostic} compact /></td>
-                    <td><span className={`server-enabled ${server.enabled ? "is-on" : "is-off"}`}>{server.enabled ? "Habilitado" : "Desativado"}</span>{!server.enabled && server.disabled_until ? <small className="server-domain">até {formatDate(server.disabled_until)}</small> : null}</td>
-                    <td className="admin-actions server-actions">
-                      <button type="button" disabled={busyId === `test:${server.id}` || testingAll} onClick={() => void testarServidor(server)}>{busyId === `test:${server.id}` ? "Testando…" : "Testar"}</button>
-                      <button type="button" className={server.enabled ? "is-danger" : "is-enable"} disabled={busyId === `toggle:${server.id}`} title={server.blockedReason || server.compatibilityMessage} onClick={() => void setServerEnabled(server, !server.enabled)}>{server.enabled ? "Desativar" : "Habilitar"}</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        </>
-      )}
+              <section className="admin-v4-panel admin-v4-provider-panel">
+                <header className="admin-v4-panel-head admin-v4-provider-head"><div><span className="admin-v4-kicker">Provedores</span><h2>Servidores de reprodução</h2><p>{filteredServers.length} de {servidores.length} exibidos</p></div><div className="admin-v4-provider-tools"><label className="admin-v4-search"><span aria-hidden="true">⌕</span><input value={serverSearch} onChange={(event) => setServerSearch(event.target.value)} placeholder="Buscar servidor" /></label><select aria-label="Filtrar servidores" value={serverFilter} onChange={(event) => setServerFilter(event.target.value as typeof serverFilter)}><option value="all">Todos os estados</option><option value="enabled">Habilitados</option><option value="pt">Foco PT-BR</option><option value="online">Online</option><option value="degraded">Instáveis</option><option value="offline">Offline</option><option value="unknown">Não testados</option></select><button type="button" className="admin-v4-primary" disabled={testingAll} onClick={() => void testarTodos()}>{testingAll ? "Testando…" : "Testar todos"}</button></div></header>
+                <div className="admin-v4-disable-window"><span>Ao desativar um servidor, manter indisponível por</span><select value={disableMinutes} onChange={(event) => setDisableMinutes(Number(event.target.value))}><option value={60}>1 hora</option><option value={360}>6 horas</option><option value={1440}>24 horas</option><option value={0}>tempo indeterminado</option></select></div>
+                <div className="admin-v4-provider-grid">
+                  {filteredServers.map((server) => {
+                    const samples = server.last_diagnostic?.audioAudit ?? [];
+                    const confirmed = samples.filter((sample) => sample.portugueseAudio === "confirmed").length;
+                    return (
+                      <article className={`admin-v4-provider-card is-${server.last_status} ${!server.enabled ? "is-disabled" : ""}`} key={server.id}>
+                        <header><div className="admin-v4-provider-rank">{String(server.priority + 1).padStart(2, "0")}</div><div className="admin-v4-provider-name"><div><h3>{server.name}</h3><span className={`admin-v4-status is-${server.last_status}`}><i />{statusLabel(server.last_status)}</span></div><p>{server.domain}</p></div><button type="button" className={`admin-v4-switch ${server.enabled ? "is-on" : ""}`} disabled={busyId === `toggle:${server.id}`} onClick={() => void setServerEnabled(server, !server.enabled)} aria-label={server.enabled ? `Desativar ${server.name}` : `Habilitar ${server.name}`}><i /></button></header>
+                        <div className="admin-v4-provider-tags"><span>{server.supportsMovie ? "Filmes" : ""}{server.supportsMovie && server.supportsTv ? " + " : ""}{server.supportsTv ? "Séries" : ""}</span>{server.prioritizesPortugueseAudio ? <span className="is-pt">PT-BR prioritário</span> : <span>Idioma variável</span>}{server.advertisingProfile === "none-declared" ? <span className="is-clean">Sem ads declarado</span> : null}</div>
+                        <div className="admin-v4-audit-head"><div><strong>Auditoria de áudio</strong><small>3 filmes de referência</small></div><span className={confirmed === 3 ? "is-complete" : ""}>{confirmed}/3 PT-BR</span></div>
+                        <div className="admin-v4-audit-list">{samples.length ? samples.map((sample) => <div key={sample.tmdbId}><i className={`is-${sample.portugueseAudio}`} /><span><strong>{sample.title}</strong><small>{sample.portugueseAudio === "confirmed" ? "Português confirmado" : sample.portugueseAudio === "not-detected" ? "Português não encontrado" : "Idioma não verificável"}</small></span><em className={`is-${sample.status}`}>{sample.status === "online" ? "OK" : sample.status === "offline" ? "Falha" : "Revisar"}</em></div>) : <div className="is-empty"><span><strong>Auditoria pendente</strong><small>Execute o teste deste servidor.</small></span></div>}</div>
+                        {server.compatibilityMessage || server.blockedReason ? <p className="admin-v4-provider-warning"><span>!</span>{server.blockedReason || server.compatibilityMessage}</p> : null}
+                        <div className="admin-v4-provider-diagnostic"><div><span>Último teste</span><strong>{formatDate(server.last_tested_at)}</strong></div><div><span>Latência</span><strong>{server.last_latency_ms != null ? `${server.last_latency_ms} ms` : "—"}</strong></div><div><span>HTTP</span><strong>{server.last_http_status ?? "—"}</strong></div></div>
+                        <ServerDiagnosticDetails diagnostic={server.last_diagnostic} compact />
+                        <footer><button type="button" className="admin-v4-test" disabled={busyId === `test:${server.id}` || testingAll} onClick={() => void testarServidor(server)}><span aria-hidden="true">▷</span>{busyId === `test:${server.id}` ? "Testando servidor…" : "Testar e abrir player"}</button><span className={server.enabled ? "is-enabled" : "is-disabled"}><i />{server.enabled ? "Em uso" : server.disabled_until ? `Até ${formatDate(server.disabled_until)}` : "Desativado"}</span></footer>
+                      </article>
+                    );
+                  })}
+                  {!filteredServers.length ? <div className="admin-v4-empty"><span>◈</span><strong>Nenhum servidor encontrado</strong><p>Altere a busca ou o filtro selecionado.</p></div> : null}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </section>
 
       {modalServer ? (
         <div className="server-test-modal" role="dialog" aria-modal="true" aria-label={`Teste de ${modalServer.name}`}>

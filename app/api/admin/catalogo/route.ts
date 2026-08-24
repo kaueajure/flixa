@@ -12,7 +12,6 @@ type CatalogItem = {
   backdrop?: unknown;
   available?: unknown;
   server_count?: unknown;
-  provider_available?: unknown;
 };
 
 type MediaKind = "movie" | "tv";
@@ -62,7 +61,6 @@ export async function POST(request: Request) {
     const problems: Array<{ key: string; title: string; issues: string[] }> = [];
     let total = 0;
     let valid = 0;
-    let providerAvailable = 0;
 
     payloads.forEach((payload, index) => {
       const expectedKind: MediaKind = index === 0 ? "movie" : "tv";
@@ -76,7 +74,6 @@ export async function POST(request: Request) {
         const result = validateItem(movie, expectedKind, seen);
         if (result.issues.length === 0) valid += 1;
         else if (problems.length < 20) problems.push(result);
-        if (movie.provider_available === true) providerAvailable += 1;
       });
     });
 
@@ -87,14 +84,13 @@ export async function POST(request: Request) {
       total,
       valid,
       invalid,
-      provider_available: providerAvailable,
       problems,
       rules: [
         "TMDB ID positivo e sem duplicidade",
         "tipo filme/série consistente",
         "título e imagens HTTPS válidos",
         "ao menos um servidor compatível habilitado",
-        "inventário do provedor consultado",
+        "ao menos um provedor ativo no catálogo",
       ],
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

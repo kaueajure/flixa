@@ -1,4 +1,3 @@
-import { getProviderInventory } from "../provider";
 import { listarServidoresDesabilitados } from "../../../../db/player-servers";
 import { DEFAULT_DISABLED_PLAYER_SERVER_IDS, PLAYER_SERVERS } from "../../../../lib/player-servers";
 
@@ -64,30 +63,8 @@ export async function POST(request: Request) {
   });
   const available = [...new Set(validKeys)];
 
-  const providerAvailable: string[] = [];
-  const neededKinds = [...new Set(items.map((item) => mediaKind(item.kind)).filter((kind): kind is MediaKind => kind != null))];
-  const entries = await Promise.all(
-    neededKinds.map(async (kind) => {
-      try {
-        return [kind, await getProviderInventory(kind)] as const;
-      } catch {
-        return [kind, new Set<string>()] as const;
-      }
-    }),
-  );
-  const inventories = new Map(entries);
-  items.forEach((item) => {
-    const kind = mediaKind(item.kind);
-    if (!kind) return;
-    const id = mediaId(item);
-    if (/^[1-9]\d*$/.test(id) && enabledByKind[kind] > 0 && inventories.get(kind)?.has(id)) {
-      providerAvailable.push(`${kind}:${id}`);
-    }
-  });
-
   return Response.json({
     available: [...new Set(available)],
-    provider_available: [...new Set(providerAvailable)],
     validation: {
       received: items.length,
       valid: available.length,

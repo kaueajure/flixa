@@ -1,4 +1,3 @@
-import { getProviderInventory } from "./provider";
 import { listarServidoresDesabilitados } from "../../../db/player-servers";
 import { DEFAULT_DISABLED_PLAYER_SERVER_IDS, PLAYER_SERVERS } from "../../../lib/player-servers";
 
@@ -28,7 +27,6 @@ type CatalogMovie = {
   trailer?: string;
   available: boolean;
   server_count?: number;
-  provider_available?: boolean;
   playback_locale: "pt-BR";
   is_brazilian?: boolean;
 };
@@ -438,26 +436,12 @@ async function markProviderAvailability(movies: CatalogMovie[]) {
     movie: PLAYER_SERVERS.filter((server) => server.supportsMovie && !disabled.has(server.id)).length,
     tv: PLAYER_SERVERS.filter((server) => server.supportsTv && !disabled.has(server.id)).length,
   };
-  const kinds = [...new Set(playable.map((movie) => movie.kind))];
-  const entries = await Promise.all(
-    kinds.map(async (kind) => {
-      try {
-        return [kind, await getProviderInventory(kind)] as const;
-      } catch {
-        return [kind, new Set<string>()] as const;
-      }
-    }),
-  );
-  const inventories = new Map(entries);
-
   return playable.map((movie) => {
-    const id = movie.tmdb_id || movie.id.replace(/^(?:movie-|tv-)/i, "");
     const serverCount = enabledServerCount[movie.kind];
     return {
       ...movie,
       available: serverCount > 0,
       server_count: serverCount,
-      provider_available: inventories.get(movie.kind)?.has(id) === true,
     };
   });
 }
