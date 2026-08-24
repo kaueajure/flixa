@@ -37,6 +37,8 @@ const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
   { id: "vidcore", name: "VidCore PT", domain: "vidcore.org", testUrl: "https://www.vidcore.org/embed/movie/550?lang=pt", testTvUrl: "https://www.vidcore.org/embed/tv/1399/1/1?lang=pt", supportsMovie: true, supportsTv: true, advertisingProfile: "none-declared", prioritizesPortugueseAudio: true },
   { id: "cinezo", name: "Cinezo", domain: "player.cinezo.live", testUrl: "https://player.cinezo.live/embed/movie/550", testTvUrl: "https://player.cinezo.live/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true, advertisingProfile: "none-declared" },
   { id: "screenscape", name: "ScreenScape PT", domain: "screenscape.me", testUrl: "https://screenscape.me/embed?tmdb=550&type=movie&lan=por", testTvUrl: "https://screenscape.me/embed?tmdb=1399&type=tv&s=1&e=1&lan=por", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
+  { id: "cinesrc", name: "CineSrc Grupo", domain: "cinesrc.st", testUrl: "https://cinesrc.st/embed/movie/550?autoplay=false", testTvUrl: "https://cinesrc.st/embed/tv/1399?s=1&e=1&autoplay=false", supportsMovie: true, supportsTv: true, watchPartySupport: "full", compatibilityMessage: "Bridge de play, pausa, seek e status validado no sandbox real; a faixa de áudio depende do título" },
+  { id: "moviesapi", name: "MoviesAPI Grupo", domain: "moviesapi.to", testUrl: "https://moviesapi.to/movie/550", testTvUrl: "https://moviesapi.to/tv/1399/1/1", supportsMovie: true, supportsTv: true, watchPartySupport: "full", compatibilityMessage: "Bridge validado como fallback; fontes internas incompatíveis com sandbox são detectadas pelo watchdog da sala" },
   { id: "unlimplay", name: "UnlimPlay", domain: "unlimplay.com", testUrl: "https://unlimplay.com/f/embed/movie/550", testTvUrl: "https://unlimplay.com/f/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "vidsrc-wiki", name: "VidSrc Wiki", domain: "vidsrc.wiki", testUrl: "https://vidsrc.wiki/embed/movie/550", testTvUrl: "https://vidsrc.wiki/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true, advertisingProfile: "none-declared" },
   { id: "videasy", name: "Videasy", domain: "player.videasy.net", testUrl: "https://player.videasy.net/movie/550", testTvUrl: "https://player.videasy.net/tv/1399/1/1", supportsMovie: true, supportsTv: true },
@@ -51,7 +53,7 @@ const BLOCKED_SERVER_REASONS: Record<string, string> = {
 };
 
 const SERVER_PRIORITY = [
-  "pipocacine", "cdn-embed", "vidcore", "cinezo", "screenscape", "unlimplay",
+  "pipocacine", "cdn-embed", "vidcore", "cinezo", "screenscape", "cinesrc", "moviesapi", "unlimplay",
   "vidsrc-wiki", "videasy", "autoembed-co", "vidphantom", "embed-api", "iembed",
 ];
 

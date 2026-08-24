@@ -10,7 +10,7 @@ import {
 } from "ably";
 import { playerServerIdForSource } from "../lib/player-servers";
 
-type PartyProviderId = "strigil";
+type PartyProviderId = "cinesrc" | "moviesapi";
 
 type PartySource = {
   id: string;
@@ -75,16 +75,15 @@ type AblyAuthResponse = {
   erro?: string;
 };
 
-// Nenhum provedor atual passou simultaneamente no sandbox estrito, na
-// sincronização por comandos e na validação de áudio PT-BR. O código da
-// sala é preservado para reativar somente quando um bridge for comprovado.
-const PARTY_PROVIDERS = new Set<PartyProviderId>();
-const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = [];
+const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc", "moviesapi"]);
+const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["cinesrc", "moviesapi"];
 const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
-  strigil: "Bridge legado desativado · exige nova validação completa",
+  cinesrc: "Principal · comandos validados no sandbox real",
+  moviesapi: "Fallback · troca automática se a fonte interna bloquear",
 };
 const PARTY_PROVIDER_ORIGINS: Record<PartyProviderId, string> = {
-  strigil: "https://strigil.cc",
+  cinesrc: "https://cinesrc.st",
+  moviesapi: "https://moviesapi.to",
 };
 
 function providerFor(source?: PartySource): PartyProviderId | null {
@@ -108,11 +107,24 @@ function sendPlayerCommand(
   const targetOrigin = PARTY_PROVIDER_ORIGINS[providerId];
   const safeTime = Math.max(0, Number(time) || 0);
 
-  if (command === "getStatus") return;
+  if (providerId === "cinesrc") {
+    const send = (nextCommand: string, args: unknown[] = []) => target.postMessage({
+      type: "cinesrc:command",
+      command: nextCommand,
+      args,
+    }, targetOrigin);
+    if (command === "getStatus") {
+      send("getCurrentTime");
+      send("getPaused");
+    } else {
+      send(command, command === "seek" ? [safeTime] : []);
+    }
+    return;
+  }
+
   target.postMessage({
-    type: "PLAYER_COMMAND",
-    command,
-    ...(command === "seek" ? { value: safeTime } : {}),
+    action: command,
+    ...(command === "seek" ? { time: safeTime } : {}),
   }, targetOrigin);
 }
 
@@ -127,9 +139,19 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
   }
   if (!payload || typeof payload !== "object") return null;
   const data = payload as Record<string, unknown>;
-  if (providerId !== "strigil" || data.type !== "PLAYER_EVENT") return null;
-  const details = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : data;
-  const eventName = typeof details.event === "string" ? details.event : "";
+  let details = data;
+  let eventName = "";
+  let command = "";
+  let result: unknown = null;
+  if (providerId === "cinesrc") {
+    if (typeof data.type !== "string" || !data.type.startsWith("cinesrc:")) return null;
+    eventName = data.type.slice("cinesrc:".length);
+    command = typeof data.command === "string" ? data.command : "";
+    result = data.result;
+  } else {
+    if (data.source !== "moviesapi-player" || typeof data.event !== "string") return null;
+    eventName = data.event;
+  }
 
   const currentTime = Number(details.currentTime ?? details.time ?? data.currentTime ?? data.time);
   const pausedValue = details.paused ?? data.paused;
@@ -137,8 +159,8 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
     name: eventName.toLowerCase(),
     currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : null,
     paused: typeof pausedValue === "boolean" ? pausedValue : null,
-    command: "",
-    result: null,
+    command,
+    result,
   };
 }
 
@@ -193,6 +215,8 @@ export default function WatchPartyControls({
   const serverClockOffsetRef = useRef(0);
   const autoJoinAttemptedRef = useRef(false);
   const handledFailureSequenceRef = useRef(0);
+  const lastPlayerSignalRef = useRef(0);
+  const failedPartyProvidersRef = useRef<Set<PartyProviderId>>(new Set());
   const lastChatSentAtRef = useRef(0);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const sourcesRef = useRef(sources);
@@ -224,6 +248,8 @@ export default function WatchPartyControls({
     hostClientIdRef.current = "";
     sessionRef.current = "";
     pendingPlaybackRef.current = null;
+    lastPlayerSignalRef.current = 0;
+    failedPartyProvidersRef.current.clear();
     setRoomCode("");
     setRole("");
     setParticipants([]);
@@ -374,11 +400,15 @@ export default function WatchPartyControls({
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
     if (connecting) return;
     const activeProvider = providerFor(activeSourceRef.current);
-    const candidate = mode === "create" && activeProvider
-      ? sourcesRef.current.find((source) => source.id === activeSourceRef.current?.id) ?? null
+    const candidate = mode === "create"
+      ? (activeProvider
+        ? sourcesRef.current.find((source) => source.id === activeSourceRef.current?.id)
+        : null) ?? [...sourcesRef.current]
+        .filter((source) => providerFor(source))
+        .sort((left, right) => PARTY_PROVIDER_PRIORITY.indexOf(providerFor(left)!) - PARTY_PROVIDER_PRIORITY.indexOf(providerFor(right)!))[0]
       : null;
     if (mode === "create" && !candidate) {
-      setError("Nenhum player passou simultaneamente nos requisitos de sandbox, sincronização e áudio PT-BR.");
+      setError("Nenhum bridge de grupo está disponível para este título.");
       updateOpen(true);
       return;
     }
@@ -607,6 +637,14 @@ export default function WatchPartyControls({
       if (event.origin !== expectedOrigin) return;
       const playerEvent = parsePlayerEvent(event, currentProvider);
       if (!playerEvent) return;
+      const confirmsPlayback = ["loadedmetadata", "timeupdate", "play", "pause", "seeked", "playerstatus"].includes(playerEvent.name)
+        || (playerEvent.name === "response" && (
+          Number.isFinite(Number(playerEvent.result)) || typeof playerEvent.result === "boolean"
+        ));
+      if (confirmsPlayback) {
+        lastPlayerSignalRef.current = Date.now();
+        failedPartyProvidersRef.current.delete(currentProvider);
+      }
 
       if (playerEvent.name === "response") {
         if (playerEvent.command === "getCurrentTime" && Number.isFinite(Number(playerEvent.result))) {
@@ -697,12 +735,18 @@ export default function WatchPartyControls({
 
   const changeProviderForEveryone = useCallback((automaticReason?: string) => {
     if (roleRef.current !== "host") return false;
-    if (compatibleSources.length < 2) {
+    if (automaticReason && providerRef.current) failedPartyProvidersRef.current.add(providerRef.current);
+    const alternatives = compatibleSources.filter((source) => {
+      const candidateProvider = providerFor(source);
+      return candidateProvider
+        && candidateProvider !== providerRef.current
+        && !failedPartyProvidersRef.current.has(candidateProvider);
+    });
+    if (alternatives.length === 0) {
       if (automaticReason) setError("O player da sessão falhou e não há outro servidor sincronizado disponível.");
       return false;
     }
-    const currentIndex = compatibleSources.findIndex((source) => providerFor(source) === providerRef.current);
-    const next = compatibleSources[(currentIndex + 1) % compatibleSources.length];
+    const next = alternatives[0];
     const nextProvider = providerFor(next);
     if (!nextProvider) return false;
     providerRef.current = nextProvider;
@@ -722,6 +766,23 @@ export default function WatchPartyControls({
     setError(automaticReason ? `${automaticReason} Trocando todos para ${next.name}.` : "");
     return true;
   }, [applyPlayback, compatibleSources, onSelectSource, onSessionProviderChange, publishRoomState]);
+
+  useEffect(() => {
+    if (!roomCode || !providerId || providerFor(activeSource) !== providerId) return;
+    lastPlayerSignalRef.current = 0;
+    const probe = window.setInterval(() => sendPlayerCommand(playerRef.current, providerId, "getStatus"), 1_500);
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(probe);
+      if (lastPlayerSignalRef.current > 0) return;
+      const reason = `${PARTY_PROVIDER_LABELS[providerId]} não confirmou o player neste título.`;
+      if (roleRef.current === "host") changeProviderForEveryone(reason);
+      else setError("O player não respondeu. Aguardando o anfitrião trocar o servidor da sala.");
+    }, 10_000);
+    return () => {
+      window.clearInterval(probe);
+      window.clearTimeout(timeout);
+    };
+  }, [activeSource, changeProviderForEveryone, playerRef, providerId, roomCode]);
 
   useEffect(() => {
     if (!providerFailure || providerFailure.sequence <= handledFailureSequenceRef.current || !roomCodeRef.current) return;
@@ -754,7 +815,6 @@ export default function WatchPartyControls({
   }
 
   const providerName = compatibleSources.find((source) => providerFor(source) === providerId)?.name || providerId;
-  const activePartyProvider = providerFor(activeSource);
 
   return (
     <div className={`watch-party ${open ? "is-open" : ""} ${roomCode ? "is-connected" : ""}`} ref={menuRef}>
@@ -780,9 +840,9 @@ export default function WatchPartyControls({
           {!roomCode ? (
             <div className="watch-party-join">
               <p>{compatibleSources.length
-                ? "Play, pausa e avanço ficam sincronizados. O anfitrião controla o filme para todos."
-                : "Assistir em grupo foi desativado para evitar players quebrados, sem dublagem ou que exigem pop-up."}</p>
-              <button type="button" className="watch-party-primary" disabled={connecting || !activePartyProvider} onClick={() => void connect("create")}>
+                ? "Play, pausa e avanço ficam sincronizados. Se uma fonte interna bloquear o sandbox, a sala troca de bridge automaticamente."
+                : "Nenhum bridge de grupo está disponível para este título."}</p>
+              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
                 {connecting ? "Conectando…" : "Criar uma sala"}
               </button>
               <div className="watch-party-code-row">
@@ -797,10 +857,8 @@ export default function WatchPartyControls({
                 <button type="button" disabled={connecting || compatibleSources.length === 0 || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
               <small>{compatibleSources.length
-                ? activePartyProvider
-                  ? "Antes de criar, confirme no seletor de áudio do Strigil que existe Português (Brasil)."
-                  : "Selecione um player de grupo validado e confirme a faixa PT-BR antes de criar a sala."
-                : "Nenhum player passou simultaneamente nos requisitos de sandbox e sincronização para este título."}</small>
+                ? `${compatibleSources.length} bridges com comandos reais; áudio PT-BR só é indicado quando a faixa do título for confirmada.`
+                : "Nenhum player passou nos requisitos de sandbox e sincronização para este título."}</small>
             </div>
           ) : (
             <div className="watch-party-room">

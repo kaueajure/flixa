@@ -2919,7 +2919,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /pipocacine\.lat|cdn-embed\.com|vidcore\.org|cinezo\.live|screenscape\.me|unlimplay\.com|vidsrc\.wiki|videasy\.(?:net|to)|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
+  return /pipocacine\.lat|cdn-embed\.com|vidcore\.org|cinezo\.live|screenscape\.me|cinesrc\.st|moviesapi\.to|unlimplay\.com|vidsrc\.wiki|videasy\.(?:net|to)|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -3174,6 +3174,14 @@ function buildPlayerSources(
     const autoEmbedKind = fallbackId.startsWith("tt") ? "imdb" : "tmdb";
     sources.push(
       {
+        id: "moviesapi",
+        name: "MoviesAPI Grupo",
+        theme: "gold",
+        src: isTv
+          ? `https://moviesapi.to/tv/${fallbackId}/${episodePath}`
+          : `https://moviesapi.to/movie/${fallbackId}`,
+      },
+      {
         id: "autoembed-co",
         name: "AutoEmbed",
         theme: "gold",
@@ -3209,6 +3217,14 @@ function buildPlayerSources(
         src: isTv
           ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}?lang=pt`
           : `https://www.vidcore.org/embed/movie/${tmdbOnlyId}?lang=pt`,
+      },
+      {
+        id: "cinesrc",
+        name: "CineSrc Grupo",
+        theme: "rose",
+        src: isTv
+          ? `https://cinesrc.st/embed/tv/${tmdbOnlyId}?s=${season ?? 1}&e=${episode ?? 1}&autoplay=false`
+          : `https://cinesrc.st/embed/movie/${tmdbOnlyId}?autoplay=false`,
       },
       {
         id: "cinextream",

@@ -4,7 +4,7 @@ import test from "node:test";
 import { PLAYER_SERVERS } from "../lib/player-servers.ts";
 
 const curatedServerIds = [
-  "pipocacine", "cdn-embed", "vidcore", "cinezo", "screenscape", "unlimplay",
+  "pipocacine", "cdn-embed", "vidcore", "cinezo", "screenscape", "cinesrc", "moviesapi", "unlimplay",
   "vidsrc-wiki", "videasy", "autoembed-co", "vidphantom", "embed-api", "iembed",
 ];
 
@@ -27,9 +27,10 @@ test("registers usable endpoints for every declared media kind", () => {
   }
 });
 
-test("does not advertise a watch-party bridge without end-to-end proof", () => {
+test("advertises only watch-party bridges with end-to-end command proof", () => {
   const partyServers = PLAYER_SERVERS.filter((server) => server.watchPartySupport === "full");
-  assert.deepEqual(partyServers, []);
+  assert.deepEqual(partyServers.map((server) => server.id), ["cinesrc", "moviesapi"]);
+  for (const server of partyServers) assert.match(server.compatibilityMessage, /Bridge|bridge/);
 });
 
 test("prefers Portuguese audio only where the provider supports it", () => {
