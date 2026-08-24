@@ -36,6 +36,12 @@ export type ManifestAudioMetadata = {
   audioMetadataSource: "hls" | "dash";
 };
 
+export type EmbedPolicyViolation = {
+  code: "SANDBOX_REQUIRES_POPUPS" | "FORCED_POPUP_ADVERTISING";
+  message: string;
+  evidence: string;
+};
+
 export type PlayerServerEvidence = {
   verification: "automatic" | "manual";
   playbackConfirmed: boolean;
@@ -133,6 +139,33 @@ function normalizeEmbeddedText(html: string) {
     .replace(/\\u002f/gi, "/")
     .replace(/\\\//g, "/")
     .replace(/&amp;/gi, "&");
+}
+
+/**
+ * Rejeita sinais inequívocos de comportamento incompatível com a política
+ * do player. HTTP 200 não é sucesso quando a página exige relaxar o sandbox
+ * ou injeta um pop-under/smartlink em cliques do usuário.
+ */
+export function inspectEmbedPolicy(html: string): EmbedPolicyViolation | null {
+  const normalized = normalizeEmbeddedText(html);
+  const sandboxPopup = normalized.match(/allow-popups(?:-to-escape-sandbox)?/i);
+  if (sandboxPopup) {
+    return {
+      code: "SANDBOX_REQUIRES_POPUPS",
+      message: "O provedor exige permissão de pop-up incompatível com o sandbox protegido",
+      evidence: sandboxPopup[0],
+    };
+  }
+
+  const forcedPopup = normalized.match(/adcash-popunder|runPop\s*\(|effectivecpmnetwork|onclickperformance|mypopads|popunder-init|smartlink[^\n]{0,160}window\.open/i);
+  if (forcedPopup) {
+    return {
+      code: "FORCED_POPUP_ADVERTISING",
+      message: "O provedor injeta publicidade que abre pop-up ou outra guia",
+      evidence: forcedPopup[0].slice(0, 180),
+    };
+  }
+  return null;
 }
 
 function publicHttpUrl(value: string, base: string) {
@@ -336,6 +369,14 @@ async function inspectNestedFrame(url: string, parentUrl: string) {
     }
     if (contentType && !/text\/html|application\/xhtml\+xml/.test(contentType)) {
       return { resources: null, problem: issue("NESTED_IFRAME_CONTENT_TYPE", "document", "warning", "O iframe interno retornou conteúdo inesperado", contentType), blocking: false };
+    }
+    const policyViolation = inspectEmbedPolicy(html);
+    if (policyViolation) {
+      return {
+        resources: null,
+        problem: issue(policyViolation.code, "embed", "error", policyViolation.message, policyViolation.evidence),
+        blocking: true,
+      };
     }
     return { resources: extractResourceEvidence(html, response.url || url), problem: null, blocking: false };
   } catch (error) {
@@ -592,6 +633,12 @@ async function testEndpoint(
     }
     if (html.trim().length < 250) {
       issues.push(issue("EMPTY_DOCUMENT", "document", "error", "A resposta está vazia ou incompleta", `${html.length} bytes`));
+      return failedCheck(kind, url, startedAt, issues, evidence, response.status, response.url || url);
+    }
+
+    const policyViolation = inspectEmbedPolicy(html);
+    if (policyViolation) {
+      issues.push(issue(policyViolation.code, "embed", "error", policyViolation.message, policyViolation.evidence));
       return failedCheck(kind, url, startedAt, issues, evidence, response.status, response.url || url);
     }
 

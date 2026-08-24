@@ -2919,7 +2919,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /betterflix\.cfd|mgeb\.top|pipocacine\.lat|cdn-embed\.com|vidspark\.to|vidcore\.org|strigil\.cc|cinezo\.live|screenscape\.me|unlimplay\.com|vidsrc\.wiki|cinesrc\.st|videasy\.(?:net|to)|moviesapi\.to|vidzen\.fun|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|mapple\.uk|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
+  return /pipocacine\.lat|cdn-embed\.com|vidcore\.org|cinezo\.live|screenscape\.me|unlimplay\.com|vidsrc\.wiki|videasy\.(?:net|to)|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -3072,13 +3072,9 @@ type AdditionalPlayerSource = {
 };
 
 const ADDITIONAL_PLAYER_SOURCES: AdditionalPlayerSource[] = [
-  { id: "betterflix", name: "BetterFlix", theme: "cyan", movieUrl: (id) => `https://betterflix.cfd/api/player?id=${id}&type=movie&direct=true`, tvUrl: (id, season, episode) => `https://betterflix.cfd/api/player?id=${id}&type=tv&season=${season}&episode=${episode}&direct=true` },
-  { id: "megaembed", name: "MegaEmbed", theme: "gold", movieUrl: (id) => `https://mgeb.top/embed/${id}?player=vidstack`, tvUrl: (id, season, episode) => `https://mgeb.top/embed/${id}/${season}/${episode}?player=vidstack` },
   { id: "pipocacine", name: "PipocaCine", theme: "rose", movieUrl: (id) => `https://pipocacine.lat/embed/${id}`, tvUrl: (id, season, episode) => `https://pipocacine.lat/embed/${id}/${season}/${episode}` },
   { id: "cdn-embed", name: "CDN Brasil", theme: "emerald", movieUrl: (id) => `https://cdn-embed.com/filme/${id}`, tvUrl: (id, season, episode) => `https://cdn-embed.com/serie/${id}/${season}/${episode}` },
-  { id: "vidspark", name: "VidSpark", theme: "sky", movieUrl: (id) => `https://vidspark.to/movie/${id}`, tvUrl: (id, season, episode) => `https://vidspark.to/tv/${id}/${season}/${episode}` },
   { id: "vidcore", name: "VidCore PT", theme: "violet", movieUrl: (id) => `https://www.vidcore.org/embed/movie/${id}?lang=pt`, tvUrl: (id, season, episode) => `https://www.vidcore.org/embed/tv/${id}/${season}/${episode}?lang=pt` },
-  { id: "strigil", name: "Strigil", theme: "emerald", movieUrl: (id) => `https://strigil.cc/embed/movie/${id}?sub=pt`, tvUrl: (id, season, episode) => `https://strigil.cc/embed/tv/${id}/${season}/${episode}?sub=pt` },
   { id: "cinezo", name: "Cinezo", theme: "cyan", movieUrl: (id) => `https://player.cinezo.live/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://player.cinezo.live/embed/tv/${id}/${season}/${episode}` },
   { id: "screenscape", name: "ScreenScape PT", theme: "violet", movieUrl: (id) => `https://screenscape.me/embed?tmdb=${id}&type=movie&lan=por`, tvUrl: (id, season, episode) => `https://screenscape.me/embed?tmdb=${id}&type=tv&s=${season}&e=${episode}&lan=por` },
   { id: "unlimplay", name: "UnlimPlay", theme: "rose", movieUrl: (id) => `https://unlimplay.com/f/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://unlimplay.com/f/embed/tv/${id}/${season}/${episode}` },
@@ -3123,28 +3119,12 @@ function buildPlayerSources(
           : `https://api.pomfy.stream/filme/${tmdbOnlyId}`,
       },
       {
-        id: "betterflix",
-        name: "BetterFlix",
-        theme: "emerald",
-        src: isTv
-          ? `https://betterflix.cfd/api/player?id=${tmdbOnlyId}&type=tv&season=${season ?? 1}&episode=${episode ?? 1}&direct=true`
-          : `https://betterflix.cfd/api/player?id=${tmdbOnlyId}&type=movie&direct=true`,
-      },
-      {
         id: "pipocacine",
         name: "PipocaCine",
         theme: "rose",
         src: isTv
           ? `https://pipocacine.lat/embed/${tmdbOnlyId}/${episodePath}`
           : `https://pipocacine.lat/embed/${tmdbOnlyId}`,
-      },
-      {
-        id: "vidzen",
-        name: "VidZen",
-        theme: "rose",
-        src: isTv
-          ? `https://vidzen.fun/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://vidzen.fun/movie/${tmdbOnlyId}`,
       },
       {
         id: "vidsrc-wiki",
@@ -3194,14 +3174,6 @@ function buildPlayerSources(
     const autoEmbedKind = fallbackId.startsWith("tt") ? "imdb" : "tmdb";
     sources.push(
       {
-        id: "moviesapi",
-        name: "MoviesAPI",
-        theme: "gold",
-        src: isTv
-          ? `https://moviesapi.to/tv/${fallbackId}/${episodePath}`
-          : `https://moviesapi.to/movie/${fallbackId}`,
-      },
-      {
         id: "autoembed-co",
         name: "AutoEmbed",
         theme: "gold",
@@ -3239,14 +3211,6 @@ function buildPlayerSources(
           : `https://www.vidcore.org/embed/movie/${tmdbOnlyId}?lang=pt`,
       },
       {
-        id: "cinesrc",
-        name: "CineSrc",
-        theme: "rose",
-        src: isTv
-          ? `https://cinesrc.st/embed/tv/${tmdbOnlyId}?s=${season ?? 1}&e=${episode ?? 1}`
-          : `https://cinesrc.st/embed/movie/${tmdbOnlyId}`,
-      },
-      {
         id: "cinextream",
         name: "CineXtream",
         theme: "emerald",
@@ -3269,14 +3233,6 @@ function buildPlayerSources(
         src: isTv
           ? `https://iembed.codeera.dev/embed/tv/${tmdbOnlyId}/${episodePath}`
           : `https://iembed.codeera.dev/embed/movie/${tmdbOnlyId}`,
-      },
-      {
-        id: "mapple",
-        name: "Mapple",
-        theme: "gold",
-        src: isTv
-          ? `https://mapple.uk/watch/tv/${tmdbOnlyId}-${episodeDashPath}`
-          : `https://mapple.uk/watch/movie/${tmdbOnlyId}`,
       },
     );
   }

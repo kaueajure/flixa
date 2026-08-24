@@ -10,7 +10,7 @@ import {
 } from "ably";
 import { playerServerIdForSource } from "../lib/player-servers";
 
-type PartyProviderId = "vidspark" | "strigil" | "cinesrc" | "moviesapi" | "vidzen";
+type PartyProviderId = "strigil";
 
 type PartySource = {
   id: string;
@@ -75,21 +75,16 @@ type AblyAuthResponse = {
   erro?: string;
 };
 
-const PARTY_PROVIDERS = new Set<PartyProviderId>(["vidspark", "strigil", "cinesrc", "moviesapi", "vidzen"]);
-const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["vidspark", "cinesrc", "moviesapi", "vidzen", "strigil"];
+// Nenhum provedor atual passou simultaneamente no sandbox estrito, na
+// sincronização por comandos e na validação de áudio PT-BR. O código da
+// sala é preservado para reativar somente quando um bridge for comprovado.
+const PARTY_PROVIDERS = new Set<PartyProviderId>();
+const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = [];
 const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
-  vidspark: "Alternativa 1 · procure áudio Português (Brasil) no player",
-  cinesrc: "Alternativa 2 · procure áudio Português (Brasil) no player",
-  moviesapi: "Alternativa 3 · procure áudio Português (Brasil) no player",
-  vidzen: "Alternativa 4 · procure áudio Português (Brasil) no player",
-  strigil: "Sem anúncios declarados · áudio PT-BR depende do título",
+  strigil: "Bridge legado desativado · exige nova validação completa",
 };
 const PARTY_PROVIDER_ORIGINS: Record<PartyProviderId, string> = {
-  vidspark: "https://vidspark.to",
   strigil: "https://strigil.cc",
-  cinesrc: "https://cinesrc.st",
-  moviesapi: "https://moviesapi.to",
-  vidzen: "https://vidzen.fun",
 };
 
 function providerFor(source?: PartySource): PartyProviderId | null {
@@ -113,42 +108,11 @@ function sendPlayerCommand(
   const targetOrigin = PARTY_PROVIDER_ORIGINS[providerId];
   const safeTime = Math.max(0, Number(time) || 0);
 
-  if (providerId === "strigil") {
-    if (command === "getStatus") return;
-    target.postMessage({
-      type: "PLAYER_COMMAND",
-      command,
-      ...(command === "seek" ? { value: safeTime } : {}),
-    }, targetOrigin);
-    return;
-  }
-
-  if (providerId === "cinesrc") {
-    const send = (nextCommand: string, args: unknown[] = []) => target.postMessage({
-      type: "cinesrc:command",
-      command: nextCommand,
-      args,
-    }, targetOrigin);
-    if (command === "getStatus") {
-      send("getCurrentTime");
-      send("getPaused");
-    } else {
-      send(command, command === "seek" ? [safeTime] : []);
-    }
-    return;
-  }
-
-  if (providerId === "vidzen") {
-    target.postMessage(JSON.stringify({
-      command,
-      ...(command === "seek" ? { time: safeTime } : {}),
-    }), targetOrigin);
-    return;
-  }
-
+  if (command === "getStatus") return;
   target.postMessage({
-    action: command,
-    ...(command === "seek" ? { time: safeTime } : {}),
+    type: "PLAYER_COMMAND",
+    command,
+    ...(command === "seek" ? { value: safeTime } : {}),
   }, targetOrigin);
 }
 
@@ -163,27 +127,9 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
   }
   if (!payload || typeof payload !== "object") return null;
   const data = payload as Record<string, unknown>;
-  let details = data;
-  let eventName = "";
-  let command = "";
-  let result: unknown = null;
-
-  if (providerId === "cinesrc") {
-    if (typeof data.type !== "string" || !data.type.startsWith("cinesrc:")) return null;
-    eventName = data.type.slice("cinesrc:".length);
-    command = typeof data.command === "string" ? data.command : "";
-    result = data.result;
-  } else if (providerId === "moviesapi" || providerId === "vidspark") {
-    const expectedSource = providerId === "moviesapi" ? "moviesapi-player" : "vidspark-player";
-    if (data.source !== expectedSource || typeof data.event !== "string") return null;
-    eventName = data.event;
-  } else {
-    if (data.type !== "PLAYER_EVENT") return null;
-    details = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : data;
-    eventName = typeof details.event === "string" ? details.event : "";
-    command = typeof details.command === "string" ? details.command : "";
-    result = details.result ?? null;
-  }
+  if (providerId !== "strigil" || data.type !== "PLAYER_EVENT") return null;
+  const details = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : data;
+  const eventName = typeof details.event === "string" ? details.event : "";
 
   const currentTime = Number(details.currentTime ?? details.time ?? data.currentTime ?? data.time);
   const pausedValue = details.paused ?? data.paused;
@@ -191,8 +137,8 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
     name: eventName.toLowerCase(),
     currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : null,
     paused: typeof pausedValue === "boolean" ? pausedValue : null,
-    command,
-    result,
+    command: "",
+    result: null,
   };
 }
 
@@ -428,17 +374,11 @@ export default function WatchPartyControls({
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
     if (connecting) return;
     const activeProvider = providerFor(activeSourceRef.current);
-    const candidate = mode === "create"
-      ? (
-        activeProvider
-          ? sourcesRef.current.find((source) => source.id === activeSourceRef.current?.id)
-          : null
-      ) ?? [...sourcesRef.current]
-        .filter((source) => providerFor(source))
-        .sort((left, right) => PARTY_PROVIDER_PRIORITY.indexOf(providerFor(left)!) - PARTY_PROVIDER_PRIORITY.indexOf(providerFor(right)!))[0]
+    const candidate = mode === "create" && activeProvider
+      ? sourcesRef.current.find((source) => source.id === activeSourceRef.current?.id) ?? null
       : null;
     if (mode === "create" && !candidate) {
-      setError("Nenhum player compatível com sessão compartilhada está disponível para este título.");
+      setError("Nenhum player passou simultaneamente nos requisitos de sandbox, sincronização e áudio PT-BR.");
       updateOpen(true);
       return;
     }
@@ -814,6 +754,7 @@ export default function WatchPartyControls({
   }
 
   const providerName = compatibleSources.find((source) => providerFor(source) === providerId)?.name || providerId;
+  const activePartyProvider = providerFor(activeSource);
 
   return (
     <div className={`watch-party ${open ? "is-open" : ""} ${roomCode ? "is-connected" : ""}`} ref={menuRef}>
@@ -838,8 +779,10 @@ export default function WatchPartyControls({
 
           {!roomCode ? (
             <div className="watch-party-join">
-              <p>Play, pausa e avanço ficam sincronizados. O anfitrião controla o filme para todos.</p>
-              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
+              <p>{compatibleSources.length
+                ? "Play, pausa e avanço ficam sincronizados. O anfitrião controla o filme para todos."
+                : "Assistir em grupo foi desativado para evitar players quebrados, sem dublagem ou que exigem pop-up."}</p>
+              <button type="button" className="watch-party-primary" disabled={connecting || !activePartyProvider} onClick={() => void connect("create")}>
                 {connecting ? "Conectando…" : "Criar uma sala"}
               </button>
               <div className="watch-party-code-row">
@@ -849,10 +792,15 @@ export default function WatchPartyControls({
                   placeholder="CÓDIGO"
                   aria-label="Código da sala"
                   maxLength={6}
+                  disabled={compatibleSources.length === 0}
                 />
-                <button type="button" disabled={connecting || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
+                <button type="button" disabled={connecting || compatibleSources.length === 0 || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
-              <small>{compatibleSources.length ? `${compatibleSources.length} players prontos; escolha antes o que tiver áudio PT-BR neste título.` : "Nenhum player sincronizável disponível para este título…"}</small>
+              <small>{compatibleSources.length
+                ? activePartyProvider
+                  ? "Antes de criar, confirme no seletor de áudio do Strigil que existe Português (Brasil)."
+                  : "Selecione um player de grupo validado e confirme a faixa PT-BR antes de criar a sala."
+                : "Nenhum player passou simultaneamente nos requisitos de sandbox e sincronização para este título."}</small>
             </div>
           ) : (
             <div className="watch-party-room">

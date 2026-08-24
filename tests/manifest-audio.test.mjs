@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inspectManifestAudio } from "../lib/player-server-health.ts";
+import { inspectEmbedPolicy, inspectManifestAudio } from "../lib/player-server-health.ts";
 
 test("detects Portuguese only in HLS audio tracks", () => {
   const manifest = `#EXTM3U
@@ -43,4 +43,30 @@ test("detects DASH audio AdaptationSet language metadata", () => {
 test("returns unknown when a manifest does not declare audio language", () => {
   const manifest = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\nvideo.m3u8";
   assert.equal(inspectManifestAudio(manifest, "hls").hasPortugueseAudio, null);
+});
+
+test("rejects embeds that require popup sandbox permissions", () => {
+  assert.deepEqual(inspectEmbedPolicy(`
+    <div>Seu sandbox está bloqueando o player.</div>
+    <code>sandbox="allow-scripts allow-same-origin allow-popups"</code>
+  `), {
+    code: "SANDBOX_REQUIRES_POPUPS",
+    message: "O provedor exige permissão de pop-up incompatível com o sandbox protegido",
+    evidence: "allow-popups",
+  });
+});
+
+test("rejects forced pop-under and smartlink scripts", () => {
+  const violation = inspectEmbedPolicy(`
+    <script>window.aclib?.runPop({ zoneId: "11201262" });</script>
+    <script id="adcash-popunder-init"></script>
+  `);
+  assert.equal(violation?.code, "FORCED_POPUP_ADVERTISING");
+});
+
+test("allows a regular embedded player document", () => {
+  assert.equal(inspectEmbedPolicy(`
+    <video controls></video>
+    <script>window.parent.postMessage({ type: "PLAYER_EVENT" }, "https://flixa.app")</script>
+  `), null);
 });
