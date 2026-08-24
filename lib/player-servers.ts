@@ -2,6 +2,12 @@ export type PlayerServerStatus = "unknown" | "online" | "degraded" | "offline";
 export type PlayerServerAdvertisingProfile = "none-declared" | "minimal-declared" | "unknown";
 export type PlayerServerWatchPartySupport = "full" | "none";
 
+export type PlayerServerAudioTestUrl = {
+  tmdbId: string;
+  title: string;
+  url: string;
+};
+
 export type PlayerServerDefinition = {
   id: string;
   name: string;
@@ -16,11 +22,12 @@ export type PlayerServerDefinition = {
   advertisingProfile: PlayerServerAdvertisingProfile;
   watchPartySupport: PlayerServerWatchPartySupport;
   prioritizesPortugueseAudio: boolean;
+  audioTestUrls: PlayerServerAudioTestUrl[];
   compatibilityMessage?: string;
   blockedReason?: string;
 };
 
-type BasePlayerServer = Omit<PlayerServerDefinition, "priority" | "protectedEmbedCompatible" | "enabledByDefault" | "advertisingProfile" | "watchPartySupport" | "prioritizesPortugueseAudio"> & {
+type BasePlayerServer = Omit<PlayerServerDefinition, "priority" | "protectedEmbedCompatible" | "enabledByDefault" | "advertisingProfile" | "watchPartySupport" | "prioritizesPortugueseAudio" | "audioTestUrls"> & {
   protectedEmbedCompatible?: boolean;
   advertisingProfile?: PlayerServerAdvertisingProfile;
   watchPartySupport?: PlayerServerWatchPartySupport;
@@ -34,7 +41,7 @@ const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
   // a confirmação de faixa PT-BR continua sendo feita por título no manifesto.
   { id: "pipocacine", name: "PipocaCine", domain: "pipocacine.lat", testUrl: "https://pipocacine.lat/embed/550", testTvUrl: "https://pipocacine.lat/embed/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
   { id: "cdn-embed", name: "CDN Brasil", domain: "cdn-embed.com", testUrl: "https://cdn-embed.com/filme/550", testTvUrl: "https://cdn-embed.com/serie/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
-  { id: "cinezo", name: "Cinezo", domain: "player.cinezo.live", testUrl: "https://player.cinezo.live/embed/movie/550", testTvUrl: "https://player.cinezo.live/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true, advertisingProfile: "none-declared" },
+  { id: "yapgrid", name: "YapGrid PT", domain: "yapgrid.com", testUrl: "https://yapgrid.com/embed/movie/550?lang=pt", testTvUrl: "https://yapgrid.com/embed/tv/1399/1/1?lang=pt", supportsMovie: true, supportsTv: true, advertisingProfile: "none-declared", compatibilityMessage: "Solicita português no player; o parâmetro oficial prioriza legendas e não comprova a faixa de áudio" },
   { id: "screenscape", name: "ScreenScape PT", domain: "screenscape.me", testUrl: "https://screenscape.me/embed?tmdb=550&type=movie&lan=por", testTvUrl: "https://screenscape.me/embed?tmdb=1399&type=tv&s=1&e=1&lan=por", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
   { id: "xpass", name: "XPass Grupo", domain: "play.xpass.top", testUrl: "https://play.xpass.top/e/movie/105", testTvUrl: "https://play.xpass.top/e/tv/1399/1/1", supportsMovie: true, supportsTv: true, watchPartySupport: "full", compatibilityMessage: "Bridge de play, pausa, seek e posição validado sem sandbox; o idioma do áudio precisa ser conferido em cada título" },
   { id: "cinesrc", name: "CineSrc Grupo", domain: "cinesrc.st", testUrl: "https://cinesrc.st/embed/movie/550?autoplay=false", testTvUrl: "https://cinesrc.st/embed/tv/1399?s=1&e=1&autoplay=false", supportsMovie: true, supportsTv: true, watchPartySupport: "full", compatibilityMessage: "Bridge de play, pausa, seek e status validado no sandbox real; a faixa de áudio depende do título" },
@@ -45,6 +52,13 @@ const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
   { id: "vidphantom", name: "VidPhantom", domain: "vidphantom.com", testUrl: "https://vidphantom.com/movie/550", testTvUrl: "https://vidphantom.com/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "embed-api", name: "Embed API", domain: "player.embed-api.stream", testUrl: "https://player.embed-api.stream/?id=550&type=movie", testTvUrl: "https://player.embed-api.stream/?id=1399&s=1&e=1", supportsMovie: true, supportsTv: true },
   { id: "iembed", name: "iEmbed", domain: "iembed.codeera.dev", testUrl: "https://iembed.codeera.dev/embed/movie/550", testTvUrl: "https://iembed.codeera.dev/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
+  { id: "pomfy", name: "Pomfy Brasil", domain: "api.pomfy.stream", testUrl: "https://api.pomfy.stream/filme/550", testTvUrl: "https://api.pomfy.stream/serie/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
+  { id: "megaembed", name: "MegaEmbed Dublado", domain: "megaembed.com", testUrl: "https://megaembed.com/embed/550", testTvUrl: "https://megaembed.com/embed/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true, compatibilityMessage: "A documentação do provedor declara o áudio dublado como opção padrão" },
+  { id: "superflix", name: "SuperFlix Brasil", domain: "superflixapi.sbs", testUrl: "https://superflixapi.sbs/filme/550", testTvUrl: "https://superflixapi.sbs/serie/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
+  { id: "warezcdn", name: "WarezCDN Brasil", domain: "warezcdn.lat", testUrl: "https://warezcdn.lat/filme/550", testTvUrl: "https://warezcdn.lat/serie/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
+  { id: "redeflix", name: "RedeFlix Brasil", domain: "redeflixapi.store", testUrl: "https://redeflixapi.store/filme/550", testTvUrl: "https://redeflixapi.store/serie/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
+  { id: "betterflix", name: "BetterFlix Brasil", domain: "betterflix.cfd", testUrl: "https://betterflix.cfd/api/player?id=550&type=movie", testTvUrl: "https://betterflix.cfd/api/player?id=1399&type=tv&season=1&episode=1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
+  { id: "embedmovies", name: "EmbedMovies Brasil", domain: "myembed.biz", testUrl: "https://myembed.biz/filme/550", testTvUrl: "https://myembed.biz/serie/1399/1/1", supportsMovie: true, supportsTv: true, prioritizesPortugueseAudio: true },
 ];
 
 /** Problemas conhecidos exibidos como alerta; o administrador mantém o controle de uso. */
@@ -52,8 +66,9 @@ const BLOCKED_SERVER_REASONS: Record<string, string> = {
 };
 
 const SERVER_PRIORITY = [
-  "pipocacine", "cdn-embed", "cinezo", "screenscape", "xpass", "cinesrc", "unlimplay",
+  "pipocacine", "cdn-embed", "yapgrid", "screenscape", "xpass", "cinesrc", "unlimplay",
   "vidsrc-wiki", "videasy", "autoembed-co", "vidphantom", "embed-api", "iembed",
+  "pomfy", "megaembed", "superflix", "warezcdn", "redeflix", "betterflix", "embedmovies",
 ];
 
 const PRIORITY_BY_ID = new Map(SERVER_PRIORITY.map((id, index) => [id, index]));
@@ -67,6 +82,11 @@ export const PLAYER_SERVERS: PlayerServerDefinition[] = BASE_PLAYER_SERVERS
     advertisingProfile: server.advertisingProfile ?? "unknown",
     watchPartySupport: server.watchPartySupport ?? "none",
     prioritizesPortugueseAudio: server.prioritizesPortugueseAudio ?? false,
+    audioTestUrls: [
+      { tmdbId: "105", title: "De Volta para o Futuro", url: server.testUrl.replace(/550/g, "105") },
+      { tmdbId: "808", title: "Shrek", url: server.testUrl.replace(/550/g, "808") },
+      { tmdbId: "299534", title: "Vingadores: Ultimato", url: server.testUrl.replace(/550/g, "299534") },
+    ],
     blockedReason: BLOCKED_SERVER_REASONS[server.id],
   }))
   .sort((a, b) => a.priority - b.priority);
@@ -81,7 +101,8 @@ export function getPlayerServer(id: string) {
 
 export function playerServerIdForSource(sourceId: string) {
   if (sourceId === "cdn-tmdb" || sourceId === "cdn-imdb") return "cdn-embed";
-  if (sourceId === "superflix-imdb") return "superflix-pro";
+  if (sourceId === "superflix-imdb" || sourceId === "superflix-pro" || sourceId === "superflix-help") return "superflix";
+  if (sourceId === "megaembedapi") return "megaembed";
   if (sourceId === "warez-tmdb" || sourceId === "warez-imdb") return "warezcdn";
   return SERVER_IDS.has(sourceId) ? sourceId : sourceId;
 }

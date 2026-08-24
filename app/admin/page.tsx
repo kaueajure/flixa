@@ -2,13 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type AdminUser = {
   id: number;
   nome: string;
+  username?: string | null;
   email: string;
   administrador: boolean;
   criado_em?: string | null;
+  atualizado_em?: string | null;
+  ultima_atividade?: string | null;
+  itens_lista?: number;
+  itens_historico?: number;
+  itens_progresso?: number;
+  sessoes_ativas?: number;
 };
 
 type Stats = {
@@ -16,6 +24,9 @@ type Stats = {
   itens_lista: number;
   itens_historico: number;
   itens_progresso: number;
+  administradores: number;
+  novos_30_dias: number;
+  usuarios_com_progresso: number;
 };
 
 type ServerStatus = "unknown" | "online" | "degraded" | "offline";
@@ -49,7 +60,7 @@ type ServerEndpointCheck = {
       message: string;
       audioLanguages?: string[];
       hasPortugueseAudio?: boolean | null;
-      audioMetadataSource?: "hls" | "dash";
+      audioMetadataSource?: "hls" | "dash" | "mp4";
     } | null;
   };
 };
@@ -58,6 +69,15 @@ type ServerDiagnostic = {
   status: ServerStatus;
   testedAt: string;
   checks: ServerEndpointCheck[];
+  audioAudit?: Array<{
+    tmdbId: string;
+    title: string;
+    url: string;
+    status: ServerStatus;
+    portugueseAudio: "confirmed" | "not-detected" | "unverified";
+    message: string;
+    check: ServerEndpointCheck;
+  }>;
 };
 
 type AdminServer = {
@@ -228,6 +248,28 @@ function ServerDiagnosticDetails({ diagnostic, compact = false }: { diagnostic: 
   );
 }
 
+function ServerAudioAudit({ diagnostic }: { diagnostic: ServerDiagnostic | null }) {
+  const samples = diagnostic?.audioAudit ?? [];
+  if (!samples.length) return <span className="audio-audit-empty">3 filmes ainda não auditados</span>;
+  const confirmed = samples.filter((sample) => sample.portugueseAudio === "confirmed").length;
+  return (
+    <details className="server-audio-audit">
+      <summary className={confirmed === samples.length ? "is-confirmed" : "is-pending"}>
+        <span>{confirmed}/{samples.length} com PT-BR comprovado</span>
+        <small>Ver detalhes</small>
+      </summary>
+      <div>
+        {samples.map((sample) => (
+          <article key={sample.tmdbId} className={`is-${sample.portugueseAudio}`}>
+            <i aria-hidden="true" />
+            <span><strong>{sample.title}</strong><small>{sample.message}</small></span>
+          </article>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 async function responseJson<T>(response: Response): Promise<T & { erro?: string }> {
   return (await response.json().catch(() => ({}))) as T & { erro?: string };
 }
@@ -249,13 +291,34 @@ export default function AdminPage() {
   const [modalKind, setModalKind] = useState<"movie" | "tv">("movie");
   const [catalogChecking, setCatalogChecking] = useState(false);
   const [catalogCheck, setCatalogCheck] = useState<CatalogCheck | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+  const [serverSearch, setServerSearch] = useState("");
+  const [serverFilter, setServerFilter] = useState<"all" | ServerStatus | "enabled" | "pt">("all");
 
   const serverStats = useMemo(() => ({
     online: servidores.filter((server) => server.last_status === "online").length,
     degraded: servidores.filter((server) => server.last_status === "degraded").length,
     offline: servidores.filter((server) => server.last_status === "offline").length,
     enabled: servidores.filter((server) => server.enabled).length,
+    ptPriority: servidores.filter((server) => server.prioritizesPortugueseAudio).length,
+    ptConfirmed: servidores.filter((server) => server.last_diagnostic?.audioAudit?.every((sample) => sample.portugueseAudio === "confirmed")).length,
   }), [servidores]);
+
+  const filteredUsers = useMemo(() => {
+    const term = userSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!term) return usuarios;
+    return usuarios.filter((user) => `${user.nome} ${user.username ?? ""} ${user.email}`.toLocaleLowerCase("pt-BR").includes(term));
+  }, [usuarios, userSearch]);
+
+  const filteredServers = useMemo(() => {
+    const term = serverSearch.trim().toLocaleLowerCase("pt-BR");
+    return servidores.filter((server) => {
+      const matchesSearch = !term || `${server.name} ${server.domain} ${server.id}`.toLocaleLowerCase("pt-BR").includes(term);
+      const matchesFilter = serverFilter === "all"
+        || (serverFilter === "enabled" ? server.enabled : serverFilter === "pt" ? server.prioritizesPortugueseAudio : server.last_status === serverFilter);
+      return matchesSearch && matchesFilter;
+    });
+  }, [servidores, serverFilter, serverSearch]);
 
   function handleUnauthorized(status: number) {
     if (status === 401 || status === 403) {
@@ -286,16 +349,21 @@ export default function AdminPage() {
 
   useEffect(() => {
     let active = true;
-    carregar()
-      .catch((error) => {
-        if (active) setErro(error instanceof Error ? error.message : "Falha ao carregar");
-      })
-      .finally(() => {
-        if (active) setCarregando(false);
-      });
+    const timer = window.setTimeout(() => {
+      void carregar()
+        .catch((error) => {
+          if (active) setErro(error instanceof Error ? error.message : "Falha ao carregar");
+        })
+        .finally(() => {
+          if (active) setCarregando(false);
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
+    // A carga inicial é intencionalmente executada uma vez por montagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   useEffect(() => {
@@ -485,12 +553,13 @@ export default function AdminPage() {
   return (
     <main className="admin-shell">
       <header className="admin-head">
-        <div>
-          <p className="eyebrow">Flixa</p>
-          <h1>Painel Admin</h1>
-          <p>Usuários, disponibilidade e testes reais dos servidores de reprodução.</p>
+        <div className="admin-brand-mark" aria-hidden="true">F</div>
+        <div className="admin-head-copy">
+          <p className="eyebrow">Flixa Control</p>
+          <h1>Central de administração</h1>
+          <p>Visão operacional de pessoas, catálogo e provedores de reprodução.</p>
         </div>
-        <a className="admin-back" href="/">Voltar ao catálogo</a>
+        <Link className="admin-back" href="/">Abrir o Flixa <span aria-hidden="true">↗</span></Link>
       </header>
 
       {erro ? <p className="login-error">{erro}</p> : null}
@@ -504,23 +573,32 @@ export default function AdminPage() {
         <>
           {stats ? (
             <section className="admin-stats" aria-label="Estatísticas">
-              <article><strong>{stats.usuarios}</strong><span>Usuários</span></article>
+              <article><small>Total</small><strong>{stats.usuarios}</strong><span>Usuários cadastrados</span></article>
+              <article><small>Crescimento</small><strong>+{stats.novos_30_dias}</strong><span>Novos em 30 dias</span></article>
+              <article><small>Acesso</small><strong>{stats.administradores}</strong><span>Administradores</span></article>
+              <article><small>Engajamento</small><strong>{stats.usuarios_com_progresso}</strong><span>Assistindo agora/recente</span></article>
               <article><strong>{stats.itens_lista}</strong><span>Itens na lista</span></article>
               <article><strong>{stats.itens_historico}</strong><span>Histórico</span></article>
-              <article><strong>{stats.itens_progresso}</strong><span>Progressos</span></article>
+              <article><strong>{stats.itens_progresso}</strong><span>Reproduções em progresso</span></article>
             </section>
           ) : null}
 
           <section className="admin-table-wrap">
-            <h2>Usuários</h2>
+            <div className="admin-section-head">
+              <div><p className="eyebrow">Contas</p><h2>Usuários</h2><span>{filteredUsers.length} de {usuarios.length} registros</span></div>
+              <label className="admin-search"><span aria-hidden="true">⌕</span><input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Buscar nome, @username ou e-mail" /></label>
+            </div>
             <table className="admin-table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Ações</th></tr></thead>
+              <thead><tr><th>Usuário</th><th>Atividade</th><th>Biblioteca</th><th>Acesso</th><th>Ações</th></tr></thead>
               <tbody>
-                {usuarios.map((user) => {
+                {filteredUsers.map((user) => {
                   const isSelf = user.id === euId;
                   return (
                     <tr key={user.id}>
-                      <td>{user.nome}</td><td>{user.email}</td><td>{user.administrador ? "Admin" : "Usuário"}</td>
+                      <td><div className="admin-user-cell"><span>{user.nome.slice(0, 1).toUpperCase()}</span><div><strong>{user.nome}</strong><small>{user.username ? `@${user.username} · ` : ""}{user.email}</small><em>{user.administrador ? "Administrador" : "Membro"}</em></div></div></td>
+                      <td><strong>{formatDate(user.ultima_atividade ?? null)}</strong><small className="server-domain">Criado em {formatDate(user.criado_em ?? null)}</small></td>
+                      <td><div className="admin-user-metrics"><span><strong>{user.itens_lista ?? 0}</strong> lista</span><span><strong>{user.itens_historico ?? 0}</strong> vistos</span><span><strong>{user.itens_progresso ?? 0}</strong> em curso</span></div></td>
+                      <td><span className={`server-enabled ${(user.sessoes_ativas ?? 0) > 0 ? "is-on" : "is-off"}`}>{(user.sessoes_ativas ?? 0) > 0 ? `${user.sessoes_ativas} sessão ativa` : "Sem sessão"}</span></td>
                       <td className="admin-actions">
                         <button type="button" disabled={busyId === `user:${user.id}` || (isSelf && user.administrador)} onClick={() => void toggleAdmin(user)}>{user.administrador ? "Remover admin" : "Tornar admin"}</button>
                         <button type="button" className="is-danger" disabled={busyId === `user:${user.id}` || isSelf} onClick={() => void excluir(user)}>Excluir</button>
@@ -535,11 +613,13 @@ export default function AdminPage() {
       ) : (
         <>
           <section className="admin-stats admin-server-stats" aria-label="Estado dos servidores">
-            <article><strong>{servidores.length}</strong><span>Total</span></article>
+            <article><small>Catálogo</small><strong>{servidores.length}</strong><span>Provedores totais</span></article>
             <article className="is-online"><strong>{serverStats.online}</strong><span>Verdes</span></article>
             <article className="is-degraded"><strong>{serverStats.degraded}</strong><span>Aguardam confirmação</span></article>
             <article className="is-offline"><strong>{serverStats.offline}</strong><span>Vermelhos</span></article>
             <article><strong>{serverStats.enabled}</strong><span>Habilitados</span></article>
+            <article className="is-pt"><strong>{serverStats.ptPriority}</strong><span>Priorizam PT-BR</span></article>
+            <article className="is-pt"><strong>{serverStats.ptConfirmed}</strong><span>3/3 PT-BR comprovados</span></article>
           </section>
 
           <section className={`admin-catalog-check ${catalogCheck ? `is-${catalogCheck.status}` : ""}`}>
@@ -560,8 +640,10 @@ export default function AdminPage() {
 
           <section className="admin-table-wrap admin-servers-wrap">
             <div className="admin-section-head">
-              <div><h2>Servidores</h2><p>Teste automático de acesso e confirmação visual do vídeo.</p></div>
+              <div><p className="eyebrow">Infraestrutura</p><h2>Servidores</h2><p>Teste de filme, série e auditoria de áudio em três títulos conhecidos.</p><span>{filteredServers.length} de {servidores.length} provedores</span></div>
               <div className="admin-server-toolbar">
+                <label className="admin-search"><span aria-hidden="true">⌕</span><input value={serverSearch} onChange={(event) => setServerSearch(event.target.value)} placeholder="Buscar servidor" /></label>
+                <select aria-label="Filtrar servidores" value={serverFilter} onChange={(event) => setServerFilter(event.target.value as typeof serverFilter)}><option value="all">Todos</option><option value="enabled">Habilitados</option><option value="pt">Prioridade PT-BR</option><option value="online">Operacionais</option><option value="degraded">Pendentes</option><option value="offline">Com falha</option><option value="unknown">Não testados</option></select>
                 <label>Desativar por
                   <select value={disableMinutes} onChange={(event) => setDisableMinutes(Number(event.target.value))}>
                     <option value={60}>1 hora</option><option value={360}>6 horas</option><option value={1440}>24 horas</option><option value={0}>Indefinidamente</option>
@@ -572,14 +654,13 @@ export default function AdminPage() {
             </div>
 
             <table className="admin-table admin-server-table">
-              <thead><tr><th>Status</th><th>Servidor</th><th>Cobertura</th><th>Último teste</th><th>Uso</th><th>Ações</th></tr></thead>
+              <thead><tr><th>Status</th><th>Servidor</th><th>PT-BR · 3 filmes</th><th>Diagnóstico</th><th>Uso</th><th>Ações</th></tr></thead>
               <tbody>
-                {servidores.map((server) => (
+                {filteredServers.map((server) => (
                   <tr key={server.id} className={!server.enabled ? "is-disabled" : ""}>
                     <td><ServerStatusBreakdown server={server} /></td>
                     <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{server.blockedReason || server.compatibilityMessage || !server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Alerta: {server.blockedReason || server.compatibilityMessage || "pode ser incompatível com a proteção anti-pop-up"}</small> : null}</td>
-                    <td>
-                      {[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}
+                    <td><ServerAudioAudit diagnostic={server.last_diagnostic} />
                       {server.prioritizesPortugueseAudio ? <small className="server-audio-profile is-dub">Prioridade dublado/PT</small> : null}
                       {server.advertisingProfile === "none-declared" ? <small className="server-audio-profile is-low-ads">Sem anúncios (declarado)</small> : null}
                       {server.advertisingProfile === "minimal-declared" ? <small className="server-audio-profile is-low-ads">Poucos anúncios</small> : null}
@@ -611,13 +692,13 @@ export default function AdminPage() {
             ) : null}
             <div className="server-test-frame-wrap">
               {!modalLoaded ? <div className="server-test-loading">Carregando o player real…</div> : null}
-              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen" onLoad={() => setModalLoaded(true)} />
+              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen allow-popups allow-popups-to-escape-sandbox" onLoad={() => setModalLoaded(true)} />
             </div>
             <div className="server-test-diagnostic">
               <strong>Diagnóstico automático de {kindLabel(modalKind)}</strong>
               {modalCheck ? <ServerDiagnosticDetails diagnostic={{ status: modalCheck.status, testedAt: modalServer.last_diagnostic?.testedAt ?? "", checks: [modalCheck] }} /> : <small>Execute o teste automático para gerar os detalhes.</small>}
             </div>
-            <footer><p>Pressione Play. Pop-ups e novas abas estão bloqueados neste teste.</p><div><button type="button" className="is-danger" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(false)}>Não funciona</button><button type="button" className="is-success" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(true)}>Funciona</button></div></footer>
+            <footer><p>Pressione Play e confirme a reprodução. O diagnóstico de PT-BR usa os manifestos dos três filmes de auditoria.</p><div><button type="button" className="is-danger" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(false)}>Não funciona</button><button type="button" className="is-success" disabled={busyId === `confirm:${modalServer.id}`} onClick={() => void confirmarModal(true)}>Funciona</button></div></footer>
           </div>
         </div>
       ) : null}

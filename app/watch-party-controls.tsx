@@ -8,6 +8,7 @@ import {
   type RealtimeChannel,
   type TokenRequest,
 } from "ably";
+import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 import { playerServerIdForSource } from "../lib/player-servers";
 
 type PartyProviderId = "xpass" | "cinesrc";
@@ -413,6 +414,11 @@ export default function WatchPartyControls({
   }, []);
 
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
+    if (!WATCH_PARTY_ENABLED) {
+      setError("O Assistir Junto está temporariamente desabilitado.");
+      updateOpen(true);
+      return;
+    }
     if (connecting) return;
     const activeProvider = providerFor(activeSourceRef.current);
     const candidate = mode === "create"
@@ -604,6 +610,10 @@ export default function WatchPartyControls({
   ]);
 
   useEffect(() => {
+    if (!WATCH_PARTY_ENABLED) {
+      autoJoinAttemptedRef.current = true;
+      return;
+    }
     if (autoJoinAttemptedRef.current || compatibleSources.length === 0) return;
     const partyValue = new URL(window.location.href).searchParams.get("party") || "";
     if (partyValue.toLowerCase() === "create") {
@@ -839,11 +849,14 @@ export default function WatchPartyControls({
     <div className={`watch-party ${open ? "is-open" : ""} ${roomCode ? "is-connected" : ""}`} ref={menuRef}>
       <button
         type="button"
-        className={`player-icon-btn watch-party-trigger ${roomCode ? "is-active" : ""}`}
+        className={`player-icon-btn watch-party-trigger ${roomCode ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
         onClick={() => updateOpen(!open)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={roomCode ? `Sessão com ${participants.length} participantes` : "Assistir junto"}
+        aria-label={roomCode
+          ? `Sessão com ${participants.length} participantes`
+          : WATCH_PARTY_ENABLED ? "Assistir junto" : "Assistir junto temporariamente desabilitado"}
+        title={!WATCH_PARTY_ENABLED ? "Assistir Junto temporariamente desabilitado" : undefined}
       >
         <span aria-hidden="true">◉</span>
         <small>{roomCode ? participants.length : "Junto"}</small>
@@ -858,11 +871,13 @@ export default function WatchPartyControls({
 
           {!roomCode ? (
             <div className="watch-party-join">
-              <p>{compatibleSources.length
-                ? "Play, pausa e avanço ficam sincronizados. Os bridges atuais não confirmaram áudio PT-BR para este título."
-                : "Nenhum bridge de grupo está disponível para este título."}</p>
-              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
-                {connecting ? "Conectando…" : "Criar uma sala"}
+              <p>{WATCH_PARTY_ENABLED
+                ? compatibleSources.length
+                  ? "Play, pausa e avanço ficam sincronizados. Os bridges atuais não confirmaram áudio PT-BR para este título."
+                  : "Nenhum bridge de grupo está disponível para este título."
+                : "O Assistir Junto continua no Flixa, mas está temporariamente desabilitado para uso."}</p>
+              <button type="button" className="watch-party-primary" disabled={!WATCH_PARTY_ENABLED || connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
+                {!WATCH_PARTY_ENABLED ? "Temporariamente indisponível" : connecting ? "Conectando…" : "Criar uma sala"}
               </button>
               <div className="watch-party-code-row">
                 <input
@@ -871,13 +886,15 @@ export default function WatchPartyControls({
                   placeholder="CÓDIGO"
                   aria-label="Código da sala"
                   maxLength={6}
-                  disabled={compatibleSources.length === 0}
+                  disabled={!WATCH_PARTY_ENABLED || compatibleSources.length === 0}
                 />
-                <button type="button" disabled={connecting || compatibleSources.length === 0 || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
+                <button type="button" disabled={!WATCH_PARTY_ENABLED || connecting || compatibleSources.length === 0 || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
-              <small>{compatibleSources.length
-                ? `${compatibleSources.length} bridges com comandos reais; nenhum é apresentado como dublado sem confirmação da faixa.`
-                : "Nenhum player passou nos requisitos de sandbox e sincronização para este título."}</small>
+              <small>{WATCH_PARTY_ENABLED
+                ? compatibleSources.length
+                  ? `${compatibleSources.length} bridges com comandos reais; nenhum é apresentado como dublado sem confirmação da faixa.`
+                  : "Nenhum player passou nos requisitos de sandbox e sincronização para este título."
+                : "Criação, entrada por código e links de convite estão bloqueados."}</small>
             </div>
           ) : (
             <div className="watch-party-room">

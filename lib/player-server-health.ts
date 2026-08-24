@@ -27,7 +27,7 @@ export type PlayerServerMediaProbe = {
   message: string;
   audioLanguages?: string[];
   hasPortugueseAudio?: boolean | null;
-  audioMetadataSource?: "hls" | "dash";
+  audioMetadataSource?: "hls" | "dash" | "mp4";
 };
 
 export type ManifestAudioMetadata = {
@@ -76,6 +76,17 @@ export type PlayerServerHealthResult = {
   finalUrl: string;
   testedAt: string;
   checks: PlayerServerEndpointCheck[];
+  audioAudit: PlayerServerAudioAuditSample[];
+};
+
+export type PlayerServerAudioAuditSample = {
+  tmdbId: string;
+  title: string;
+  url: string;
+  status: PlayerServerStatus;
+  portugueseAudio: "confirmed" | "not-detected" | "unverified";
+  message: string;
+  check: PlayerServerEndpointCheck;
 };
 
 const BAD_PAGE = /(?:captcha|valida[cç][aã]o segura|verifica[cç][aã]o humana|checking your browser|just a moment|attention required|404\s*(?:not found)?|page not found|domain (?:is )?for sale|access denied|forbidden|investidor\.blog|site suspenso|account suspended)/i;
@@ -462,6 +473,61 @@ export function inspectManifestAudio(text: string, source: "hls" | "dash"): Mani
   return manifestAudioResult(languages, source);
 }
 
+/** Lê o código ISO-639 do box `mdhd` apenas dentro de tracks MP4 de áudio. */
+export function inspectMp4Audio(bytes: Uint8Array) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const ascii = (offset: number, length: number) => String.fromCharCode(...bytes.slice(offset, offset + length));
+  const languages: string[] = [];
+
+  function boxes(start: number, end: number) {
+    let offset = start;
+    while (offset + 8 <= end) {
+      let size = view.getUint32(offset);
+      const type = ascii(offset + 4, 4);
+      let header = 8;
+      if (size === 1 && offset + 16 <= end) {
+        const large = view.getBigUint64(offset + 8);
+        size = large <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(large) : 0;
+        header = 16;
+      }
+      if (size === 0) size = end - offset;
+      if (size < header) break;
+      const declaredEnd = offset + size;
+      const boxEnd = Math.min(declaredEnd, end);
+      if (type === "trak") {
+        const trackText = ascii(offset + header, Math.max(0, boxEnd - offset - header));
+        if (trackText.includes("soun")) {
+          for (let marker = offset + header + 4; marker + 40 < boxEnd; marker += 1) {
+            if (ascii(marker, 4) !== "mdhd") continue;
+            const version = bytes[marker + 4];
+            const languageOffset = marker + (version === 1 ? 36 : 24);
+            if (languageOffset + 2 > boxEnd) continue;
+            const packed = view.getUint16(languageOffset);
+            const language = String.fromCharCode(
+              ((packed >> 10) & 31) + 0x60,
+              ((packed >> 5) & 31) + 0x60,
+              (packed & 31) + 0x60,
+            );
+            if (/^[a-z]{3}$/.test(language) && language !== "und") languages.push(language);
+          }
+        }
+      } else if (["moov", "mdia", "minf", "stbl"].includes(type)) {
+        boxes(offset + header, boxEnd);
+      }
+      if (declaredEnd > end || size === 0) break;
+      offset = declaredEnd;
+    }
+  }
+
+  boxes(0, bytes.byteLength);
+  const normalized = [...new Set(languages.map(normalizeManifestLanguage).filter(Boolean))];
+  return {
+    audioLanguages: normalized,
+    hasPortugueseAudio: normalized.length ? normalized.some((language) => language === "pt" || language.startsWith("pt-")) : null,
+    audioMetadataSource: "mp4" as const,
+  };
+}
+
 async function probeMedia(url: string, referer: string): Promise<PlayerServerMediaProbe> {
   try {
     const { response, bytes } = await fetchMediaPrefix(url, referer);
@@ -516,12 +582,14 @@ async function probeMedia(url: string, referer: string): Promise<PlayerServerMed
 
     const signature = new TextDecoder("latin1").decode(bytes.slice(0, 32));
     const validMp4 = /video\/mp4/i.test(contentType) || /ftyp/.test(signature);
+    const audioMetadata = validMp4 ? inspectMp4Audio(bytes) : null;
     return {
       url,
       status: validMp4 && bytes.byteLength > 0 ? "passed" : "failed",
       httpStatus: response.status,
       contentType,
       message: validMp4 && bytes.byteLength > 0 ? "Arquivo MP4 respondeu com bytes de vídeo" : "A URL MP4 não retornou dados reconhecíveis de vídeo",
+      ...(audioMetadata ?? {}),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao acessar mídia";
@@ -638,8 +706,7 @@ async function testEndpoint(
 
     const policyViolation = inspectEmbedPolicy(html);
     if (policyViolation) {
-      issues.push(issue(policyViolation.code, "embed", "error", policyViolation.message, policyViolation.evidence));
-      return failedCheck(kind, url, startedAt, issues, evidence, response.status, response.url || url);
+      issues.push(issue(policyViolation.code, "embed", "warning", policyViolation.message, policyViolation.evidence));
     }
 
     const resources = extractResourceEvidence(html, response.url || url);
@@ -778,22 +845,42 @@ export async function testPlayerServer(server: PlayerServerDefinition): Promise<
   const targets: Array<{ kind: "movie" | "tv"; url: string }> = [];
   if (server.supportsMovie && server.testUrl) targets.push({ kind: "movie", url: server.testUrl });
   if (server.supportsTv && server.testTvUrl) targets.push({ kind: "tv", url: server.testTvUrl });
-  const checks = await Promise.all(targets.map((target) => testEndpoint(server, target.kind, target.url)));
+  const [checks, audioChecks] = await Promise.all([
+    Promise.all(targets.map((target) => testEndpoint(server, target.kind, target.url))),
+    Promise.all(server.audioTestUrls.map((sample) => testEndpoint(server, "movie", sample.url))),
+  ]);
+  const audioAudit = server.audioTestUrls.map((sample, index): PlayerServerAudioAuditSample => {
+    const check = audioChecks[index];
+    const detected = check.evidence.mediaProbe?.hasPortugueseAudio;
+    const portugueseAudio = detected === true ? "confirmed" : detected === false ? "not-detected" : "unverified";
+    const message = detected === true
+      ? "Faixa de áudio em português declarada no manifesto"
+      : detected === false
+        ? "O manifesto declarou idiomas, mas não encontrou português"
+        : check.status === "offline"
+          ? check.message
+          : "O player abriu, mas não expôs metadados de idioma ao teste automático";
+    return { ...sample, status: check.status, portugueseAudio, message, check };
+  });
   const primary = checks[0];
-  const status = aggregateStatus(checks);
+  const endpointStatus = aggregateStatus([...checks, ...audioChecks]);
+  const audioComplete = audioAudit.every((sample) => sample.portugueseAudio === "confirmed");
+  const status = endpointStatus === "offline" ? "offline" : endpointStatus === "online" && audioComplete ? "online" : "degraded";
   const summary = checks
     .map((check) => `${check.kind === "movie" ? "Filme" : "Série"}: ${check.status === "online" ? "reprodução acessível" : check.status === "degraded" ? `parcial (${check.message})` : check.message}`)
     .join(" · ");
+  const confirmedAudio = audioAudit.filter((sample) => sample.portugueseAudio === "confirmed").length;
 
   return {
     id: server.id,
     status,
     httpStatus: primary?.httpStatus ?? null,
     latencyMs: checks.reduce((highest, check) => Math.max(highest, check.latencyMs), 0),
-    message: summary || "Nenhum endpoint configurado",
+    message: `${summary || "Nenhum endpoint configurado"} · PT-BR confirmado em ${confirmedAudio}/${audioAudit.length} filmes`,
     finalUrl: primary?.finalUrl ?? server.testUrl,
     testedAt: new Date().toISOString(),
     checks,
+    audioAudit,
   };
 }
 
@@ -828,5 +915,6 @@ export function applyManualPlaybackConfirmation(
       .join(" · "),
     testedAt: new Date().toISOString(),
     checks,
+    audioAudit: result.audioAudit ?? [],
   };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inspectEmbedPolicy, inspectManifestAudio } from "../lib/player-server-health.ts";
+import { inspectEmbedPolicy, inspectManifestAudio, inspectMp4Audio } from "../lib/player-server-health.ts";
 
 test("detects Portuguese only in HLS audio tracks", () => {
   const manifest = `#EXTM3U
@@ -43,6 +43,23 @@ test("detects DASH audio AdaptationSet language metadata", () => {
 test("returns unknown when a manifest does not declare audio language", () => {
   const manifest = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\nvideo.m3u8";
   assert.equal(inspectManifestAudio(manifest, "hls").hasPortugueseAudio, null);
+});
+
+test("detects ISO-639 Portuguese metadata in an MP4 audio track", () => {
+  const bytes = new Uint8Array(100);
+  const view = new DataView(bytes.buffer);
+  const writeType = (offset, value) => value.split("").forEach((character, index) => { bytes[offset + index] = character.charCodeAt(0); });
+  view.setUint32(0, 100); writeType(4, "moov");
+  view.setUint32(8, 92); writeType(12, "trak");
+  writeType(24, "soun");
+  writeType(40, "mdhd");
+  bytes[44] = 0;
+  view.setUint16(64, (16 << 10) | (15 << 5) | 18); // por
+  assert.deepEqual(inspectMp4Audio(bytes), {
+    audioLanguages: ["pt"],
+    hasPortugueseAudio: true,
+    audioMetadataSource: "mp4",
+  });
 });
 
 test("rejects embeds that require popup sandbox permissions", () => {

@@ -293,11 +293,17 @@ export async function estatisticasAdmin() {
     const [listaCount] = await db.select({ total: sql<number>`count(*)` }).from(lista_titulos);
     const [historicoCount] = await db.select({ total: sql<number>`count(*)` }).from(historico_assistidos);
     const [progressoCount] = await db.select({ total: sql<number>`count(*)` }).from(progresso_reproducao);
+    const [adminCount] = await db.select({ total: sql<number>`count(*)` }).from(usuarios).where(sql`${usuarios.administrador} = 1`);
+    const [newUsersCount] = await db.select({ total: sql<number>`count(*)` }).from(usuarios).where(sql`${usuarios.criado_em} >= date_sub(current_timestamp, interval 30 day)`);
+    const [activeUsersCount] = await db.select({ total: sql<number>`count(distinct ${progresso_reproducao.usuario_id})` }).from(progresso_reproducao);
     return {
       usuarios: Number(usuariosCount?.total || 0),
       itens_lista: Number(listaCount?.total || 0),
       itens_historico: Number(historicoCount?.total || 0),
       itens_progresso: Number(progressoCount?.total || 0),
+      administradores: Number(adminCount?.total || 0),
+      novos_30_dias: Number(newUsersCount?.total || 0),
+      usuarios_com_progresso: Number(activeUsersCount?.total || 0),
     };
   });
 }
