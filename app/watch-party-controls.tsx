@@ -10,7 +10,7 @@ import {
 } from "ably";
 import { playerServerIdForSource } from "../lib/player-servers";
 
-type PartyProviderId = "cinesrc" | "moviesapi" | "vidzen";
+type PartyProviderId = "strigil";
 
 type PartySource = {
   id: string;
@@ -75,12 +75,10 @@ type AblyAuthResponse = {
   erro?: string;
 };
 
-const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc", "moviesapi", "vidzen"]);
-const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["cinesrc", "moviesapi", "vidzen"];
+const PARTY_PROVIDERS = new Set<PartyProviderId>(["strigil"]);
+const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["strigil"];
 const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
-  cinesrc: "Poucos anúncios · sincronização completa",
-  moviesapi: "Sincronização completa · servidor reserva",
-  vidzen: "Sincronização completa · servidor reserva",
+  strigil: "Sem anúncios declarados · sincronização completa",
 };
 
 function providerFor(source?: PartySource): PartyProviderId | null {
@@ -101,52 +99,21 @@ function sendPlayerCommand(
 ) {
   const target = iframe?.contentWindow;
   if (!target) return;
-  if (providerId === "cinesrc") {
-    target.postMessage({
-      type: "cinesrc:command",
-      command: command === "getStatus" ? "getCurrentTime" : command,
-      args: command === "seek" ? [Math.max(0, Number(time) || 0)] : [],
-    }, "https://cinesrc.st");
-    if (command === "getStatus") {
-      target.postMessage({ type: "cinesrc:command", command: "getPaused", args: [] }, "https://cinesrc.st");
-    }
-    return;
-  }
-  if (providerId === "moviesapi") {
-    target.postMessage({ action: command, ...(command === "seek" ? { time: Math.max(0, Number(time) || 0) } : {}) }, "https://moviesapi.to");
-    return;
-  }
-  target.postMessage(JSON.stringify({
+  if (providerId !== "strigil" || command === "getStatus") return;
+  target.postMessage({
+    type: "PLAYER_COMMAND",
     command,
-    ...(command === "seek" ? { time: Math.max(0, Number(time) || 0) } : {}),
-  }), "https://vidzen.fun");
+    ...(command === "seek" ? { value: Math.max(0, Number(time) || 0) } : {}),
+  }, "https://strigil.cc");
 }
 
 function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
-  let payload: unknown = event.data;
-  if (providerId === "vidzen" && typeof payload === "string") {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      return null;
-    }
-  }
+  const payload: unknown = event.data;
   if (!payload || typeof payload !== "object") return null;
   const data = payload as Record<string, unknown>;
-  let eventName = "";
-  let details: Record<string, unknown> = data;
-
-  if (providerId === "cinesrc") {
-    if (typeof data.type !== "string" || !data.type.startsWith("cinesrc:")) return null;
-    eventName = data.type.slice("cinesrc:".length);
-  } else if (providerId === "moviesapi") {
-    if (data.source !== "moviesapi-player" || typeof data.event !== "string") return null;
-    eventName = data.event;
-  } else {
-    if (data.type !== "PLAYER_EVENT") return null;
-    details = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : data;
-    eventName = typeof details.event === "string" ? details.event : "";
-  }
+  if (providerId !== "strigil" || data.type !== "PLAYER_EVENT") return null;
+  const details = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : data;
+  const eventName = typeof details.event === "string" ? details.event : "";
 
   const currentTime = Number(details.currentTime ?? data.currentTime);
   const pausedValue = details.paused ?? data.paused;
@@ -154,8 +121,8 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
     name: eventName.toLowerCase(),
     currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : null,
     paused: typeof pausedValue === "boolean" ? pausedValue : null,
-    command: typeof data.command === "string" ? data.command : "",
-    result: data.result,
+    command: "",
+    result: null,
   };
 }
 
@@ -619,11 +586,7 @@ export default function WatchPartyControls({
       const currentProvider = providerRef.current;
       const iframe = playerRef.current;
       if (!currentProvider || !iframe?.contentWindow || event.source !== iframe.contentWindow) return;
-      const expectedOrigin = currentProvider === "cinesrc"
-        ? "https://cinesrc.st"
-        : currentProvider === "moviesapi"
-          ? "https://moviesapi.to"
-          : "https://vidzen.fun";
+      const expectedOrigin = "https://strigil.cc";
       if (event.origin !== expectedOrigin) return;
       const playerEvent = parsePlayerEvent(event, currentProvider);
       if (!playerEvent) return;
@@ -812,7 +775,7 @@ export default function WatchPartyControls({
                 />
                 <button type="button" disabled={connecting || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
-              <small>{compatibleSources.length ? `${compatibleSources.length} servidor(es) sincronizados. CineSrc será priorizado por ter menos anúncios.` : "Aguardando um servidor compatível…"}</small>
+              <small>{compatibleSources.length ? "Strigil pronto para sincronizar play, pausa e avanço." : "Aguardando o Strigil para iniciar a sessão…"}</small>
             </div>
           ) : (
             <div className="watch-party-room">

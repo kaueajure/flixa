@@ -75,7 +75,8 @@ function experienceScore(server: ServerState) {
       ? 3_500
       : 0;
   const watchPartyPoints = server.watchPartySupport === "full" ? 1_200 : 0;
-  return advertisingPoints + watchPartyPoints;
+  const portugueseAudioPoints = server.prioritizesPortugueseAudio ? 9_000 : 0;
+  return advertisingPoints + watchPartyPoints + portugueseAudioPoints;
 }
 
 function storedScore(server: ServerState, kind: "movie" | "tv") {

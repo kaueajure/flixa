@@ -5644,6 +5644,10 @@ body.player-open > div[style*="z-index"] {
   color: #f7d984;
 }
 
+.server-audio-profile.is-dub {
+  color: #8feeff;
+}
+
 .server-audio-profile.is-low-ads {
   border-color: rgba(63, 214, 137, 0.28);
   background: rgba(63, 214, 137, 0.1);

@@ -2919,7 +2919,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|2embed\.(?:online|skin|cc|stream)|myembed\.biz|filmesyseries\.epizy\.com|vidsrc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|ezvidapi\.com|vidcore\.org|cinesrc\.st|cinextream\.net|embed-api\.stream|iembed\.codeera\.dev|mapple\.uk|pipocacine\.lat|api\.pomfy\.stream|betterflix\.lat|megaembedapi\.site|nontongo\.win|primesrc\.me|vidlux\.(?:site|xyz|top)|cinezo\.live|vidzee\.wtf|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
+  return /betterflix\.cfd|mgeb\.top|pipocacine\.lat|cdn-embed\.com|myembed\.biz|vidcore\.org|strigil\.cc|cinezo\.live|screenscape\.me|unlimplay\.com|vidsrc\.wiki|cinesrc\.st|videasy\.(?:net|to)|moviesapi\.to|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|mapple\.uk|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -3072,37 +3072,16 @@ type AdditionalPlayerSource = {
 };
 
 const ADDITIONAL_PLAYER_SOURCES: AdditionalPlayerSource[] = [
-  { id: "vidbolt", name: "VidBolt", theme: "gold", movieUrl: (id) => `https://vidbolt.pro/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://vidbolt.pro/embed/tv/${id}/${season}/${episode}` },
-  { id: "embos", name: "Embos", theme: "emerald", movieUrl: (id) => `https://embos.top/movie/?mid=${id}`, tvUrl: (id, season, episode) => `https://embos.top/tv/?mid=${id}&s=${season}&e=${episode}` },
-  { id: "unlimplay", name: "UnlimPlay", theme: "rose", movieUrl: (id) => `https://unlimplay.com/f/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://unlimplay.com/f/embed/tv/${id}/${season}/${episode}` },
-  { id: "screenscape", name: "ScreenScape", theme: "violet", movieUrl: (id) => `https://screenscape.me/embed?tmdb=${id}&type=movie`, tvUrl: (id, season, episode) => `https://screenscape.me/embed?tmdb=${id}&type=tv&s=${season}&e=${episode}` },
-  { id: "nsrplay", name: "NasriPlay", theme: "cyan", movieUrl: (id) => `https://nsrplay.space/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://nsrplay.space/embed/tv/${id}/${season}/${episode}` },
-  { id: "filesun", name: "FileSuN", theme: "gold", movieUrl: (id) => `https://filesun.sbs/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://filesun.sbs/embed/tv/${id}/${season}/${episode}` },
-  { id: "vidphantom-live", name: "VidPhantom Live", theme: "violet", movieUrl: (id) => `https://vidphantom.live/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.live/tv/${id}/${season}/${episode}` },
-  { id: "vidphantom-online", name: "VidPhantom Online", theme: "cyan", movieUrl: (id) => `https://vidphantom.online/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.online/tv/${id}/${season}/${episode}` },
-  { id: "vidphantom-site", name: "VidPhantom Site", theme: "gold", movieUrl: (id) => `https://vidphantom.site/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.site/tv/${id}/${season}/${episode}` },
-  { id: "vidphantom-website", name: "VidPhantom Web", theme: "emerald", movieUrl: (id) => `https://vidphantom.website/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.website/tv/${id}/${season}/${episode}` },
-  { id: "vidphantom-xyz", name: "VidPhantom XYZ", theme: "rose", movieUrl: (id) => `https://vidphantom.xyz/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.xyz/tv/${id}/${season}/${episode}` },
-  { id: "apiplayer", name: "APIPlayer", theme: "sky", movieUrl: (id) => `https://apiplayer.ru/embed/movie/${id}?lang=pt`, tvUrl: (id, season, episode) => `https://apiplayer.ru/embed/tv/${id}/${season}/${episode}?lang=pt` },
-  { id: "vidsrc-cc", name: "VidSrc CC", theme: "violet", movieUrl: (id) => `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=false`, tvUrl: (id, season, episode) => `https://vidsrc.cc/v2/embed/tv/${id}/${season}/${episode}?autoPlay=false` },
-  { id: "2embed-skin", name: "2Embed Skin", theme: "gold", movieUrl: (id) => `https://www.2embed.skin/embed/${id}`, tvUrl: (id, season, episode) => `https://www.2embed.skin/embedtv/${id}&s=${season}&e=${episode}` },
-  { id: "2embed-cc", name: "2Embed CC", theme: "rose", movieUrl: (id) => `https://www.2embed.cc/embed/${id}`, tvUrl: (id, season, episode) => `https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}` },
-  { id: "nontongo", name: "Nontongo", theme: "emerald", movieUrl: (id) => `https://www.nontongo.win/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://www.nontongo.win/embed/tv/${id}/${season}/${episode}` },
-  { id: "primesrc", name: "PrimeSrc", theme: "violet", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}` },
-  { id: "vidlux", name: "VidLux", theme: "sky", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}` },
+  { id: "betterflix", name: "BetterFlix", theme: "cyan", movieUrl: (id) => `https://betterflix.cfd/api/player?id=${id}&type=movie&direct=true`, tvUrl: (id, season, episode) => `https://betterflix.cfd/api/player?id=${id}&type=tv&season=${season}&episode=${episode}&direct=true` },
+  { id: "megaembed", name: "MegaEmbed", theme: "gold", movieUrl: (id) => `https://mgeb.top/embed/${id}?player=vidstack`, tvUrl: (id, season, episode) => `https://mgeb.top/embed/${id}/${season}/${episode}?player=vidstack` },
+  { id: "pipocacine", name: "PipocaCine", theme: "rose", movieUrl: (id) => `https://pipocacine.lat/embed/${id}`, tvUrl: (id, season, episode) => `https://pipocacine.lat/embed/${id}/${season}/${episode}` },
+  { id: "cdn-embed", name: "CDN Brasil", theme: "emerald", movieUrl: (id) => `https://cdn-embed.com/filme/${id}`, tvUrl: (id, season, episode) => `https://cdn-embed.com/serie/${id}/${season}/${episode}` },
+  { id: "myembed", name: "MyEmbed", theme: "sky", movieUrl: (id) => `https://myembed.biz/filme/${id}`, tvUrl: (id, season, episode) => `https://myembed.biz/serie/${id}/${season}/${episode}` },
+  { id: "vidcore", name: "VidCore PT", theme: "violet", movieUrl: (id) => `https://www.vidcore.org/embed/movie/${id}?lang=pt`, tvUrl: (id, season, episode) => `https://www.vidcore.org/embed/tv/${id}/${season}/${episode}?lang=pt` },
+  { id: "strigil", name: "Strigil", theme: "emerald", movieUrl: (id) => `https://strigil.cc/embed/movie/${id}?sub=pt`, tvUrl: (id, season, episode) => `https://strigil.cc/embed/tv/${id}/${season}/${episode}?sub=pt` },
   { id: "cinezo", name: "Cinezo", theme: "cyan", movieUrl: (id) => `https://player.cinezo.live/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://player.cinezo.live/embed/tv/${id}/${season}/${episode}` },
-  { id: "vidzee", name: "VidZee", theme: "gold", movieUrl: (id) => `https://player.vidzee.wtf/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}` },
-  { id: "2embed-stream", name: "2Embed Stream", theme: "rose", movieUrl: (id) => `https://2embed.stream/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://2embed.stream/embed/tv/${id}/${season}/${episode}` },
-  { id: "vidlux-top", name: "VidLux Top", theme: "sky", movieUrl: (id) => `https://vidlux.top/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://vidlux.top/embed/tv/${id}/${season}/${episode}` },
-  { id: "vidlux-quilox", name: "VidLux Quilox", theme: "cyan", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=quilox`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=quilox` },
-  { id: "vidlux-spider", name: "VidLux Spider", theme: "gold", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=spider`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=spider` },
-  { id: "vidlux-magic", name: "VidLux Magic", theme: "violet", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=magic`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=magic` },
-  { id: "vidlux-dubai", name: "VidLux Dubai", theme: "emerald", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=dubai`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=dubai` },
-  { id: "vidlux-astra", name: "VidLux Astra", theme: "rose", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=astra`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=astra` },
-  { id: "vidlux-vidrock", name: "VidLux VidRock", theme: "sky", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=vidrock`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=vidrock` },
-  { id: "primesrc-primevid", name: "PrimeSrc PrimeVid", theme: "cyan", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}&whitelistServers=PrimeVid`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&whitelistServers=PrimeVid` },
-  { id: "primesrc-voe", name: "PrimeSrc Voe", theme: "gold", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}&whitelistServers=Voe`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&whitelistServers=Voe` },
-  { id: "primesrc-dood", name: "PrimeSrc Dood", theme: "violet", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}&whitelistServers=Dood`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&whitelistServers=Dood` },
+  { id: "screenscape", name: "ScreenScape PT", theme: "violet", movieUrl: (id) => `https://screenscape.me/embed?tmdb=${id}&type=movie&lan=por`, tvUrl: (id, season, episode) => `https://screenscape.me/embed?tmdb=${id}&type=tv&s=${season}&e=${episode}&lan=por` },
+  { id: "unlimplay", name: "UnlimPlay", theme: "rose", movieUrl: (id) => `https://unlimplay.com/f/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://unlimplay.com/f/embed/tv/${id}/${season}/${episode}` },
 ];
 
 function withSuperflixFlags(url: string, isTv: boolean) {
@@ -3148,8 +3127,8 @@ function buildPlayerSources(
         name: "BetterFlix",
         theme: "emerald",
         src: isTv
-          ? `https://betterflix.lat/api/player?id=${tmdbOnlyId}&type=tv&season=${season ?? 1}&episode=${episode ?? 1}`
-          : `https://betterflix.lat/api/player?id=${tmdbOnlyId}&type=movie`,
+          ? `https://betterflix.cfd/api/player?id=${tmdbOnlyId}&type=tv&season=${season ?? 1}&episode=${episode ?? 1}&direct=true`
+          : `https://betterflix.cfd/api/player?id=${tmdbOnlyId}&type=movie&direct=true`,
       },
       {
         id: "pipocacine",
@@ -3253,11 +3232,11 @@ function buildPlayerSources(
       },
       {
         id: "vidcore",
-        name: "VidCore",
+        name: "VidCore PT",
         theme: "gold",
         src: isTv
-          ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://www.vidcore.org/embed/movie/${tmdbOnlyId}`,
+          ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}?lang=pt`
+          : `https://www.vidcore.org/embed/movie/${tmdbOnlyId}?lang=pt`,
       },
       {
         id: "cinesrc",
@@ -3395,7 +3374,15 @@ function buildPlayerSources(
   const seenServers = new Set<string>();
   return sources.filter((source) => {
     const serverId = playerServerIdForSource(source.id);
-    if (!source.src || seen.has(source.src) || seenServers.has(serverId) || disabledServerIds.has(serverId)) return false;
+    const server = getPlayerServer(serverId);
+    if (
+      !server
+      || (isTv ? !server.supportsTv : !server.supportsMovie)
+      || !source.src
+      || seen.has(source.src)
+      || seenServers.has(serverId)
+      || disabledServerIds.has(serverId)
+    ) return false;
     seen.add(source.src);
     seenServers.add(serverId);
     return true;

@@ -3,50 +3,54 @@ import test from "node:test";
 
 import { PLAYER_SERVERS } from "../lib/player-servers.ts";
 
-const additionalServerIds = [
-  "vidbolt", "embos", "unlimplay", "screenscape", "nsrplay", "filesun",
-  "vidphantom-live", "vidphantom-online", "vidphantom-site", "vidphantom-website",
-  "vidphantom-xyz", "apiplayer", "vidsrc-cc", "2embed-skin", "2embed-cc",
-  "nontongo", "primesrc", "vidlux", "cinezo", "vidzee",
+const curatedServerIds = [
+  "betterflix", "megaembed", "pipocacine", "cdn-embed", "myembed",
+  "vidcore", "strigil", "cinezo", "screenscape", "unlimplay",
+  "vidsrc-wiki", "cinesrc", "videasy", "moviesapi", "vidzen",
+  "autoembed-co", "vidphantom", "embed-api", "iembed", "mapple",
 ];
 
-const sandboxReplacementIds = [
-  "2embed-skin", "2embed-cc", "nontongo", "primesrc", "vidlux", "cinezo", "vidzee",
-  "2embed-stream", "vidlux-top", "vidlux-quilox", "vidlux-spider", "vidlux-magic",
-  "vidlux-dubai", "vidlux-astra", "vidlux-vidrock", "primesrc-primevid", "primesrc-voe",
-  "primesrc-dood",
-];
-
-test("registers 20 additional movie and TV endpoints without duplicate ids", () => {
+test("keeps a closed top 20 without mirrors or duplicate ids", () => {
   const ids = PLAYER_SERVERS.map((server) => server.id);
+  assert.deepEqual(ids, curatedServerIds);
+  assert.equal(ids.length, 20);
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(additionalServerIds.length, 20);
-
-  for (const id of additionalServerIds) {
-    const server = PLAYER_SERVERS.find((candidate) => candidate.id === id);
-    assert.ok(server, `${id} should be registered`);
-    assert.equal(server.supportsMovie, true);
-    assert.equal(server.supportsTv, true);
-    assert.match(server.testUrl, /^https:\/\//);
-    assert.match(server.testTvUrl, /^https:\/\//);
-  }
+  assert.equal(new Set(PLAYER_SERVERS.map((server) => server.domain)).size, 20);
 });
 
-test("does not attach provider-wide audio labels", () => {
+test("registers usable endpoints for every declared media kind", () => {
   for (const server of PLAYER_SERVERS) {
-    assert.equal(Object.hasOwn(server, "audioProfile"), false, `${server.id} must not claim an audio language`);
+    assert.equal(server.supportsMovie, true, `${server.id} should support movies`);
+    assert.match(server.testUrl, /^https:\/\//);
+    if (server.id === "strigil") {
+      assert.equal(server.supportsTv, false);
+      assert.equal(server.testTvUrl, "");
+    } else {
+      assert.equal(server.supportsTv, true, `${server.id} should support TV`);
+      assert.match(server.testTvUrl, /^https:\/\//);
+    }
+    assert.equal(server.protectedEmbedCompatible, true);
+    assert.equal(server.blockedReason, undefined);
   }
 });
 
-test("keeps 56 servers while replacing every sandbox-incompatible entry one-for-one", () => {
-  assert.equal(PLAYER_SERVERS.length, 56);
-  assert.equal(sandboxReplacementIds.length, 18);
-  assert.equal(PLAYER_SERVERS.every((server) => server.protectedEmbedCompatible), true);
+test("uses only Strigil for synchronized watch parties", () => {
+  const partyServers = PLAYER_SERVERS.filter((server) => server.watchPartySupport === "full");
+  assert.deepEqual(partyServers.map((server) => server.id), ["strigil"]);
+  assert.equal(partyServers[0].advertisingProfile, "none-declared");
+});
 
-  for (const id of sandboxReplacementIds) {
-    const server = PLAYER_SERVERS.find((candidate) => candidate.id === id);
-    assert.ok(server, `${id} should replace a sandbox-incompatible server`);
-    assert.equal(server.supportsMovie, true);
-    assert.equal(server.supportsTv, true);
+test("prefers Portuguese audio only where the provider supports it", () => {
+  const vidcore = PLAYER_SERVERS.find((server) => server.id === "vidcore");
+  const screenscape = PLAYER_SERVERS.find((server) => server.id === "screenscape");
+  assert.match(vidcore.testUrl, /[?&]lang=pt(?:&|$)/);
+  assert.match(screenscape.testUrl, /[?&]lan=por(?:&|$)/);
+  assert.deepEqual(
+    PLAYER_SERVERS.filter((server) => server.prioritizesPortugueseAudio).map((server) => server.id),
+    ["betterflix", "megaembed", "pipocacine", "cdn-embed", "myembed", "vidcore", "screenscape"],
+  );
+
+  for (const server of PLAYER_SERVERS) {
+    assert.equal(Object.hasOwn(server, "audioProfile"), false, `${server.id} must not claim an unverified audio language`);
   }
 });
