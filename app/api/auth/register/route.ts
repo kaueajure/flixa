@@ -9,12 +9,13 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { nome?: string; email?: string; senha?: string };
+    const body = (await request.json()) as { nome?: string; username?: string; email?: string; senha?: string };
     const nome = String(body.nome || "");
+    const username = String(body.username || "");
     const email = String(body.email || "");
     const senha = String(body.senha || "");
 
-    const resultado = await cadastrarUsuario({ nome, email, senha });
+    const resultado = await cadastrarUsuario({ nome, username, email, senha });
     if (!resultado.usuario) {
       return Response.json({ erro: resultado.erro || "Não foi possível cadastrar." }, { status: 400 });
     }

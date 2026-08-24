@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 type Usuario = {
   id: number;
   nome: string;
+  username: string | null;
   email: string;
   administrador: boolean;
 };
@@ -16,6 +17,7 @@ export default function LoginForm() {
   const router = useRouter();
   const [modo, setModo] = useState<ModoAuth>("login");
   const [nome, setNome] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -68,6 +70,11 @@ export default function LoginForm() {
         setErro("Informe um nome com pelo menos 2 caracteres.");
         return;
       }
+      const normalizedUsername = username.trim().toLowerCase().replace(/^@+/, "");
+      if (!/^[a-z0-9](?:[a-z0-9._]{1,18}[a-z0-9])$/.test(normalizedUsername)) {
+        setErro("Escolha um username de 3 a 20 caracteres usando letras, números, ponto ou underline.");
+        return;
+      }
       if (senha.length < 6) {
         setErro("A senha deve ter pelo menos 6 caracteres.");
         return;
@@ -86,7 +93,7 @@ export default function LoginForm() {
       const payload =
         modo === "login"
           ? { email, senha }
-          : { nome: nome.trim(), email, senha };
+          : { nome: nome.trim(), username: username.trim().toLowerCase().replace(/^@+/, ""), email, senha };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -182,17 +189,35 @@ export default function LoginForm() {
 
         <form className="login-form" onSubmit={onSubmit}>
           {modo === "cadastro" ? (
-            <label>
-              <span>Nome</span>
-              <input
-                type="text"
-                autoComplete="name"
-                value={nome}
-                onChange={(event) => setNome(event.target.value)}
-                placeholder="Seu nome"
-                required
-              />
-            </label>
+            <>
+              <label>
+                <span>Nome</span>
+                <input
+                  type="text"
+                  autoComplete="name"
+                  value={nome}
+                  onChange={(event) => setNome(event.target.value)}
+                  placeholder="Seu nome"
+                  required
+                />
+              </label>
+              <label>
+                <span>Username</span>
+                <div className="username-input-wrap">
+                  <b aria-hidden="true">@</b>
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9._]/g, "").slice(0, 20))}
+                    placeholder="seu.username"
+                    minLength={3}
+                    maxLength={20}
+                    required
+                  />
+                </div>
+              </label>
+            </>
           ) : null}
 
           <label>

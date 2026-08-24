@@ -36,6 +36,20 @@
       "when": 1787414400000,
       "tag": "0004_diagnostico_real_players",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787529600000,
+      "tag": "0005_usuario_username",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787529660000,
+      "tag": "0006_amizades",
+      "breakpoints": true
     }
   ]
 }

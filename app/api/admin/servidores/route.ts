@@ -56,9 +56,10 @@ export async function PATCH(request: Request) {
     if (!getPlayerServer(id) || typeof body.enabled !== "boolean") {
       return Response.json({ erro: "Servidor ou estado inválido." }, { status: 400 });
     }
+    const enabled = body.enabled;
     const minutes = body.minutes == null ? null : Number(body.minutes);
     const servidor = await withDb(async (db) => {
-      await definirServidorHabilitado(id, body.enabled, admin.id, Number.isFinite(minutes) ? minutes : null, db);
+      await definirServidorHabilitado(id, enabled, admin.id, Number.isFinite(minutes) ? minutes : null, db);
       return obterServidorAdmin(id, db);
     });
     return Response.json(

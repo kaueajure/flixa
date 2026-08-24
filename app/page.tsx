@@ -7,8 +7,11 @@ import {
   playerServerIdForSource,
 } from "../lib/player-servers";
 import BorderCollieForum from "./border-collie-forum";
+import FriendsView, { type FriendActivity } from "./friends-view";
 import LoginForm from "./login-form";
+import SeriesRecapModal from "./series-recap-modal";
 import SiteIntro from "./site-intro";
+import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
 
 type MediaKind = "movie" | "tv";
@@ -44,10 +47,11 @@ type Movie = {
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "lista" | "surpreenda-me" | "grupo";
+type View = "home" | "filmes" | "series" | "lista" | "surpreenda-me" | "grupo" | "amigos";
 type AuthUser = {
   id: number;
   nome: string;
+  username: string | null;
   email: string;
   administrador: boolean;
 };
@@ -364,6 +368,7 @@ function parseRoute(hash: string) {
   if (raw === "minha-lista" || raw === "lista") return { view: "lista" as View };
   if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
   if (raw === "assistir-em-grupo" || raw === "grupo") return { view: "grupo" as View };
+  if (raw === "amigos" || raw === "amizades") return { view: "amigos" as View };
 
   const genre = raw.match(/^genero\/(\d+)$/);
   if (genre) {
@@ -450,6 +455,7 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [playerMovie, setPlayerMovie] = useState<Movie | null>(null);
+  const [recapMovie, setRecapMovie] = useState<Movie | null>(null);
   const [listMovies, setListMovies] = useState<Movie[]>([]);
   const [recentMovies, setRecentMovies] = useState<Movie[]>([]);
   const [continueMovies, setContinueMovies] = useState<Movie[]>([]);
@@ -687,7 +693,8 @@ export default function Home() {
         route.view === "series" ||
         route.view === "lista" ||
         route.view === "surpreenda-me" ||
-        route.view === "grupo"
+        route.view === "grupo" ||
+        route.view === "amigos"
       ) {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -992,6 +999,24 @@ export default function Home() {
     [saveProgress],
   );
 
+  function startPlayer(payload: Movie) {
+    const isTv = mediaKind(payload) === "tv";
+    const season = isTv ? payload.season ?? 1 : undefined;
+    const episode = isTv ? payload.episode ?? 1 : undefined;
+    setSearchOpen(false);
+    setSelectedMovie(null);
+    setRecapMovie(null);
+    setPlayerMovie(payload);
+    rememberWatch(payload);
+    saveProgress(payload, {
+      progresso: Math.max(Number(payload.progress || 0), 5),
+      posicao_segundos: payload.positionSeconds || 0,
+      temporada: season ?? null,
+      episodio: episode ?? null,
+    });
+    goTo(playerHash(payload, season, episode));
+  }
+
   function openPlayer(movie: Movie, pick?: { season?: number; episode?: number }) {
     if (!canWatch(movie)) {
       showToast("Título sem ID válido para reprodução");
@@ -1002,18 +1027,24 @@ export default function Home() {
     const season = isTv ? pick?.season ?? merged.season ?? 1 : undefined;
     const episode = isTv ? pick?.episode ?? merged.episode ?? 1 : undefined;
     const payload: Movie = { ...merged, season, episode };
+    const shouldRecap = isTv && Number(payload.progress || 0) > 0 && ((season || 1) > 1 || (episode || 1) > 1);
+    if (shouldRecap) {
+      setSearchOpen(false);
+      setSelectedMovie(null);
+      setRecapMovie(payload);
+      return;
+    }
+    startPlayer(payload);
+  }
 
-    setSearchOpen(false);
-    setSelectedMovie(null);
-    setPlayerMovie(payload);
-    rememberWatch(payload);
-    saveProgress(payload, {
-      progresso: Math.max(Number(payload.progress || 0), 5),
-      posicao_segundos: payload.positionSeconds || 0,
-      temporada: season ?? null,
-      episodio: episode ?? null,
-    });
-    goTo(playerHash(payload, season, episode));
+  async function openFriendActivity(activity: FriendActivity) {
+    const id = activity.tmdb_id || activity.id.replace(/^tv:/, "");
+    const movie = await resolveTitle(id, activity.kind);
+    if (!movie) {
+      showToast("Não foi possível abrir este título.");
+      return;
+    }
+    openDetails({ ...movie, season: activity.season || undefined, episode: activity.episode || undefined });
   }
 
   function createGroupSession(movie: Movie) {
@@ -1093,9 +1124,11 @@ export default function Home() {
     );
   }
 
+  if (!authUser) return null;
+
   return (
     <main className="flixa-shell has-mobile-nav">
-      <SiteIntro name={authUser.nome} />
+      {authUser.username ? <SiteIntro name={authUser.nome} /> : null}
       <header className={`flixa-header ${scrolled || searchOpen || view !== "home" ? "is-scrolled" : ""}`}>
         <a className="brand" href="#home" onClick={() => goTo("home")} aria-label="Flixa início">
           <img className="brand-logo" src="/logo-transparent.png" alt="Flixa" />
@@ -1134,6 +1167,7 @@ export default function Home() {
             Minha Lista
             {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
           </a>
+          <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
         </nav>
 
         <div className="header-actions">
@@ -1217,7 +1251,9 @@ export default function Home() {
         </div>
       ) : null}
 
-      {view === "grupo" ? (
+      {view === "amigos" ? (
+        <FriendsView username={authUser.username || ""} onOpenActivity={(activity) => void openFriendActivity(activity)} />
+      ) : view === "grupo" ? (
         <GroupWatchView
           movies={groupCandidates}
           onCreate={createGroupSession}
@@ -1573,6 +1609,24 @@ export default function Home() {
         />
       ) : null}
 
+      {recapMovie ? (
+        <SeriesRecapModal
+          movie={recapMovie}
+          onContinue={() => startPlayer(recapMovie)}
+          onCancel={() => {
+            setRecapMovie(null);
+            if (/^#(?:filme|serie)\//.test(window.location.hash)) setSelectedMovie(recapMovie);
+            const url = new URL(window.location.href);
+            if (url.searchParams.get("party") === "create") {
+              url.searchParams.delete("party");
+              window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+            }
+          }}
+        />
+      ) : null}
+
+      {!authUser.username ? <UsernameSetupModal user={authUser} onComplete={setAuthUser} /> : null}
+
       {toast ? <div className="toast" role="status">{toast}</div> : null}
 
       <nav className="mobile-nav" aria-label="Navegação inferior">
@@ -1592,6 +1646,7 @@ export default function Home() {
         >
           Grupo
         </a>
+        <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
         <a href="#minha-lista" className={view === "lista" ? "is-active" : ""} onClick={() => goTo("minha-lista")}>
           Lista
           {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}

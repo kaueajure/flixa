@@ -109,14 +109,14 @@ export async function POST(request: Request) {
 
   if (!claims) {
     const role: PartyRole = body.action === "create" ? "host" : "guest";
-    claims = newSession(usuario.id, usuario.nome, role, body.roomCode);
+    claims = newSession(usuario.id, usuario.username ? `@${usuario.username}` : usuario.nome, role, body.roomCode);
     if (!claims) return Response.json({ erro: "Código de sala inválido." }, { status: 400 });
   }
 
   const resource = `watch-party:${claims.roomCode}`;
   const operations: CapabilityOp[] = claims.role === "host"
     ? ["publish", "subscribe", "presence", "history"]
-    : ["subscribe", "presence", "history"];
+    : ["publish", "subscribe", "presence", "history"];
 
   try {
     const client = new Rest({ key: ablyKey() });

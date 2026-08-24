@@ -27,7 +27,8 @@ function isMysqlApiPath(pathname: string) {
     pathname === "/api/movies" ||
     pathname === "/api/movies/availability" ||
     pathname === "/api/movies/servers" ||
-    pathname === "/api/watch-party/ticket"
+    pathname === "/api/watch-party/ticket" ||
+    pathname === "/api/amigos"
   );
 }
 
@@ -90,6 +91,7 @@ async function loadRouteModule(pathname: string): Promise<RouteModule | null> {
   if (pathname === "/api/movies/availability") return import("../app/api/movies/availability/route");
   if (pathname === "/api/movies/servers") return import("../app/api/movies/servers/route");
   if (pathname === "/api/watch-party/ticket") return import("../app/api/watch-party/ticket/route");
+  if (pathname === "/api/amigos") return import("../app/api/amigos/route");
   return null;
 }
 

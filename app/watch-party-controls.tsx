@@ -58,6 +58,13 @@ type PartyRealtimeMessage = PartyRoomState & {
   action?: "play" | "pause" | "seek" | "state";
 };
 
+type PartyChatMessage = {
+  id: string;
+  name: string;
+  text: string;
+  sentAt: number;
+};
+
 type AblyAuthResponse = {
   tokenRequest?: TokenRequest;
   session?: string;
@@ -181,6 +188,8 @@ export default function WatchPartyControls({
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [unlocked, setUnlocked] = useState(true);
+  const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
 
   const realtimeRef = useRef<Realtime | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -201,6 +210,8 @@ export default function WatchPartyControls({
   const serverClockOffsetRef = useRef(0);
   const autoJoinAttemptedRef = useRef(false);
   const handledFailureSequenceRef = useRef(0);
+  const lastChatSentAtRef = useRef(0);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
   const sourcesRef = useRef(sources);
   const mediaRef = useRef(media);
   const activeSourceRef = useRef(activeSource);
@@ -235,6 +246,8 @@ export default function WatchPartyControls({
     setParticipants([]);
     setProviderId(null);
     setUnlocked(true);
+    setChatMessages([]);
+    setChatInput("");
     unlockedRef.current = true;
     onSessionProviderChange?.(null);
     if (removeInvite && typeof window !== "undefined") {
@@ -359,6 +372,22 @@ export default function WatchPartyControls({
     }
   }, [closeRealtime, refreshParticipants, resetSession]);
 
+  const handleChatMessage = useCallback((message: InboundMessage) => {
+    const data = message.data as Partial<PartyChatMessage> | null;
+    if (!data || typeof data !== "object" || typeof data.text !== "string") return;
+    const text = data.text.trim().slice(0, 240);
+    const name = typeof data.name === "string" ? data.name.trim().slice(0, 80) : "Convidado";
+    const id = typeof data.id === "string" ? data.id.slice(0, 120) : `${message.clientId}:${message.timestamp}`;
+    if (!text || !id) return;
+    const next: PartyChatMessage = {
+      id,
+      name: name || "Convidado",
+      text,
+      sentAt: Number.isFinite(Number(data.sentAt)) ? Number(data.sentAt) : Number(message.timestamp) || Date.now(),
+    };
+    setChatMessages((current) => current.some((item) => item.id === id) ? current : [...current, next].slice(-60));
+  }, []);
+
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
     if (connecting) return;
     const candidate = mode === "create"
@@ -452,8 +481,18 @@ export default function WatchPartyControls({
       const channel = realtime.channels.get(`watch-party:${code}`);
       channelRef.current = channel;
       await channel.subscribe("party", handleRealtimeMessage);
+      await channel.subscribe("chat", handleChatMessage);
       await channel.presence.subscribe(handlePresenceChange);
       await channel.attach();
+
+      try {
+        const history = await channel.history({ limit: 50, direction: "forwards" });
+        for (const message of history.items) {
+          if (message.name === "chat") handleChatMessage(message);
+        }
+      } catch {
+        // O chat ao vivo continua funcionando mesmo sem histórico anterior.
+      }
 
       let roomState: PartyRoomState;
       if (mode === "create" && candidate) {
@@ -526,6 +565,7 @@ export default function WatchPartyControls({
     closeRealtime,
     connecting,
     handlePresenceChange,
+    handleChatMessage,
     handleRealtimeMessage,
     onSelectSource,
     refreshParticipants,
@@ -714,6 +754,25 @@ export default function WatchPartyControls({
     setError("Seu player apresentou uma falha. Aguardando o anfitrião trocar o servidor para toda a sala.");
   }, [changeProviderForEveryone, providerFailure]);
 
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [chatMessages.length]);
+
+  function sendChat(textValue = chatInput) {
+    const channel = channelRef.current;
+    const text = textValue.trim().slice(0, 240);
+    if (!channel || !roomCodeRef.current || !text || Date.now() - lastChatSentAtRef.current < 600) return;
+    lastChatSentAtRef.current = Date.now();
+    const message: PartyChatMessage = {
+      id: `${clientIdRef.current}:${Date.now()}`,
+      name: participantNameRef.current || "Convidado",
+      text,
+      sentAt: Date.now() + serverClockOffsetRef.current,
+    };
+    setChatInput("");
+    void channel.publish("chat", message).catch(() => setError("Não foi possível enviar a mensagem."));
+  }
+
   const providerName = compatibleSources.find((source) => providerFor(source) === providerId)?.name || providerId;
 
   return (
@@ -781,6 +840,25 @@ export default function WatchPartyControls({
                     <li key={participant.id}><span>{participant.name.slice(0, 1).toUpperCase()}</span>{participant.name}{participant.host ? <em>Anfitrião</em> : null}</li>
                   ))}
                 </ul>
+              </div>
+              <div className="watch-party-chat">
+                <div className="watch-party-chat-head"><strong>Chat da sala</strong><small>{chatMessages.length} mensagens</small></div>
+                <div className="watch-party-chat-messages" aria-live="polite">
+                  {chatMessages.length ? chatMessages.map((message) => (
+                    <article className={message.name === participantNameRef.current ? "is-mine" : ""} key={message.id}>
+                      <small>{message.name}</small>
+                      <p>{message.text}</p>
+                    </article>
+                  )) : <p className="watch-party-chat-empty">Envie a primeira mensagem para a sala.</p>}
+                  <div ref={chatEndRef} />
+                </div>
+                <div className="watch-party-reactions" aria-label="Reações rápidas">
+                  {["😂", "😱", "❤️", "🍿", "👏"].map((emoji) => <button type="button" key={emoji} onClick={() => sendChat(emoji)}>{emoji}</button>)}
+                </div>
+                <form onSubmit={(event) => { event.preventDefault(); sendChat(); }}>
+                  <input value={chatInput} onChange={(event) => setChatInput(event.target.value.slice(0, 240))} placeholder="Mensagem para a sala…" maxLength={240} aria-label="Mensagem para a sala" />
+                  <button type="submit" disabled={!chatInput.trim()}>Enviar</button>
+                </form>
               </div>
               <button type="button" className="watch-party-leave" onClick={leave}>{role === "host" ? "Encerrar sala para todos" : "Sair da sala"}</button>
             </div>

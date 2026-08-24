@@ -19,6 +19,7 @@ export const usuarios = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     nome: varchar("nome", { length: 120 }).notNull(),
+    username: varchar("username", { length: 32 }),
     email: varchar("email", { length: 190 }).notNull(),
     senha: varchar("senha", { length: 255 }).notNull(),
     administrador: tinyint("administrador").notNull().default(0),
@@ -29,7 +30,10 @@ export const usuarios = mysqlTable(
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [uniqueIndex("usuarios_email_unico").on(table.email)],
+  (table) => [
+    uniqueIndex("usuarios_email_unico").on(table.email),
+    uniqueIndex("usuarios_username_unico").on(table.username),
+  ],
 );
 
 /** Sessões de autenticação (cookie flixa_sessao). */
@@ -133,6 +137,36 @@ export const progresso_reproducao = mysqlTable(
   ],
 );
 
+/** Relações de amizade e solicitações entre usuários. */
+export const amizades = mysqlTable(
+  "amizades",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_a_id: int("usuario_a_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    usuario_b_id: int("usuario_b_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    solicitante_id: int("solicitante_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    status: mysqlEnum("status", ["pendente", "aceita"]).notNull().default("pendente"),
+    criado_em: datetime("criado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    atualizado_em: datetime("atualizado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("amizades_par_unico").on(table.usuario_a_id, table.usuario_b_id),
+    index("amizades_usuario_a_idx").on(table.usuario_a_id),
+    index("amizades_usuario_b_idx").on(table.usuario_b_id),
+    index("amizades_status_idx").on(table.status),
+  ],
+);
+
 /** Estado operacional dos provedores externos controlado pelo painel admin. */
 export const servidores_player = mysqlTable(
   "servidores_player",
@@ -161,4 +195,5 @@ export const servidores_player = mysqlTable(
 
 export type Usuario = typeof usuarios.$inferSelect;
 export type Sessao = typeof sessoes.$inferSelect;
+export type Amizade = typeof amizades.$inferSelect;
 export type ServidorPlayer = typeof servidores_player.$inferSelect;

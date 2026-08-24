@@ -10,6 +10,7 @@ export const SESSAO_DIAS = 14;
 export type UsuarioPublico = {
   id: number;
   nome: string;
+  username: string | null;
   email: string;
   administrador: boolean;
 };
@@ -46,6 +47,7 @@ export function paraUsuarioPublico(usuario: Usuario): UsuarioPublico {
   return {
     id: usuario.id,
     nome: usuario.nome,
+    username: usuario.username,
     email: usuario.email,
     administrador: Number(usuario.administrador) === 1,
   };
@@ -105,13 +107,35 @@ export async function autenticarUsuario(email: string, senha: string) {
   });
 }
 
-export async function cadastrarUsuario(input: { nome: string; email: string; senha: string }) {
+export function normalizarUsername(value: string) {
+  return value.trim().toLowerCase().replace(/^@+/, "");
+}
+
+export function validarUsername(value: string) {
+  const username = normalizarUsername(value);
+  if (username.length < 3 || username.length > 20) {
+    return { username, erro: "O username precisa ter entre 3 e 20 caracteres." };
+  }
+  if (!/^[a-z0-9](?:[a-z0-9._]*[a-z0-9])?$/.test(username)) {
+    return { username, erro: "Use apenas letras sem acento, números, ponto ou underline." };
+  }
+  if (["admin", "administrador", "flixa", "moderador", "suporte"].includes(username)) {
+    return { username, erro: "Este username é reservado." };
+  }
+  return { username, erro: null as string | null };
+}
+
+export async function cadastrarUsuario(input: { nome: string; username: string; email: string; senha: string }) {
   const nome = input.nome.trim().replace(/\s+/g, " ");
+  const usernameResult = validarUsername(input.username);
   const email = input.email.trim().toLowerCase();
   const senha = input.senha;
 
   if (nome.length < 2) {
     return { erro: "Informe um nome com pelo menos 2 caracteres.", usuario: null as Usuario | null };
+  }
+  if (usernameResult.erro) {
+    return { erro: usernameResult.erro, usuario: null as Usuario | null };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { erro: "Informe um e-mail válido.", usuario: null as Usuario | null };
@@ -125,10 +149,15 @@ export async function cadastrarUsuario(input: { nome: string; email: string; sen
     if (existentes[0]) {
       return { erro: "Este e-mail já está cadastrado.", usuario: null as Usuario | null };
     }
+    const usernameExistente = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.username, usernameResult.username)).limit(1);
+    if (usernameExistente[0]) {
+      return { erro: "Este username já está em uso.", usuario: null as Usuario | null };
+    }
 
     const agora = agoraSql();
     await db.insert(usuarios).values({
       nome,
+      username: usernameResult.username,
       email,
       senha: hashSenha(senha),
       administrador: 0,
@@ -165,6 +194,7 @@ export async function obterUsuarioPorToken(token: string | null) {
     .select({
       id: usuarios.id,
       nome: usuarios.nome,
+      username: usuarios.username,
       email: usuarios.email,
       senha: usuarios.senha,
       administrador: usuarios.administrador,
@@ -220,6 +250,7 @@ export async function listarUsuariosAdmin() {
       .select({
         id: usuarios.id,
         nome: usuarios.nome,
+        username: usuarios.username,
         email: usuarios.email,
         administrador: usuarios.administrador,
         criado_em: usuarios.criado_em,
@@ -229,6 +260,7 @@ export async function listarUsuariosAdmin() {
     return rows.map((row) => ({
       id: row.id,
       nome: row.nome,
+      username: row.username,
       email: row.email,
       administrador: Number(row.administrador) === 1,
       criado_em: row.criado_em,
