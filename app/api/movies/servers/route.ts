@@ -68,6 +68,16 @@ function manualCheck(server: ServerState, kind: "movie" | "tv") {
   return server.last_diagnostic?.checks?.find((check) => check.kind === kind) ?? null;
 }
 
+function experienceScore(server: ServerState) {
+  const advertisingPoints = server.advertisingProfile === "none-declared"
+    ? 7_000
+    : server.advertisingProfile === "minimal-declared"
+      ? 3_500
+      : 0;
+  const watchPartyPoints = server.watchPartySupport === "full" ? 1_200 : 0;
+  return advertisingPoints + watchPartyPoints;
+}
+
 function storedScore(server: ServerState, kind: "movie" | "tv") {
   const statusPoints = {
     online: 4_000,
@@ -84,6 +94,7 @@ function storedScore(server: ServerState, kind: "movie" | "tv") {
   const latencyPenalty = Math.min(1_500, Math.max(0, server.last_latency_ms ?? 0) / 8);
   return statusPoints
     + manualPoints
+    + experienceScore(server)
     + (server.audioProfile === "pt-BR" ? 700 : 0)
     + (server.protectedEmbedCompatible ? 600 : -1_200)
     - (server.blockedReason ? 2_500 : 0)
@@ -102,6 +113,7 @@ function endpointScore(candidate: SourceCandidate, check: PlayerServerEndpointCh
         : 0;
   return statusPoints
     + confidencePoints
+    + experienceScore(candidate.server)
     + (check.evidence.mediaProbe?.status === "passed" ? 2_500 : 0)
     + (check.evidence.playbackConfirmed ? 4_000 : 0)
     - (check.issues.some((item) => item.code === "PRIMARY_MEDIA_FAILED") ? 7_000 : 0)

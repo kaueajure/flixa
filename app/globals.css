@@ -3814,6 +3814,13 @@ img {
   font-size: 0.78rem;
 }
 
+.watch-party-provider > small {
+  flex-basis: 100%;
+  color: rgba(195, 255, 220, 0.7);
+  font-size: 0.67rem;
+  line-height: 1.35;
+}
+
 .watch-party-people ul {
   display: grid;
   gap: 0.45rem;
@@ -5009,6 +5016,18 @@ body.player-open > div[style*="z-index"] {
 
 .server-audio-profile.is-sub {
   color: #f7d984;
+}
+
+.server-audio-profile.is-low-ads {
+  border-color: rgba(63, 214, 137, 0.28);
+  background: rgba(63, 214, 137, 0.1);
+  color: #84efb4;
+}
+
+.server-audio-profile.is-party {
+  border-color: rgba(151, 136, 255, 0.3);
+  background: rgba(151, 136, 255, 0.1);
+  color: #beb4ff;
 }
 
 .admin-catalog-check {

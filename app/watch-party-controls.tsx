@@ -69,6 +69,12 @@ type AblyAuthResponse = {
 };
 
 const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc", "moviesapi", "vidzen"]);
+const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["cinesrc", "moviesapi", "vidzen"];
+const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
+  cinesrc: "Poucos anúncios · sincronização completa",
+  moviesapi: "Sincronização completa · servidor reserva",
+  vidzen: "Sincronização completa · servidor reserva",
+};
 
 function providerFor(source?: PartySource): PartyProviderId | null {
   if (!source) return null;
@@ -154,6 +160,7 @@ export default function WatchPartyControls({
   onSelectSource,
   onOpenChange,
   onSessionProviderChange,
+  providerFailure,
 }: {
   media: PartyMedia;
   sources: PartySource[];
@@ -162,6 +169,7 @@ export default function WatchPartyControls({
   onSelectSource: (id: string) => void;
   onOpenChange?: (open: boolean) => void;
   onSessionProviderChange?: (providerId: PartyProviderId | null) => void;
+  providerFailure?: { sourceId: string; reason: string; sequence: number } | null;
 }) {
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -192,11 +200,18 @@ export default function WatchPartyControls({
   const lastStateSentAtRef = useRef(0);
   const serverClockOffsetRef = useRef(0);
   const autoJoinAttemptedRef = useRef(false);
+  const handledFailureSequenceRef = useRef(0);
   const sourcesRef = useRef(sources);
   const mediaRef = useRef(media);
   const activeSourceRef = useRef(activeSource);
 
-  const compatibleSources = useMemo(() => sources.filter((source) => providerFor(source)), [sources]);
+  const compatibleSources = useMemo(() => [...sources]
+    .filter((source) => providerFor(source))
+    .sort((left, right) => {
+      const leftProvider = providerFor(left);
+      const rightProvider = providerFor(right);
+      return PARTY_PROVIDER_PRIORITY.indexOf(leftProvider!) - PARTY_PROVIDER_PRIORITY.indexOf(rightProvider!);
+    }), [sources]);
 
   useEffect(() => { sourcesRef.current = sources; }, [sources]);
   useEffect(() => { mediaRef.current = media; }, [media]);
@@ -660,12 +675,16 @@ export default function WatchPartyControls({
     }
   }
 
-  function changeProviderForEveryone() {
-    if (roleRef.current !== "host" || compatibleSources.length < 2) return;
+  const changeProviderForEveryone = useCallback((automaticReason?: string) => {
+    if (roleRef.current !== "host") return false;
+    if (compatibleSources.length < 2) {
+      if (automaticReason) setError("O player da sessão falhou e não há outro servidor sincronizado disponível.");
+      return false;
+    }
     const currentIndex = compatibleSources.findIndex((source) => providerFor(source) === providerRef.current);
     const next = compatibleSources[(currentIndex + 1) % compatibleSources.length];
     const nextProvider = providerFor(next);
-    if (!nextProvider) return;
+    if (!nextProvider) return false;
     providerRef.current = nextProvider;
     setProviderId(nextProvider);
     onSessionProviderChange?.(nextProvider);
@@ -680,7 +699,20 @@ export default function WatchPartyControls({
     pausedRef.current = true;
     window.setTimeout(() => applyPlayback(playback, true), 900);
     publishRoomState("provider", playback, undefined, nextProvider);
-  }
+    setError(automaticReason ? `${automaticReason} Trocando todos para ${next.name}.` : "");
+    return true;
+  }, [applyPlayback, compatibleSources, onSelectSource, onSessionProviderChange, publishRoomState]);
+
+  useEffect(() => {
+    if (!providerFailure || providerFailure.sequence <= handledFailureSequenceRef.current || !roomCodeRef.current) return;
+    handledFailureSequenceRef.current = providerFailure.sequence;
+    if (playerServerIdForSource(providerFailure.sourceId) !== providerRef.current) return;
+    if (roleRef.current === "host") {
+      changeProviderForEveryone(`O servidor anterior falhou (${providerFailure.reason}).`);
+      return;
+    }
+    setError("Seu player apresentou uma falha. Aguardando o anfitrião trocar o servidor para toda a sala.");
+  }, [changeProviderForEveryone, providerFailure]);
 
   const providerName = compatibleSources.find((source) => providerFor(source) === providerId)?.name || providerId;
 
@@ -721,7 +753,7 @@ export default function WatchPartyControls({
                 />
                 <button type="button" disabled={connecting || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
-              <small>{compatibleSources.length ? `${compatibleSources.length} servidor(es) compatível(is) neste título.` : "Aguardando um servidor compatível…"}</small>
+              <small>{compatibleSources.length ? `${compatibleSources.length} servidor(es) sincronizados. CineSrc será priorizado por ter menos anúncios.` : "Aguardando um servidor compatível…"}</small>
             </div>
           ) : (
             <div className="watch-party-room">
@@ -736,7 +768,8 @@ export default function WatchPartyControls({
               <div className="watch-party-provider">
                 <span>Player sincronizado</span>
                 <strong>{providerName}</strong>
-                {role === "host" && compatibleSources.length > 1 ? <button type="button" onClick={changeProviderForEveryone}>Trocar para todos</button> : null}
+                {providerId ? <small>{PARTY_PROVIDER_LABELS[providerId]}</small> : null}
+                {role === "host" && compatibleSources.length > 1 ? <button type="button" onClick={() => changeProviderForEveryone()}>Trocar para todos</button> : null}
               </div>
               {role === "guest" && !unlocked ? (
                 <button type="button" className="watch-party-primary" onClick={unlockAndSync}>Sincronizar meu player</button>

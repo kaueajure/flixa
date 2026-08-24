@@ -66,6 +66,8 @@ type AdminServer = {
   supportsMovie: boolean;
   supportsTv: boolean;
   audioProfile: "pt-BR" | "legendado";
+  advertisingProfile: "none-declared" | "minimal-declared" | "unknown";
+  watchPartySupport: "full" | "none";
   priority: number;
   protectedEmbedCompatible: boolean;
   enabledByDefault: boolean;
@@ -573,7 +575,13 @@ export default function AdminPage() {
                   <tr key={server.id} className={!server.enabled ? "is-disabled" : ""}>
                     <td><ServerStatusBreakdown server={server} /></td>
                     <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{server.blockedReason || !server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Alerta: {server.blockedReason || server.compatibilityMessage || "pode ser incompatível com a proteção anti-pop-up"}</small> : null}</td>
-                    <td>{[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}<small className={`server-audio-profile is-${server.audioProfile === "pt-BR" ? "ptbr" : "sub"}`}>{server.audioProfile === "pt-BR" ? "PT-BR prioritário" : "Legendado"}</small></td>
+                    <td>
+                      {[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}
+                      <small className={`server-audio-profile is-${server.audioProfile === "pt-BR" ? "ptbr" : "sub"}`}>{server.audioProfile === "pt-BR" ? "PT-BR prioritário" : "Legendado"}</small>
+                      {server.advertisingProfile === "none-declared" ? <small className="server-audio-profile is-low-ads">Sem anúncios (declarado)</small> : null}
+                      {server.advertisingProfile === "minimal-declared" ? <small className="server-audio-profile is-low-ads">Poucos anúncios</small> : null}
+                      {server.watchPartySupport === "full" ? <small className="server-audio-profile is-party">Compatível com grupo</small> : null}
+                    </td>
                     <td className="server-last-test"><strong>{formatDate(server.last_tested_at)}</strong><small>{server.last_latency_ms != null ? `${server.last_latency_ms} ms · ` : ""}{server.last_http_status ? `HTTP ${server.last_http_status} · ` : ""}{server.last_message || "Aguardando teste"}</small><ServerDiagnosticDetails diagnostic={server.last_diagnostic} compact /></td>
                     <td><span className={`server-enabled ${server.enabled ? "is-on" : "is-off"}`}>{server.enabled ? "Habilitado" : "Desativado"}</span>{!server.enabled && server.disabled_until ? <small className="server-domain">até {formatDate(server.disabled_until)}</small> : null}</td>
                     <td className="admin-actions server-actions">

@@ -1,4 +1,6 @@
 export type PlayerServerStatus = "unknown" | "online" | "degraded" | "offline";
+export type PlayerServerAdvertisingProfile = "none-declared" | "minimal-declared" | "unknown";
+export type PlayerServerWatchPartySupport = "full" | "none";
 
 export type PlayerServerDefinition = {
   id: string;
@@ -12,24 +14,28 @@ export type PlayerServerDefinition = {
   priority: number;
   protectedEmbedCompatible: boolean;
   enabledByDefault: boolean;
+  advertisingProfile: PlayerServerAdvertisingProfile;
+  watchPartySupport: PlayerServerWatchPartySupport;
   compatibilityMessage?: string;
   blockedReason?: string;
 };
 
-type BasePlayerServer = Omit<PlayerServerDefinition, "audioProfile" | "priority" | "protectedEmbedCompatible" | "enabledByDefault"> & {
+type BasePlayerServer = Omit<PlayerServerDefinition, "audioProfile" | "priority" | "protectedEmbedCompatible" | "enabledByDefault" | "advertisingProfile" | "watchPartySupport"> & {
   protectedEmbedCompatible?: boolean;
+  advertisingProfile?: PlayerServerAdvertisingProfile;
+  watchPartySupport?: PlayerServerWatchPartySupport;
 };
 
 const UNSAFE_EMBED_MESSAGE = "Exige iframe sem sandbox; ficaria livre para abrir anúncios e novas abas";
 
 const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
   { id: "vidlink", name: "VidLink", domain: "vidlink.pro", testUrl: "https://vidlink.pro/movie/550", testTvUrl: "https://vidlink.pro/tv/1399/1/1", supportsMovie: true, supportsTv: true, protectedEmbedCompatible: false, compatibilityMessage: UNSAFE_EMBED_MESSAGE },
-  { id: "moviesapi", name: "MoviesAPI", domain: "moviesapi.to", testUrl: "https://moviesapi.to/movie/550", testTvUrl: "https://moviesapi.to/tv/1399/1/1", supportsMovie: true, supportsTv: true },
-  { id: "vidzen", name: "VidZen", domain: "vidzen.fun", testUrl: "https://vidzen.fun/movie/550", testTvUrl: "https://vidzen.fun/tv/1399/1/1", supportsMovie: true, supportsTv: true },
+  { id: "moviesapi", name: "MoviesAPI", domain: "moviesapi.to", testUrl: "https://moviesapi.to/movie/550", testTvUrl: "https://moviesapi.to/tv/1399/1/1", supportsMovie: true, supportsTv: true, watchPartySupport: "full" },
+  { id: "vidzen", name: "VidZen", domain: "vidzen.fun", testUrl: "https://vidzen.fun/movie/550", testTvUrl: "https://vidzen.fun/tv/1399/1/1", supportsMovie: true, supportsTv: true, watchPartySupport: "full" },
   { id: "vidfast", name: "VidFast", domain: "vidfast.vc", testUrl: "https://vidfast.vc/movie/550?autoPlay=false&sub=pt", testTvUrl: "https://vidfast.vc/tv/1399/1/1?autoPlay=false&sub=pt", supportsMovie: true, supportsTv: true, protectedEmbedCompatible: false, compatibilityMessage: UNSAFE_EMBED_MESSAGE },
   { id: "autoembed-co", name: "AutoEmbed", domain: "autoembed.co", testUrl: "https://autoembed.co/movie/tmdb/550", testTvUrl: "https://autoembed.co/tv/tmdb/1399-1-1", supportsMovie: true, supportsTv: true },
   { id: "vidsrc-link", name: "VidSrc Link", domain: "vidsrc.link", testUrl: "https://vidsrc.link/embed/movie/550", testTvUrl: "https://vidsrc.link/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
-  { id: "vidsrc-wiki", name: "VidSrc Wiki", domain: "vidsrc.wiki", testUrl: "https://vidsrc.wiki/embed/movie/550", testTvUrl: "https://vidsrc.wiki/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
+  { id: "vidsrc-wiki", name: "VidSrc Wiki", domain: "vidsrc.wiki", testUrl: "https://vidsrc.wiki/embed/movie/550", testTvUrl: "https://vidsrc.wiki/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true, advertisingProfile: "none-declared" },
   { id: "vidsrcme", name: "VidSrcMe", domain: "vidsrcme.su", testUrl: "https://vidsrcme.su/embed/movie/550", testTvUrl: "https://vidsrcme.su/embed/tv/1399/1-1", supportsMovie: true, supportsTv: true },
   { id: "vidphantom", name: "VidPhantom", domain: "vidphantom.com", testUrl: "https://vidphantom.com/movie/550", testTvUrl: "https://vidphantom.com/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "yapgrid", name: "YapGrid", domain: "yapgrid.com", testUrl: "https://yapgrid.com/embed/movie/550?lang=pt", testTvUrl: "https://yapgrid.com/embed/tv/1399/1/1?lang=pt", supportsMovie: true, supportsTv: true },
@@ -37,7 +43,7 @@ const BASE_PLAYER_SERVERS: BasePlayerServer[] = [
 
   { id: "ezvidapi", name: "EZVidAPI", domain: "ezvidapi.com", testUrl: "https://ezvidapi.com/embed/movie/550", testTvUrl: "https://ezvidapi.com/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "vidcore", name: "VidCore", domain: "vidcore.org", testUrl: "https://www.vidcore.org/embed/movie/550", testTvUrl: "https://www.vidcore.org/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
-  { id: "cinesrc", name: "CineSrc", domain: "cinesrc.st", testUrl: "https://cinesrc.st/embed/movie/550", testTvUrl: "https://cinesrc.st/embed/tv/1399?s=1&e=1", supportsMovie: true, supportsTv: true },
+  { id: "cinesrc", name: "CineSrc", domain: "cinesrc.st", testUrl: "https://cinesrc.st/embed/movie/550", testTvUrl: "https://cinesrc.st/embed/tv/1399?s=1&e=1", supportsMovie: true, supportsTv: true, advertisingProfile: "minimal-declared", watchPartySupport: "full" },
   { id: "vidsrc-mov", name: "VidSrc MOV", domain: "vidsrc.mov", testUrl: "https://vidsrc.mov/embed/movie/550", testTvUrl: "https://vidsrc.mov/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "cinextream", name: "CineXtream", domain: "cinextream.net", testUrl: "https://cinextream.net/api/embed/movie/550", testTvUrl: "https://cinextream.net/api/embed/tv/1399/1/1", supportsMovie: true, supportsTv: true },
   { id: "embed-api", name: "Embed API", domain: "player.embed-api.stream", testUrl: "https://player.embed-api.stream/?id=550&type=movie", testTvUrl: "https://player.embed-api.stream/?id=1399&s=1&e=1", supportsMovie: true, supportsTv: true },
@@ -80,13 +86,13 @@ const BLOCKED_SERVER_REASONS: Record<string, string> = {
 };
 
 const SERVER_PRIORITY = [
+  "vidsrc-wiki", "cinesrc", "moviesapi", "vidzen", "videasy", "yapgrid",
+  "vidsrc-fyi", "vidfast", "vidlink", "autoembed-co", "vidsrc-link", "vidsrcme",
+  "vidphantom", "vidcore", "vidsrc-mov", "embed-api", "iembed", "mapple",
   "megaembed-br", "cdn-embed", "superflix-pro", "superflix-help", "warezcdn",
   "pomfy", "betterflix", "pipocacine", "redeflix", "megaembedapi",
-  "myembed", "filmesyseries", "vidlink", "moviesapi", "vidzen", "autoembed-co",
-  "vidsrc-link", "vidsrcme", "vidphantom", "ezvidapi", "vidcore",
-  "cinesrc", "vidsrc-mov", "cinextream", "embed-api", "vidapi",
-  "1embed", "iembed", "mapple", "111movies", "2embed",
-  "vidsrc-fyi", "vidfast", "vidsrc-wiki", "yapgrid", "videasy",
+  "myembed", "filmesyseries", "ezvidapi", "cinextream", "vidapi",
+  "1embed", "111movies", "2embed",
 ];
 
 const PRIORITY_BY_ID = new Map(SERVER_PRIORITY.map((id, index) => [id, index]));
@@ -98,6 +104,8 @@ export const PLAYER_SERVERS: PlayerServerDefinition[] = BASE_PLAYER_SERVERS
     priority: PRIORITY_BY_ID.get(server.id) ?? 999,
     protectedEmbedCompatible: server.protectedEmbedCompatible !== false,
     enabledByDefault: true,
+    advertisingProfile: server.advertisingProfile ?? "unknown",
+    watchPartySupport: server.watchPartySupport ?? "none",
     blockedReason: BLOCKED_SERVER_REASONS[server.id],
   }))
   .sort((a, b) => a.priority - b.priority);

@@ -3386,11 +3386,20 @@ function buildPlayerSources(
     return true;
   }).map((source) => {
     const server = getPlayerServer(playerServerIdForSource(source.id));
+    const experienceHint = server?.advertisingProfile === "none-declared"
+      ? "Sem anúncios (declarado pelo provedor)"
+      : server?.advertisingProfile === "minimal-declared" && server.watchPartySupport === "full"
+        ? "Poucos anúncios · Sessão sincronizada"
+        : server?.watchPartySupport === "full"
+          ? "Sessão sincronizada"
+          : server?.audioProfile === "legendado"
+            ? "Legendado"
+            : "PT-BR prioritário";
     return {
       ...source,
       audioProfile: server?.audioProfile ?? "pt-BR",
       priority: server?.priority ?? 999,
-      hint: server?.audioProfile === "legendado" ? "Legendado" : "PT-BR prioritário",
+      hint: experienceHint,
     };
   }).sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
 }
@@ -3534,6 +3543,7 @@ function MoviePlayer({
   const [failedSourceIds, setFailedSourceIds] = useState<Set<string>>(() => new Set());
   const [serverNotice, setServerNotice] = useState("");
   const [partyProviderId, setPartyProviderId] = useState<string | null>(null);
+  const [partyFailure, setPartyFailure] = useState<{ sourceId: string; reason: string; sequence: number } | null>(null);
   const availableSources = useMemo(() => buildPlayerSources(
     movie,
     isTv ? season : undefined,
@@ -3649,7 +3659,8 @@ function MoviePlayer({
 
   const switchToNextSource = useCallback((failedId: string, reason: string) => {
     if (partyProviderId) {
-      setServerNotice(`O player da sessão falhou (${reason}). O anfitrião pode usar “Trocar para todos” na sala.`);
+      setPartyFailure((current) => ({ sourceId: failedId, reason, sequence: (current?.sequence ?? 0) + 1 }));
+      setServerNotice(`O player da sessão falhou (${reason}). Tentando trocar o servidor para o grupo…`);
       return;
     }
     const failed = new Set(failedSourceIds);
@@ -4032,6 +4043,7 @@ function MoviePlayer({
             onSelectSource={selectPlayerSource}
             onOpenChange={setMenuPinned}
             onSessionProviderChange={setPartyProviderId}
+            providerFailure={partyFailure}
           />
         </div>
         {isFullscreen ? (
