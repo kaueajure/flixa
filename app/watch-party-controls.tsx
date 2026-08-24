@@ -10,7 +10,7 @@ import {
 } from "ably";
 import { playerServerIdForSource } from "../lib/player-servers";
 
-type PartyProviderId = "xpass" | "cinesrc" | "moviesapi";
+type PartyProviderId = "xpass" | "cinesrc";
 
 type PartySource = {
   id: string;
@@ -75,17 +75,15 @@ type AblyAuthResponse = {
   erro?: string;
 };
 
-const PARTY_PROVIDERS = new Set<PartyProviderId>(["xpass", "cinesrc", "moviesapi"]);
-const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["xpass", "cinesrc", "moviesapi"];
+const PARTY_PROVIDERS = new Set<PartyProviderId>(["xpass", "cinesrc"]);
+const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["cinesrc", "xpass"];
 const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
-  xpass: "Português detectado · comandos validados sem sandbox",
-  cinesrc: "Sem pop-up observado · comandos validados",
-  moviesapi: "Fallback · compatibilidade ampliada sem sandbox",
+  xpass: "Áudio PT-BR não confirmado · comandos validados",
+  cinesrc: "Áudio PT-BR não confirmado · sem pop-up observado",
 };
 const PARTY_PROVIDER_ORIGINS: Record<PartyProviderId, string> = {
   xpass: "https://play.xpass.top",
   cinesrc: "https://cinesrc.st",
-  moviesapi: "https://moviesapi.to",
 };
 
 function providerFor(source?: PartySource): PartyProviderId | null {
@@ -164,9 +162,6 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
     eventName = data.type.slice("cinesrc:".length);
     command = typeof data.command === "string" ? data.command : "";
     result = data.result;
-  } else {
-    if (data.source !== "moviesapi-player" || typeof data.event !== "string") return null;
-    eventName = data.event;
   }
 
   // XPass currently reports the seek destination in `from`, despite the field name.
@@ -864,7 +859,7 @@ export default function WatchPartyControls({
           {!roomCode ? (
             <div className="watch-party-join">
               <p>{compatibleSources.length
-                ? "Play, pausa e avanço ficam sincronizados. Na sala, somente os bridges validados abrem sem sandbox para ampliar a compatibilidade."
+                ? "Play, pausa e avanço ficam sincronizados. Os bridges atuais não confirmaram áudio PT-BR para este título."
                 : "Nenhum bridge de grupo está disponível para este título."}</p>
               <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
                 {connecting ? "Conectando…" : "Criar uma sala"}
@@ -881,7 +876,7 @@ export default function WatchPartyControls({
                 <button type="button" disabled={connecting || compatibleSources.length === 0 || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
               <small>{compatibleSources.length
-                ? `${compatibleSources.length} bridges com comandos reais; áudio PT-BR só é indicado quando a faixa do título for confirmada.`
+                ? `${compatibleSources.length} bridges com comandos reais; nenhum é apresentado como dublado sem confirmação da faixa.`
                 : "Nenhum player passou nos requisitos de sandbox e sincronização para este título."}</small>
             </div>
           ) : (

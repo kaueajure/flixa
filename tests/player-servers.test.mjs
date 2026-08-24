@@ -4,7 +4,7 @@ import test from "node:test";
 import { PLAYER_SERVERS } from "../lib/player-servers.ts";
 
 const curatedServerIds = [
-  "pipocacine", "cdn-embed", "cinezo", "screenscape", "xpass", "cinesrc", "moviesapi", "unlimplay",
+  "pipocacine", "cdn-embed", "cinezo", "screenscape", "xpass", "cinesrc", "unlimplay",
   "vidsrc-wiki", "videasy", "autoembed-co", "vidphantom", "embed-api", "iembed",
 ];
 
@@ -29,18 +29,16 @@ test("registers usable endpoints for every declared media kind", () => {
 
 test("advertises only watch-party bridges with end-to-end command proof", () => {
   const partyServers = PLAYER_SERVERS.filter((server) => server.watchPartySupport === "full");
-  assert.deepEqual(partyServers.map((server) => server.id), ["xpass", "cinesrc", "moviesapi"]);
+  assert.deepEqual(partyServers.map((server) => server.id), ["xpass", "cinesrc"]);
   for (const server of partyServers) assert.match(server.compatibilityMessage, /Bridge|bridge/);
 });
 
 test("prefers Portuguese audio only where the provider supports it", () => {
-  const xpass = PLAYER_SERVERS.find((server) => server.id === "xpass");
   const screenscape = PLAYER_SERVERS.find((server) => server.id === "screenscape");
-  assert.match(xpass.compatibilityMessage, /Portuguese/);
   assert.match(screenscape.testUrl, /[?&]lan=por(?:&|$)/);
   assert.deepEqual(
     PLAYER_SERVERS.filter((server) => server.prioritizesPortugueseAudio).map((server) => server.id),
-    ["pipocacine", "cdn-embed", "screenscape", "xpass"],
+    ["pipocacine", "cdn-embed", "screenscape"],
   );
 
   for (const server of PLAYER_SERVERS) {
