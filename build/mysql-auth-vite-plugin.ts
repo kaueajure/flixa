@@ -1,12 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createRequire } from "node:module";
 import type { Connect, Plugin } from "vite";
 import { config as loadEnv } from "dotenv";
-
-const require = createRequire(import.meta.url);
-const { attachWatchPartyServer } = require("../realtime/watch-party.cjs") as {
-  attachWatchPartyServer: (server: object) => void;
-};
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -109,7 +103,6 @@ export function mysqlAuth(): Plugin {
     configureServer(server) {
       loadEnv({ path: ".env.local", override: false });
       loadEnv({ path: ".env", override: false });
-      if (server.httpServer) attachWatchPartyServer(server.httpServer);
 
       const handler: Connect.NextHandleFunction = async (req, res, next) => {
         const pathname = requestPath(req.url);

@@ -1,7 +1,6 @@
 const http = require("node:http");
 const path = require("node:path");
 const { config: loadEnv } = require("dotenv");
-const { attachWatchPartyServer } = require("./realtime/watch-party.cjs");
 
 loadEnv({ path: ".env.local", override: false, quiet: true });
 loadEnv({ path: ".env", override: false, quiet: true });
@@ -31,7 +30,6 @@ let handleRequest = (_req, res) => {
 const server = http.createServer((req, res) => {
   handleRequest(req, res);
 });
-attachWatchPartyServer(server);
 
 // Obrigatório: listen síncrono para o lsnode.
 server.listen(port, "127.0.0.1");

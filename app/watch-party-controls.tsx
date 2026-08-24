@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  Realtime,
+  type InboundMessage,
+  type PresenceMessage,
+  type RealtimeChannel,
+  type TokenRequest,
+} from "ably";
 import { playerServerIdForSource } from "../lib/player-servers";
 
 type PartyProviderId = "cinesrc" | "moviesapi" | "vidzen";
@@ -33,6 +40,33 @@ type PartyParticipant = {
 };
 
 type PartyRole = "host" | "guest" | "";
+
+type PartyRoomState = {
+  media: PartyMedia;
+  providerId: PartyProviderId;
+  playback: PartyPlayback;
+};
+
+type PartyPresenceData = {
+  name?: string;
+  role?: PartyRole;
+  state?: PartyRoomState;
+};
+
+type PartyRealtimeMessage = PartyRoomState & {
+  type: "sync" | "provider" | "roomClosed";
+  action?: "play" | "pause" | "seek" | "state";
+};
+
+type AblyAuthResponse = {
+  tokenRequest?: TokenRequest;
+  session?: string;
+  roomCode?: string;
+  role?: PartyRole;
+  clientId?: string;
+  name?: string;
+  erro?: string;
+};
 
 const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc", "moviesapi", "vidzen"]);
 
@@ -140,9 +174,13 @@ export default function WatchPartyControls({
   const [copied, setCopied] = useState(false);
   const [unlocked, setUnlocked] = useState(true);
 
-  const wsRef = useRef<WebSocket | null>(null);
+  const realtimeRef = useRef<Realtime | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const clientIdRef = useRef("");
+  const hostClientIdRef = useRef("");
+  const sessionRef = useRef("");
+  const participantNameRef = useRef("");
   const roleRef = useRef<PartyRole>("");
   const roomCodeRef = useRef("");
   const providerRef = useRef<PartyProviderId | null>(null);
@@ -174,6 +212,8 @@ export default function WatchPartyControls({
     roomCodeRef.current = "";
     roleRef.current = "";
     providerRef.current = null;
+    hostClientIdRef.current = "";
+    sessionRef.current = "";
     pendingPlaybackRef.current = null;
     setRoomCode("");
     setRole("");
@@ -190,6 +230,15 @@ export default function WatchPartyControls({
       }
     }
   }, [onSessionProviderChange]);
+
+  const closeRealtime = useCallback((leavePresence = true) => {
+    const channel = channelRef.current;
+    const realtime = realtimeRef.current;
+    channelRef.current = null;
+    realtimeRef.current = null;
+    if (leavePresence && channel) void channel.presence.leave().catch(() => undefined);
+    realtime?.close();
+  }, []);
 
   const applyPlayback = useCallback((playback: PartyPlayback, force = false) => {
     pendingPlaybackRef.current = playback;
@@ -223,97 +272,77 @@ export default function WatchPartyControls({
     return true;
   }, [applyPlayback, onSelectSource, onSessionProviderChange]);
 
-  const handleSocketMessage = useCallback((raw: string) => {
-    let message: Record<string, unknown>;
-    try {
-      message = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      return;
+  const refreshParticipants = useCallback(async () => {
+    const channel = channelRef.current;
+    if (!channel) return [];
+    const members = await channel.presence.get();
+    if (channelRef.current !== channel) return [];
+    const unique = new Map<string, PartyParticipant>();
+    for (const member of members) {
+      const data = member.data && typeof member.data === "object" ? member.data as PartyPresenceData : {};
+      unique.set(member.clientId, {
+        id: member.clientId,
+        name: String(data.name || "Convidado").slice(0, 80),
+        host: member.clientId === hostClientIdRef.current,
+      });
     }
-    const type = String(message.type || "");
-    const serverNow = Number(message.serverNow);
-    if (Number.isFinite(serverNow)) serverClockOffsetRef.current = serverNow - Date.now();
-    if (type === "connected") {
-      clientIdRef.current = String(message.clientId || "");
-      return;
-    }
-    if (type === "error") {
-      setError(String(message.message || "Não foi possível entrar na sessão."));
-      setConnecting(false);
-      return;
-    }
-    if (type === "joined") {
-      const joinedMedia = message.media as PartyMedia | undefined;
-      const currentMedia = mediaRef.current;
-      const sameEpisode = currentMedia.kind !== "tv" || (
-        Number(joinedMedia?.season) === Number(currentMedia.season) &&
-        Number(joinedMedia?.episode) === Number(currentMedia.episode)
-      );
-      if (!joinedMedia || joinedMedia.id !== currentMedia.id || joinedMedia.kind !== currentMedia.kind || !sameEpisode) {
-        wsRef.current?.send(JSON.stringify({ type: "leave" }));
-        setError(`Esta sala está assistindo outro ${joinedMedia?.kind === "tv" ? "episódio" : "filme"}. Abra o link completo do convite.`);
-        setConnecting(false);
-        return;
-      }
-      const nextRole = message.role === "host" ? "host" : "guest";
-      const nextProvider = String(message.providerId || "") as PartyProviderId;
-      const playback = message.playback as PartyPlayback;
-      const code = String(message.roomCode || "");
-      roomCodeRef.current = code;
-      roleRef.current = nextRole;
-      setRoomCode(code);
-      setRole(nextRole);
-      setParticipants(Array.isArray(message.participants) ? message.participants as PartyParticipant[] : []);
-      setConnecting(false);
-      setError("");
-      const canControl = nextRole === "host";
-      setUnlocked(canControl);
-      unlockedRef.current = canControl;
-      if (!selectProvider(nextProvider, playback)) return;
-      const url = new URL(window.location.href);
-      url.searchParams.set("party", code);
-      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-      return;
-    }
-    if (type === "participants") {
-      const list = Array.isArray(message.participants) ? message.participants as PartyParticipant[] : [];
-      setParticipants(list);
-      const me = list.find((participant) => participant.id === clientIdRef.current);
-      if (me) {
-        const nextRole = me.host ? "host" : "guest";
-        roleRef.current = nextRole;
-        setRole(nextRole);
-      }
-      return;
-    }
-    if (type === "hostChanged") {
-      const nextRole = String(message.hostClientId || "") === clientIdRef.current ? "host" : "guest";
-      roleRef.current = nextRole;
-      setRole(nextRole);
-      if (nextRole === "host") {
-        setUnlocked(true);
-        unlockedRef.current = true;
-        setError("Você agora controla a sessão.");
-      }
-      return;
-    }
-    if (type === "sync") {
-      applyPlayback(message.playback as PartyPlayback, String(message.action || "") === "seek");
-      return;
-    }
-    if (type === "provider") {
-      selectProvider(String(message.providerId || "") as PartyProviderId, message.playback as PartyPlayback);
-      setError("O anfitrião trocou o servidor para todos.");
-      return;
-    }
-    if (type === "roomClosed") {
-      setError("O anfitrião encerrou a sessão.");
-      wsRef.current?.close();
+    const list = [...unique.values()].sort((a, b) => Number(b.host) - Number(a.host));
+    setParticipants(list);
+    return list;
+  }, []);
+
+  const publishRoomState = useCallback((
+    type: PartyRealtimeMessage["type"],
+    playback: PartyPlayback,
+    action?: PartyRealtimeMessage["action"],
+    selectedProvider = providerRef.current,
+  ) => {
+    const channel = channelRef.current;
+    if (!channel || roleRef.current !== "host" || !selectedProvider) return;
+    const state: PartyRoomState = {
+      media: mediaRef.current,
+      providerId: selectedProvider,
+      playback,
+    };
+    pendingPlaybackRef.current = playback;
+    void Promise.all([
+      channel.publish("party", { type, action, ...state } satisfies PartyRealtimeMessage),
+      channel.presence.update({ name: participantNameRef.current, role: "host", state } satisfies PartyPresenceData),
+    ]).catch(() => setError("A sincronização com a sala foi interrompida. Tentando reconectar…"));
+  }, []);
+
+  const handleRealtimeMessage = useCallback((message: InboundMessage) => {
+    if (!hostClientIdRef.current || message.clientId !== hostClientIdRef.current || message.clientId === clientIdRef.current) return;
+    const data = message.data as Partial<PartyRealtimeMessage> | null;
+    if (!data || typeof data !== "object") return;
+    if (Number.isFinite(message.timestamp)) serverClockOffsetRef.current = message.timestamp - Date.now();
+    if (data.type === "roomClosed") {
+      closeRealtime();
       resetSession();
+      setError("O anfitrião encerrou a sessão.");
       return;
     }
-    if (type === "left") resetSession();
-  }, [applyPlayback, resetSession, selectProvider]);
+    if (!data.playback || !data.providerId || !PARTY_PROVIDERS.has(data.providerId)) return;
+    if (data.type === "sync") {
+      applyPlayback(data.playback, data.action === "seek");
+    } else if (data.type === "provider") {
+      selectProvider(data.providerId, data.playback);
+      setError("O anfitrião trocou o servidor para todos.");
+    }
+  }, [applyPlayback, closeRealtime, resetSession, selectProvider]);
+
+  const handlePresenceChange = useCallback((member: PresenceMessage) => {
+    void refreshParticipants().catch(() => undefined);
+    if (
+      roleRef.current === "guest" &&
+      member.clientId === hostClientIdRef.current &&
+      (member.action === "leave" || member.action === "absent")
+    ) {
+      closeRealtime(false);
+      resetSession(false);
+      setError("O anfitrião se desconectou e a sala foi encerrada.");
+    }
+  }, [closeRealtime, refreshParticipants, resetSession]);
 
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
     if (connecting) return;
@@ -325,63 +354,170 @@ export default function WatchPartyControls({
       updateOpen(true);
       return;
     }
-    const code = normalizeRoomCode(requestedCode);
-    if (mode === "join" && code.length !== 6) {
+    const requestedRoomCode = normalizeRoomCode(requestedCode);
+    if (mode === "join" && requestedRoomCode.length !== 6) {
       setError("Digite o código de 6 caracteres da sala.");
       updateOpen(true);
       return;
     }
+
     setConnecting(true);
     setError("");
     updateOpen(true);
+    closeRealtime();
+
     try {
       const response = await fetch("/api/watch-party/ticket", {
         method: "POST",
         credentials: "include",
         cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: mode, roomCode: requestedRoomCode }),
       });
-      const data = await response.json() as { ticket?: string; erro?: string };
-      if (!response.ok || !data.ticket) throw new Error(data.erro || "Não foi possível autenticar a sessão.");
-      wsRef.current?.close();
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      // O prefixo `vite-` faz o adaptador local ignorar este canal próprio,
-      // enquanto o servidor WebSocket do Flixa continua negociando o protocolo.
-      const socket = new WebSocket(
-        `${protocol}//${window.location.host}/api/watch-party/socket?ticket=${encodeURIComponent(data.ticket)}`,
-        "vite-watch-party",
+      const data = await response.json() as AblyAuthResponse;
+      if (!response.ok || !data.tokenRequest || !data.session || !data.roomCode || !data.clientId || !data.role) {
+        throw new Error(data.erro || "Não foi possível autenticar a sessão.");
+      }
+
+      const code = data.roomCode;
+      let initialToken: TokenRequest | null = data.tokenRequest;
+      sessionRef.current = data.session;
+      participantNameRef.current = String(data.name || "Convidado").slice(0, 80);
+      clientIdRef.current = data.clientId;
+
+      const realtime = new Realtime({
+        autoConnect: false,
+        authCallback: (_params, callback) => {
+          if (initialToken) {
+            const token = initialToken;
+            initialToken = null;
+            callback(null, token);
+            return;
+          }
+          void fetch("/api/watch-party/ticket", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "refresh", session: sessionRef.current }),
+          }).then(async (refreshResponse) => {
+            const refreshed = await refreshResponse.json() as AblyAuthResponse;
+            if (!refreshResponse.ok || !refreshed.tokenRequest) throw new Error(refreshed.erro || "A sessão expirou.");
+            if (refreshed.session) sessionRef.current = refreshed.session;
+            callback(null, refreshed.tokenRequest);
+          }).catch((cause) => callback(cause instanceof Error ? cause.message : "Falha ao renovar a sessão.", null));
+        },
+      });
+      realtimeRef.current = realtime;
+      realtime.connection.on("suspended", () => setError("Conexão instável. O Ably está tentando reconectar…"));
+      realtime.connection.on("failed", (change) => {
+        setConnecting(false);
+        setError(change.reason?.message || "A conexão em tempo real com o Ably falhou.");
+      });
+      realtime.connect();
+
+      let timeoutId = 0;
+      await Promise.race([
+        realtime.connection.whenState("connected"),
+        realtime.connection.whenState("failed").then((change) => {
+          throw new Error(change?.reason?.message || "O Ably recusou a conexão.");
+        }),
+        new Promise((_, reject) => {
+          timeoutId = window.setTimeout(() => reject(new Error("O Ably demorou demais para responder.")), 15_000);
+        }),
+      ]).finally(() => window.clearTimeout(timeoutId));
+      if (realtimeRef.current !== realtime) return;
+
+      try {
+        serverClockOffsetRef.current = await realtime.time() - Date.now();
+      } catch {
+        serverClockOffsetRef.current = 0;
+      }
+
+      const channel = realtime.channels.get(`watch-party:${code}`);
+      channelRef.current = channel;
+      await channel.subscribe("party", handleRealtimeMessage);
+      await channel.presence.subscribe(handlePresenceChange);
+      await channel.attach();
+
+      let roomState: PartyRoomState;
+      if (mode === "create" && candidate) {
+        const nextProvider = providerFor(candidate);
+        if (!nextProvider) throw new Error("O player escolhido não permite sincronização.");
+        onSelectSource(candidate.id);
+        const playback: PartyPlayback = {
+          paused: true,
+          currentTime: 0,
+          updatedAt: Date.now() + serverClockOffsetRef.current,
+          sequence: 0,
+        };
+        roomState = { media: mediaRef.current, providerId: nextProvider, playback };
+        hostClientIdRef.current = data.clientId;
+        await channel.presence.enter({ name: participantNameRef.current, role: "host", state: roomState } satisfies PartyPresenceData);
+        await channel.publish("party", { type: "sync", action: "state", ...roomState } satisfies PartyRealtimeMessage);
+      } else {
+        const members = await channel.presence.get();
+        const host = members.find((member) => {
+          const presence = member.data && typeof member.data === "object" ? member.data as PartyPresenceData : {};
+          return member.clientId.startsWith("host:") && presence.role === "host" && presence.state;
+        });
+        if (!host) throw new Error("Sala não encontrada ou o anfitrião está desconectado.");
+        if (members.length >= 12) throw new Error("Esta sala atingiu o limite de 12 participantes.");
+        hostClientIdRef.current = host.clientId;
+        roomState = (host.data as PartyPresenceData).state as PartyRoomState;
+        const joinedMedia = roomState.media;
+        const currentMedia = mediaRef.current;
+        const sameEpisode = currentMedia.kind !== "tv" || (
+          Number(joinedMedia?.season) === Number(currentMedia.season) &&
+          Number(joinedMedia?.episode) === Number(currentMedia.episode)
+        );
+        if (!joinedMedia || joinedMedia.id !== currentMedia.id || joinedMedia.kind !== currentMedia.kind || !sameEpisode) {
+          throw new Error(`Esta sala está assistindo outro ${joinedMedia?.kind === "tv" ? "episódio" : "filme"}. Abra o link completo do convite.`);
+        }
+        await channel.presence.enter({ name: participantNameRef.current, role: "guest" } satisfies PartyPresenceData);
+      }
+
+      const joinedMedia = roomState.media;
+      const currentMedia = mediaRef.current;
+      const sameEpisode = currentMedia.kind !== "tv" || (
+        Number(joinedMedia?.season) === Number(currentMedia.season) &&
+        Number(joinedMedia?.episode) === Number(currentMedia.episode)
       );
-      wsRef.current = socket;
-      socket.addEventListener("open", () => {
-        if (mode === "create" && candidate) {
-          const nextProvider = providerFor(candidate);
-          if (!nextProvider) return;
-          onSelectSource(candidate.id);
-          socket.send(JSON.stringify({ type: "create", providerId: nextProvider, media: mediaRef.current }));
-        } else {
-          socket.send(JSON.stringify({ type: "join", roomCode: code }));
-        }
-      });
-      socket.addEventListener("message", (event) => handleSocketMessage(String(event.data)));
-      socket.addEventListener("error", () => {
-        setError("A conexão em tempo real falhou. Confira se o servidor aceita WebSocket.");
-        setConnecting(false);
-      });
-      socket.addEventListener("close", (event) => {
-        if (wsRef.current !== socket) return;
-        setConnecting(false);
-        if (roomCodeRef.current) {
-          const detail = event.code === 1006
-            ? "O canal em tempo real foi interrompido sem resposta do servidor."
-            : `O canal em tempo real foi encerrado (código ${event.code}).`;
-          setError(detail);
-          resetSession(false);
-        }
-      });
+      if (!joinedMedia || joinedMedia.id !== currentMedia.id || joinedMedia.kind !== currentMedia.kind || !sameEpisode) {
+        throw new Error(`Esta sala está assistindo outro ${joinedMedia?.kind === "tv" ? "episódio" : "filme"}. Abra o link completo do convite.`);
+      }
+
+      roomCodeRef.current = code;
+      roleRef.current = data.role;
+      setRoomCode(code);
+      setRole(data.role);
+      const canControl = data.role === "host";
+      setUnlocked(canControl);
+      unlockedRef.current = canControl;
+      if (!selectProvider(roomState.providerId, roomState.playback)) throw new Error("O player da sala não está disponível neste título.");
+      await refreshParticipants();
+      setConnecting(false);
+      setError("");
+      const url = new URL(window.location.href);
+      url.searchParams.set("party", code);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     } catch (cause) {
+      closeRealtime();
+      resetSession(false);
       setConnecting(false);
       setError(cause instanceof Error ? cause.message : "Não foi possível abrir a sessão.");
     }
-  }, [connecting, handleSocketMessage, onSelectSource, resetSession, updateOpen]);
+  }, [
+    closeRealtime,
+    connecting,
+    handlePresenceChange,
+    handleRealtimeMessage,
+    onSelectSource,
+    refreshParticipants,
+    resetSession,
+    selectProvider,
+    updateOpen,
+  ]);
 
   useEffect(() => {
     if (autoJoinAttemptedRef.current || compatibleSources.length === 0) return;
@@ -455,15 +591,14 @@ export default function WatchPartyControls({
       }
 
       if (roleRef.current !== "host" || !roomCodeRef.current || Date.now() < applyingRemoteUntilRef.current) return;
-      const socket = wsRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) return;
       const emitSync = (action: "play" | "pause" | "seek" | "state") => {
-        socket.send(JSON.stringify({
-          type: "sync",
-          action,
+        const playback: PartyPlayback = {
           currentTime: currentTimeRef.current,
           paused: pausedRef.current,
-        }));
+          updatedAt: Date.now() + serverClockOffsetRef.current,
+          sequence: (pendingPlaybackRef.current?.sequence || 0) + 1,
+        };
+        publishRoomState("sync", playback, action);
       };
       if (playerEvent.name === "play") emitSync("play");
       else if (playerEvent.name === "pause" || playerEvent.name === "ended") emitSync("pause");
@@ -475,13 +610,13 @@ export default function WatchPartyControls({
     };
     window.addEventListener("message", onPlayerMessage);
     return () => window.removeEventListener("message", onPlayerMessage);
-  }, [applyPlayback, playerRef]);
+  }, [applyPlayback, playerRef, publishRoomState]);
 
   useEffect(() => () => {
     onOpenChange?.(false);
-    wsRef.current?.close();
+    closeRealtime();
     onSessionProviderChange?.(null);
-  }, [onOpenChange, onSessionProviderChange]);
+  }, [closeRealtime, onOpenChange, onSessionProviderChange]);
 
   function unlockAndSync() {
     setUnlocked(true);
@@ -489,9 +624,27 @@ export default function WatchPartyControls({
     if (pendingPlaybackRef.current) applyPlayback(pendingPlaybackRef.current, true);
   }
 
-  function leave() {
-    wsRef.current?.send(JSON.stringify({ type: roleRef.current === "host" ? "close" : "leave" }));
-    window.setTimeout(() => wsRef.current?.close(), 80);
+  async function leave() {
+    const channel = channelRef.current;
+    if (roleRef.current === "host" && channel && providerRef.current) {
+      const playback: PartyPlayback = {
+        paused: pausedRef.current,
+        currentTime: currentTimeRef.current,
+        updatedAt: Date.now() + serverClockOffsetRef.current,
+        sequence: (pendingPlaybackRef.current?.sequence || 0) + 1,
+      };
+      try {
+        await channel.publish("party", {
+          type: "roomClosed",
+          media: mediaRef.current,
+          providerId: providerRef.current,
+          playback,
+        } satisfies PartyRealtimeMessage);
+      } catch {
+        // A saída local continua mesmo se a última mensagem não puder ser entregue.
+      }
+    }
+    closeRealtime();
     resetSession();
   }
 
@@ -526,11 +679,7 @@ export default function WatchPartyControls({
     pendingPlaybackRef.current = playback;
     pausedRef.current = true;
     window.setTimeout(() => applyPlayback(playback, true), 900);
-    wsRef.current?.send(JSON.stringify({
-      type: "provider",
-      providerId: nextProvider,
-      currentTime: currentTimeRef.current,
-    }));
+    publishRoomState("provider", playback, undefined, nextProvider);
   }
 
   const providerName = compatibleSources.find((source) => providerFor(source) === providerId)?.name || providerId;

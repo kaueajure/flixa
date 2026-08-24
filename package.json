@@ -21,14 +21,14 @@
     "db:seed": "node scripts/db-seed.mjs"
   },
   "dependencies": {
+    "ably": "^2.27.0",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "0.45.2",
     "mysql2": "^3.23.3",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "vinext": "0.0.50",
-    "ws": "^8.21.3"
+    "vinext": "0.0.50"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -37,7 +37,6 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "dotenv": "^17.4.2",
