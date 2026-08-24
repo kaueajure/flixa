@@ -11,6 +11,7 @@ import FriendsView, { type FriendActivity } from "./friends-view";
 import LoginForm from "./login-form";
 import SeriesRecapModal from "./series-recap-modal";
 import SiteIntro from "./site-intro";
+import SportsView from "./sports-view";
 import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
 
@@ -47,7 +48,7 @@ type Movie = {
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "lista" | "surpreenda-me" | "grupo" | "amigos";
+type View = "home" | "filmes" | "series" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos";
 type AuthUser = {
   id: number;
   nome: string;
@@ -366,6 +367,7 @@ function parseRoute(hash: string) {
     };
   }
   if (raw === "minha-lista" || raw === "lista") return { view: "lista" as View };
+  if (raw === "esportes" || raw === "sports") return { view: "esportes" as View };
   if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
   if (raw === "assistir-em-grupo" || raw === "grupo") return { view: "grupo" as View };
   if (raw === "amigos" || raw === "amizades") return { view: "amigos" as View };
@@ -691,6 +693,7 @@ export default function Home() {
       if (
         route.view === "filmes" ||
         route.view === "series" ||
+        route.view === "esportes" ||
         route.view === "lista" ||
         route.view === "surpreenda-me" ||
         route.view === "grupo" ||
@@ -1144,6 +1147,9 @@ export default function Home() {
           <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
             Séries
           </a>
+          <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
+            Esportes
+          </a>
           <a
             href="#surpreenda-me"
             className={view === "surpreenda-me" ? "is-active" : ""}
@@ -1251,7 +1257,9 @@ export default function Home() {
         </div>
       ) : null}
 
-      {view === "amigos" ? (
+      {view === "esportes" ? (
+        <SportsView />
+      ) : view === "amigos" ? (
         <FriendsView username={authUser.username || ""} onOpenActivity={(activity) => void openFriendActivity(activity)} />
       ) : view === "grupo" ? (
         <GroupWatchView
@@ -1638,6 +1646,9 @@ export default function Home() {
         </a>
         <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
           Séries
+        </a>
+        <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
+          Esportes
         </a>
         <a
           href="#assistir-em-grupo"
@@ -2898,7 +2909,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /cdn-embed\.com|superflixapi|warezcdn|111movies\.net|2embed\.online|myembed\.biz|filmesyseries\.epizy\.com|vidlink\.pro|vidsrc|vidfast\.vc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|ezvidapi\.com|vidcore\.org|cinesrc\.st|cinextream\.net|embed-api\.stream|vaplayer\.com|1embed\.cc|iembed\.codeera\.dev|mapple\.uk|mgeb\.top|pipocacine\.lat|redeflixapi\.store|api\.pomfy\.stream|betterflix\.lat|megaembedapi\.site|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
+  return /cdn-embed\.com|superflixapi|warezcdn|2embed\.(?:online|skin|cc|stream)|myembed\.biz|filmesyseries\.epizy\.com|vidsrc|vidphantom\.com|autoembed\.co|moviesapi\.to|yapgrid\.com|videasy\.(?:net|to)|ezvidapi\.com|vidcore\.org|cinesrc\.st|cinextream\.net|embed-api\.stream|iembed\.codeera\.dev|mapple\.uk|pipocacine\.lat|api\.pomfy\.stream|betterflix\.lat|megaembedapi\.site|nontongo\.win|primesrc\.me|vidlux\.(?:site|xyz|top)|cinezo\.live|vidzee\.wtf|themoviedb|image\.tmdb|youtube|googlevideo|embedmovies/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -3016,12 +3027,73 @@ type PlayerTheme = "cyan" | "gold" | "violet" | "emerald" | "rose" | "sky";
 type PlayerSource = {
   id: PlayerSourceId;
   name: string;
-  hint: string;
   theme: PlayerTheme;
   src: string;
-  audioProfile?: "pt-BR" | "legendado";
   priority?: number;
 };
+
+const PLAYER_PREFERRED_SERVER_KEY = "flixa-player-preferred-server-v2";
+
+function readPreferredPlayerServer() {
+  if (typeof window === "undefined") return "";
+  try {
+    const value = window.localStorage.getItem(PLAYER_PREFERRED_SERVER_KEY) ?? "";
+    return /^[a-z0-9-]{1,64}$/i.test(value) ? value : "";
+  } catch {
+    return "";
+  }
+}
+
+function writePreferredPlayerServer(serverId: string) {
+  try {
+    if (serverId) window.localStorage.setItem(PLAYER_PREFERRED_SERVER_KEY, serverId);
+    else window.localStorage.removeItem(PLAYER_PREFERRED_SERVER_KEY);
+  } catch {
+    // O player continua funcionando quando o armazenamento está bloqueado.
+  }
+}
+
+type AdditionalPlayerSource = {
+  id: string;
+  name: string;
+  theme: PlayerTheme;
+  movieUrl: (tmdbId: string) => string;
+  tvUrl: (tmdbId: string, season: number, episode: number) => string;
+};
+
+const ADDITIONAL_PLAYER_SOURCES: AdditionalPlayerSource[] = [
+  { id: "vidbolt", name: "VidBolt", theme: "gold", movieUrl: (id) => `https://vidbolt.pro/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://vidbolt.pro/embed/tv/${id}/${season}/${episode}` },
+  { id: "embos", name: "Embos", theme: "emerald", movieUrl: (id) => `https://embos.top/movie/?mid=${id}`, tvUrl: (id, season, episode) => `https://embos.top/tv/?mid=${id}&s=${season}&e=${episode}` },
+  { id: "unlimplay", name: "UnlimPlay", theme: "rose", movieUrl: (id) => `https://unlimplay.com/f/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://unlimplay.com/f/embed/tv/${id}/${season}/${episode}` },
+  { id: "screenscape", name: "ScreenScape", theme: "violet", movieUrl: (id) => `https://screenscape.me/embed?tmdb=${id}&type=movie`, tvUrl: (id, season, episode) => `https://screenscape.me/embed?tmdb=${id}&type=tv&s=${season}&e=${episode}` },
+  { id: "nsrplay", name: "NasriPlay", theme: "cyan", movieUrl: (id) => `https://nsrplay.space/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://nsrplay.space/embed/tv/${id}/${season}/${episode}` },
+  { id: "filesun", name: "FileSuN", theme: "gold", movieUrl: (id) => `https://filesun.sbs/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://filesun.sbs/embed/tv/${id}/${season}/${episode}` },
+  { id: "vidphantom-live", name: "VidPhantom Live", theme: "violet", movieUrl: (id) => `https://vidphantom.live/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.live/tv/${id}/${season}/${episode}` },
+  { id: "vidphantom-online", name: "VidPhantom Online", theme: "cyan", movieUrl: (id) => `https://vidphantom.online/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.online/tv/${id}/${season}/${episode}` },
+  { id: "vidphantom-site", name: "VidPhantom Site", theme: "gold", movieUrl: (id) => `https://vidphantom.site/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.site/tv/${id}/${season}/${episode}` },
+  { id: "vidphantom-website", name: "VidPhantom Web", theme: "emerald", movieUrl: (id) => `https://vidphantom.website/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.website/tv/${id}/${season}/${episode}` },
+  { id: "vidphantom-xyz", name: "VidPhantom XYZ", theme: "rose", movieUrl: (id) => `https://vidphantom.xyz/movie/${id}`, tvUrl: (id, season, episode) => `https://vidphantom.xyz/tv/${id}/${season}/${episode}` },
+  { id: "apiplayer", name: "APIPlayer", theme: "sky", movieUrl: (id) => `https://apiplayer.ru/embed/movie/${id}?lang=pt`, tvUrl: (id, season, episode) => `https://apiplayer.ru/embed/tv/${id}/${season}/${episode}?lang=pt` },
+  { id: "vidsrc-cc", name: "VidSrc CC", theme: "violet", movieUrl: (id) => `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=false`, tvUrl: (id, season, episode) => `https://vidsrc.cc/v2/embed/tv/${id}/${season}/${episode}?autoPlay=false` },
+  { id: "2embed-skin", name: "2Embed Skin", theme: "gold", movieUrl: (id) => `https://www.2embed.skin/embed/${id}`, tvUrl: (id, season, episode) => `https://www.2embed.skin/embedtv/${id}&s=${season}&e=${episode}` },
+  { id: "2embed-cc", name: "2Embed CC", theme: "rose", movieUrl: (id) => `https://www.2embed.cc/embed/${id}`, tvUrl: (id, season, episode) => `https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}` },
+  { id: "nontongo", name: "Nontongo", theme: "emerald", movieUrl: (id) => `https://www.nontongo.win/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://www.nontongo.win/embed/tv/${id}/${season}/${episode}` },
+  { id: "primesrc", name: "PrimeSrc", theme: "violet", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}` },
+  { id: "vidlux", name: "VidLux", theme: "sky", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}` },
+  { id: "cinezo", name: "Cinezo", theme: "cyan", movieUrl: (id) => `https://player.cinezo.live/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://player.cinezo.live/embed/tv/${id}/${season}/${episode}` },
+  { id: "vidzee", name: "VidZee", theme: "gold", movieUrl: (id) => `https://player.vidzee.wtf/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}` },
+  { id: "2embed-stream", name: "2Embed Stream", theme: "rose", movieUrl: (id) => `https://2embed.stream/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://2embed.stream/embed/tv/${id}/${season}/${episode}` },
+  { id: "vidlux-top", name: "VidLux Top", theme: "sky", movieUrl: (id) => `https://vidlux.top/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://vidlux.top/embed/tv/${id}/${season}/${episode}` },
+  { id: "vidlux-quilox", name: "VidLux Quilox", theme: "cyan", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=quilox`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=quilox` },
+  { id: "vidlux-spider", name: "VidLux Spider", theme: "gold", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=spider`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=spider` },
+  { id: "vidlux-magic", name: "VidLux Magic", theme: "violet", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=magic`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=magic` },
+  { id: "vidlux-dubai", name: "VidLux Dubai", theme: "emerald", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=dubai`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=dubai` },
+  { id: "vidlux-astra", name: "VidLux Astra", theme: "rose", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=astra`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=astra` },
+  { id: "vidlux-vidrock", name: "VidLux VidRock", theme: "sky", movieUrl: (id) => `https://vidlux.site/embed/movie/${id}?server=vidrock`, tvUrl: (id, season, episode) => `https://vidlux.site/embed/tv/${id}/${season}/${episode}?server=vidrock` },
+  { id: "primesrc-primevid", name: "PrimeSrc PrimeVid", theme: "cyan", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}&whitelistServers=PrimeVid`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&whitelistServers=PrimeVid` },
+  { id: "primesrc-voe", name: "PrimeSrc Voe", theme: "gold", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}&whitelistServers=Voe`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&whitelistServers=Voe` },
+  { id: "primesrc-dood", name: "PrimeSrc Dood", theme: "violet", movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}&whitelistServers=Dood`, tvUrl: (id, season, episode) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&whitelistServers=Dood` },
+];
 
 function withSuperflixFlags(url: string, isTv: boolean) {
   const base = url.split("#")[0];
@@ -3043,7 +3115,6 @@ function buildPlayerSources(
   const path = isTv ? "serie" : "filme";
   const episodeSuffix = isTv && season && episode ? `/${season}/${episode}` : "";
   const fallbackId = /^\d+$/.test(tmdbId) ? tmdbId : (/^tt\d+$/i.test(imdbId) ? imdbId : "");
-  const fallbackIdType = fallbackId.startsWith("tt") ? "IMDb" : "TMDB";
   const sources: PlayerSource[] = [];
 
   const episodePath = `${season ?? 1}/${episode ?? 1}`;
@@ -3055,18 +3126,8 @@ function buildPlayerSources(
   if (tmdbOnlyId) {
     sources.push(
       {
-        id: "megaembed-br",
-        name: "MegaEmbed BR",
-        hint: "PT-BR prioritário",
-        theme: "gold",
-        src: isTv
-          ? `https://mgeb.top/embed/${tmdbOnlyId}/${episodePath}`
-          : `https://mgeb.top/embed/${tmdbOnlyId}`,
-      },
-      {
         id: "pomfy",
         name: "Pomfy",
-        hint: "PT-BR prioritário",
         theme: "cyan",
         src: isTv
           ? `https://api.pomfy.stream/serie/${tmdbOnlyId}/${episodePath}`
@@ -3075,7 +3136,6 @@ function buildPlayerSources(
       {
         id: "betterflix",
         name: "BetterFlix",
-        hint: "PT-BR prioritário",
         theme: "emerald",
         src: isTv
           ? `https://betterflix.lat/api/player?id=${tmdbOnlyId}&type=tv&season=${season ?? 1}&episode=${episode ?? 1}`
@@ -3084,34 +3144,14 @@ function buildPlayerSources(
       {
         id: "pipocacine",
         name: "PipocaCine",
-        hint: "PT-BR prioritário",
         theme: "rose",
         src: isTv
           ? `https://pipocacine.lat/embed/${tmdbOnlyId}/${episodePath}`
           : `https://pipocacine.lat/embed/${tmdbOnlyId}`,
       },
       {
-        id: "redeflix",
-        name: "RedeFlix",
-        hint: "PT-BR prioritário",
-        theme: "violet",
-        src: isTv
-          ? `https://redeflixapi.store/serie/${tmdbOnlyId}/${episodePath}`
-          : `https://redeflixapi.store/filme/${tmdbOnlyId}`,
-      },
-      {
-        id: "vidlink",
-        name: "VidLink",
-        hint: "Múltiplos servidores",
-        theme: "cyan",
-        src: isTv
-          ? `https://vidlink.pro/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://vidlink.pro/movie/${tmdbOnlyId}`,
-      },
-      {
         id: "vidzen",
         name: "VidZen",
-        hint: "Sessão sincronizada",
         theme: "rose",
         src: isTv
           ? `https://vidzen.fun/tv/${tmdbOnlyId}/${episodePath}`
@@ -3120,7 +3160,6 @@ function buildPlayerSources(
       {
         id: "vidsrc-wiki",
         name: "VidSrc Wiki",
-        hint: "Compatível com TMDB",
         theme: "violet",
         src: isTv
           ? `https://vidsrc.wiki/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3129,7 +3168,6 @@ function buildPlayerSources(
       {
         id: "vidphantom",
         name: "VidPhantom",
-        hint: "Player alternativo",
         theme: "rose",
         src: isTv
           ? `https://vidphantom.com/tv/${tmdbOnlyId}/${episodePath}`
@@ -3138,7 +3176,6 @@ function buildPlayerSources(
       {
         id: "yapgrid",
         name: "YapGrid",
-        hint: "Multi-CDN",
         theme: "emerald",
         src: isTv
           ? `https://yapgrid.com/embed/tv/${tmdbOnlyId}/${episodePath}?lang=pt`
@@ -3147,22 +3184,21 @@ function buildPlayerSources(
       {
         id: "videasy",
         name: "Videasy",
-        hint: "Legendas disponíveis",
         theme: "sky",
         src: isTv
           ? `https://player.videasy.net/tv/${tmdbOnlyId}/${episodePath}`
           : `https://player.videasy.net/movie/${tmdbOnlyId}`,
       },
-      {
-        id: "vidsrc-fyi",
-        name: "VidSrc FYI",
-        hint: "Legendado",
-        theme: "sky",
-        src: isTv
-          ? `https://vidsrc.fyi/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://vidsrc.fyi/embed/movie/${tmdbOnlyId}`,
-      },
     );
+
+    sources.push(...ADDITIONAL_PLAYER_SOURCES.map((source) => ({
+      id: source.id,
+      name: source.name,
+      theme: source.theme,
+      src: isTv
+        ? source.tvUrl(tmdbOnlyId, season ?? 1, episode ?? 1)
+        : source.movieUrl(tmdbOnlyId),
+    })));
   }
 
   if (fallbackId) {
@@ -3171,52 +3207,22 @@ function buildPlayerSources(
       {
         id: "moviesapi",
         name: "MoviesAPI",
-        hint: fallbackIdType,
         theme: "gold",
         src: isTv
           ? `https://moviesapi.to/tv/${fallbackId}/${episodePath}`
           : `https://moviesapi.to/movie/${fallbackId}`,
       },
       {
-        id: "vidfast",
-        name: "VidFast",
-        hint: fallbackIdType,
-        theme: "emerald",
-        src: isTv
-          ? `https://vidfast.vc/tv/${fallbackId}/${episodePath}?autoPlay=false&sub=pt`
-          : `https://vidfast.vc/movie/${fallbackId}?autoPlay=false&sub=pt`,
-      },
-      {
         id: "autoembed-co",
         name: "AutoEmbed",
-        hint: fallbackIdType,
         theme: "gold",
         src: isTv
           ? `https://autoembed.co/tv/${autoEmbedKind}/${fallbackId}-${episodeDashPath}`
           : `https://autoembed.co/movie/${autoEmbedKind}/${fallbackId}`,
       },
       {
-        id: "vidsrc-link",
-        name: "VidSrc Link",
-        hint: fallbackIdType,
-        theme: "violet",
-        src: isTv
-          ? `https://vidsrc.link/embed/tv/${fallbackId}/${episodePath}`
-          : `https://vidsrc.link/embed/movie/${fallbackId}`,
-      },
-      {
-        id: "vidsrcme",
-        name: "VidSrcMe",
-        hint: fallbackIdType,
-        theme: "sky",
-        src: isTv
-          ? `https://vidsrcme.su/embed/tv/${fallbackId}/${episodeDashPath}`
-          : `https://vidsrcme.su/embed/movie/${fallbackId}`,
-      },
-      {
         id: "megaembedapi",
         name: "MegaEmbedAPI",
-        hint: "PT-BR prioritário",
         theme: "gold",
         src: isTv && /^tt\d+$/i.test(imdbId)
           ? `https://megaembedapi.site/embed/series?imdb=${imdbId}&sea=${season ?? 1}&epi=${episode ?? 1}`
@@ -3230,7 +3236,6 @@ function buildPlayerSources(
       {
         id: "ezvidapi",
         name: "EZVidAPI",
-        hint: "Failover automático",
         theme: "cyan",
         src: isTv
           ? `https://ezvidapi.com/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3239,7 +3244,6 @@ function buildPlayerSources(
       {
         id: "vidcore",
         name: "VidCore",
-        hint: "Múltiplos servidores",
         theme: "gold",
         src: isTv
           ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3248,7 +3252,6 @@ function buildPlayerSources(
       {
         id: "cinesrc",
         name: "CineSrc",
-        hint: "Compatível com TMDB",
         theme: "rose",
         src: isTv
           ? `https://cinesrc.st/embed/tv/${tmdbOnlyId}?s=${season ?? 1}&e=${episode ?? 1}`
@@ -3257,7 +3260,6 @@ function buildPlayerSources(
       {
         id: "cinextream",
         name: "CineXtream",
-        hint: "Player alternativo",
         theme: "emerald",
         src: isTv
           ? `https://cinextream.net/api/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3266,25 +3268,14 @@ function buildPlayerSources(
       {
         id: "embed-api",
         name: "Embed API",
-        hint: "Compatível com TMDB",
         theme: "violet",
         src: isTv
           ? `https://player.embed-api.stream/?id=${tmdbOnlyId}&s=${season ?? 1}&e=${episode ?? 1}`
           : `https://player.embed-api.stream/?id=${tmdbOnlyId}&type=movie`,
       },
       {
-        id: "1embed",
-        name: "1Embed",
-        hint: "Múltiplos áudios",
-        theme: "sky",
-        src: isTv
-          ? `https://1embed.cc/embed/tv/${tmdbOnlyId}/${episodePath}`
-          : `https://1embed.cc/embed/movie/${tmdbOnlyId}`,
-      },
-      {
         id: "iembed",
         name: "iEmbed",
-        hint: "Múltiplas fontes",
         theme: "cyan",
         src: isTv
           ? `https://iembed.codeera.dev/embed/tv/${tmdbOnlyId}/${episodePath}`
@@ -3293,34 +3284,10 @@ function buildPlayerSources(
       {
         id: "mapple",
         name: "Mapple",
-        hint: "Player alternativo",
         theme: "gold",
         src: isTv
           ? `https://mapple.uk/watch/tv/${tmdbOnlyId}-${episodeDashPath}`
           : `https://mapple.uk/watch/movie/${tmdbOnlyId}`,
-      },
-    );
-  }
-
-  if (fallbackId) {
-    sources.push(
-      {
-        id: "vidsrc-mov",
-        name: "VidSrc MOV",
-        hint: fallbackIdType,
-        theme: "violet",
-        src: isTv
-          ? `https://vidsrc.mov/embed/tv/${fallbackId}/${episodePath}`
-          : `https://vidsrc.mov/embed/movie/${fallbackId}`,
-      },
-      {
-        id: "vidapi",
-        name: "VidAPI",
-        hint: fallbackIdType,
-        theme: "rose",
-        src: isTv
-          ? `https://vaplayer.ru/embed/tv/${fallbackId}/${episodePath}`
-          : `https://vaplayer.ru/embed/movie/${fallbackId}`,
       },
     );
   }
@@ -3330,7 +3297,6 @@ function buildPlayerSources(
       sources.push({
         id: "cdn-tmdb",
         name: "CDN Brasil",
-        hint: "PT-BR · TMDB · rápido",
         theme: "cyan",
         src: `https://cdn-embed.com/${path}/${tmdbId}${episodeSuffix}`,
       });
@@ -3339,14 +3305,12 @@ function buildPlayerSources(
       sources.push({
         id: "superflix-pro",
         name: "SuperFlix",
-        hint: isTv ? "PT-BR · série verificada" : "PT-BR · dublado/legendado",
         theme: "gold",
         src: withSuperflixFlags(`https://superflixapi.pro/${path}/${tmdbId}${episodeSuffix}`, isTv),
       });
       sources.push({
         id: "superflix-help",
         name: "SuperFlix Alt",
-        hint: isTv ? "PT-BR · espelho verificado" : "PT-BR · espelho oficial",
         theme: "violet",
         src: withSuperflixFlags(`https://superflixapi.help/${path}/${tmdbId}${episodeSuffix}`, isTv),
       });
@@ -3355,7 +3319,6 @@ function buildPlayerSources(
       sources.push({
         id: "warez-tmdb",
         name: "WarezCDN",
-        hint: "PT-BR · TMDB",
         theme: "emerald",
         src: `https://warezcdn.lat/${path}/${tmdbId}${episodeSuffix}`,
       });
@@ -3367,7 +3330,6 @@ function buildPlayerSources(
       sources.push({
         id: "cdn-imdb",
         name: "CDN IMDb",
-        hint: "PT-BR · IMDb",
         theme: "sky",
         src: `https://cdn-embed.com/${path}/${imdbId}${episodeSuffix}`,
       });
@@ -3376,7 +3338,6 @@ function buildPlayerSources(
       sources.push({
         id: "superflix-imdb",
         name: "SuperFlix IMDb",
-        hint: isTv ? "PT-BR · série verificada" : "PT-BR · IMDb",
         theme: "rose",
         src: withSuperflixFlags(`https://superflixapi.pro/${path}/${imdbId}${episodeSuffix}`, isTv),
       });
@@ -3385,7 +3346,6 @@ function buildPlayerSources(
       sources.push({
         id: "warez-imdb",
         name: "WarezCDN IMDb",
-        hint: "PT-BR · IMDb",
         theme: "emerald",
         src: `https://warezcdn.lat/${path}/${imdbId}${episodeSuffix}`,
       });
@@ -3395,16 +3355,8 @@ function buildPlayerSources(
   if (!isTv) {
     if (fallbackId) {
       sources.push({
-        id: "111movies",
-        name: "111Movies",
-        hint: `Alternativo · ${fallbackIdType}`,
-        theme: "violet",
-        src: `https://111movies.net/movie/${fallbackId}`,
-      });
-      sources.push({
         id: "2embed",
         name: "2Embed",
-        hint: `Alternativo · ${fallbackIdType}`,
         theme: "rose",
         src: `https://www.2embed.online/embed/movie/${fallbackId}`,
       });
@@ -3415,7 +3367,6 @@ function buildPlayerSources(
     sources.push({
       id: "myembed",
       name: "MyEmbed",
-      hint: `Alternativo · ${fallbackIdType}`,
       theme: "sky",
       src: `https://myembed.biz/${path}/${fallbackId}${episodeSuffix}`,
     });
@@ -3425,7 +3376,6 @@ function buildPlayerSources(
     sources.push({
       id: "filmesyseries",
       name: "Filmes & Séries",
-      hint: `Alternativo · IMDb`,
       theme: "gold",
       src: `https://filmesyseries.epizy.com/embed-2/?type=movies&imdb=${imdbId}`,
     });
@@ -3441,20 +3391,9 @@ function buildPlayerSources(
     return true;
   }).map((source) => {
     const server = getPlayerServer(playerServerIdForSource(source.id));
-    const experienceHint = server?.advertisingProfile === "none-declared"
-      ? "Sem anúncios (declarado pelo provedor)"
-      : server?.advertisingProfile === "minimal-declared" && server.watchPartySupport === "full"
-        ? "Poucos anúncios · Sessão sincronizada"
-        : server?.watchPartySupport === "full"
-          ? "Sessão sincronizada"
-          : server?.audioProfile === "legendado"
-            ? "Legendado"
-            : "PT-BR prioritário";
     return {
       ...source,
-      audioProfile: server?.audioProfile ?? "pt-BR",
       priority: server?.priority ?? 999,
-      hint: experienceHint,
     };
   }).sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
 }
@@ -3516,8 +3455,7 @@ function PlayerServerMenu({
       >
         <span className="player-server-dot" aria-hidden="true" />
         <span className="player-server-copy">
-          <strong>{compact ? active.name.split(" ")[0] : active.name}</strong>
-          {compact ? null : <small>{active.hint}</small>}
+          <strong>{active.name}</strong>
         </span>
         <span className="player-server-chevron" aria-hidden="true" />
       </button>
@@ -3525,36 +3463,24 @@ function PlayerServerMenu({
       {open ? (
         <div className="player-server-dropdown" role="listbox" aria-label="Servidores disponíveis">
           <p className="player-server-heading">Servidores disponíveis</p>
-          {(["pt-BR", "legendado"] as const).map((profile) => {
-            const groupedSources = sources.filter((source) => source.audioProfile === profile);
-            if (!groupedSources.length) return null;
+          {sources.map((source) => {
+            const selected = source.id === active.id;
             return (
-              <div className="player-server-group" role="group" aria-label={profile === "pt-BR" ? "Áudio PT-BR prioritário" : "Legendados"} key={profile}>
-                <p className={`player-server-group-title is-${profile === "pt-BR" ? "ptbr" : "sub"}`}>
-                  {profile === "pt-BR" ? "PT-BR prioritário" : "Legendados"}
-                  <span>{groupedSources.length}</span>
-                </p>
-                {groupedSources.map((source) => {
-                  const selected = source.id === active.id;
-                  return (
-                    <button
-                      key={source.id}
-                      type="button"
-                      role="option"
-                      aria-selected={selected}
-                      className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
-                      onClick={() => {
-                        onSelect(source.id);
-                        updateOpen(false);
-                      }}
-                    >
-                      <span className="player-server-dot" aria-hidden="true" />
-                      <span className="player-server-copy"><strong>{source.name}</strong><small>{source.hint}</small></span>
-                      {selected ? <span className="player-server-check" aria-hidden="true" /> : null}
-                    </button>
-                  );
-                })}
-              </div>
+              <button
+                key={source.id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
+                onClick={() => {
+                  onSelect(source.id);
+                  updateOpen(false);
+                }}
+              >
+                <span className="player-server-dot" aria-hidden="true" />
+                <span className="player-server-copy"><strong>{source.name}</strong></span>
+                {selected ? <span className="player-server-check" aria-hidden="true" /> : null}
+              </button>
             );
           })}
         </div>
@@ -3620,9 +3546,12 @@ function MoviePlayer({
   const playerIframeRef = useRef<HTMLIFrameElement | null>(null);
   const fsHideTimer = useRef<number | null>(null);
   const iframeLoadedRef = useRef(false);
-  const activeSource = serverPreparing || !sourceId
+  const sourceIdRef = useRef(sourceId);
+  const activeSource = !sourceId
     ? undefined
     : sources.find((source) => source.id === sourceId);
+  const activeSourceSrc = activeSource?.src ?? "";
+  const activeSourceName = activeSource?.name ?? "";
   const currentEpisodeInfo = episodes.find((item) => item.episode_number === episode);
   const currentSeasonInfo = seasons.find((item) => item.season_number === season);
   const episodeLabel = isTv
@@ -3642,6 +3571,10 @@ function MoviePlayer({
   }, [onProgress]);
 
   useEffect(() => {
+    sourceIdRef.current = sourceId;
+  }, [sourceId]);
+
+  useEffect(() => {
     if (!isTv) return;
     setSeason(Math.max(1, movie.season || 1));
     setEpisode(Math.max(1, movie.episode || 1));
@@ -3656,13 +3589,22 @@ function MoviePlayer({
       isTv ? episode : undefined,
       new Set(),
     );
+    const currentSource = candidates.find((source) => source.id === sourceIdRef.current);
+    const preferredServerId = currentSource
+      ? playerServerIdForSource(currentSource.id)
+      : readPreferredPlayerServer();
+    const preferredCandidate = candidates.find(
+      (source) => playerServerIdForSource(source.id) === preferredServerId,
+    );
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
       setServerPreparing(true);
-      setServerNotice("Analisando os servidores para este título…");
+      setServerNotice(preferredCandidate
+        ? `Confirmando ${preferredCandidate.name} para este título…`
+        : "Analisando os servidores para este título…");
       setFailedSourceIds(new Set());
       setSourceOrder([]);
-      setSourceId("");
+      setSourceId(preferredCandidate?.id ?? "");
     });
     fetch("/api/movies/servers", {
       method: "POST",
@@ -3671,6 +3613,7 @@ function MoviePlayer({
       body: JSON.stringify({
         kind: isTv ? "tv" : "movie",
         sources: candidates.map((source) => ({ id: source.id, url: source.src })),
+        preferredServerId,
       }),
       signal: controller.signal,
     })
@@ -3693,7 +3636,11 @@ function MoviePlayer({
         setDisabledServerIds(disabled);
         setSourceOrder(order);
         setSourceId(order[0] ?? "");
-        setServerNotice(order.length ? "Melhor servidor disponível selecionado." : "Nenhum servidor disponível para este título.");
+        setServerNotice(order.length
+          ? preferredCandidate && playerServerIdForSource(order[0]) === preferredServerId
+            ? `${preferredCandidate.name} continua selecionado.`
+            : "Melhor servidor disponível selecionado."
+          : "Nenhum servidor disponível para este título.");
       })
       .catch(() => {
         if (controller.signal.aborted) return;
@@ -3701,10 +3648,16 @@ function MoviePlayer({
         const fallback = candidates.filter(
           (source) => !fallbackDisabled.has(playerServerIdForSource(source.id)),
         );
+        const fallbackOrder = [
+          ...(preferredCandidate && fallback.some((source) => source.id === preferredCandidate.id) ? [preferredCandidate] : []),
+          ...fallback.filter((source) => source.id !== preferredCandidate?.id),
+        ];
         setDisabledServerIds(fallbackDisabled);
-        setSourceOrder(fallback.map((source) => source.id));
-        setSourceId(fallback[0]?.id ?? "");
-        setServerNotice("A avaliação automática falhou; usando a ordem de segurança.");
+        setSourceOrder(fallbackOrder.map((source) => source.id));
+        setSourceId(fallbackOrder[0]?.id ?? "");
+        setServerNotice(preferredCandidate
+          ? `A avaliação automática falhou; mantendo ${preferredCandidate.name}.`
+          : "A avaliação automática falhou; usando a ordem de segurança.");
       })
       .finally(() => {
         if (!controller.signal.aborted) setServerPreparing(false);
@@ -3720,6 +3673,9 @@ function MoviePlayer({
     }
     const failed = new Set(failedSourceIds);
     if (failedId) failed.add(failedId);
+    if (failedId && readPreferredPlayerServer() === playerServerIdForSource(failedId)) {
+      writePreferredPlayerServer("");
+    }
     const next = sources.find((source) => !failed.has(source.id));
     setFailedSourceIds(failed);
     if (next) {
@@ -3738,18 +3694,21 @@ function MoviePlayer({
       next.delete(id);
       return next;
     });
+    writePreferredPlayerServer(playerServerIdForSource(id));
     setSourceId(id);
     setServerNotice("");
   }
 
   useEffect(() => {
-    if (!activeSource) return;
+    if (!activeSourceSrc) return;
     iframeLoadedRef.current = false;
     const timer = window.setTimeout(() => {
-      if (!iframeLoadedRef.current) switchToNextSource(activeSource.id, "tempo limite ao carregar");
-    }, 15_000);
+      if (!iframeLoadedRef.current) {
+        setServerNotice(`${activeSourceName} ainda está carregando. O servidor não será trocado sem uma falha confirmada.`);
+      }
+    }, 30_000);
     return () => window.clearTimeout(timer);
-  }, [activeSource, switchToNextSource]);
+  }, [activeSourceName, activeSourceSrc]);
 
   useEffect(() => {
     if (!activeSource) return;
@@ -3759,7 +3718,7 @@ function MoviePlayer({
     } catch {
       return;
     }
-    const failureSignals = new Set(["error", "fatal", "fatal-error", "playback-error", "player-error", "not-found"]);
+    const failureSignals = new Set(["fatal-error", "playback-error", "player-error", "media-error", "source-not-found"]);
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== expectedOrigin) return;
       const data = event.data;
@@ -4171,7 +4130,7 @@ function MoviePlayer({
             allowFullScreen
             allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
             referrerPolicy="strict-origin-when-cross-origin"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"
             title={movie.title}
           />
         ) : serverPreparing ? (

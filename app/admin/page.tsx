@@ -47,6 +47,9 @@ type ServerEndpointCheck = {
       status: "passed" | "failed";
       httpStatus: number | null;
       message: string;
+      audioLanguages?: string[];
+      hasPortugueseAudio?: boolean | null;
+      audioMetadataSource?: "hls" | "dash";
     } | null;
   };
 };
@@ -65,7 +68,6 @@ type AdminServer = {
   testTvUrl: string;
   supportsMovie: boolean;
   supportsTv: boolean;
-  audioProfile: "pt-BR" | "legendado";
   advertisingProfile: "none-declared" | "minimal-declared" | "unknown";
   watchPartySupport: "full" | "none";
   priority: number;
@@ -134,6 +136,7 @@ const ISSUE_TITLES: Record<string, string> = {
   NESTED_IFRAME_TIMEOUT: "Player interno excedeu o tempo limite",
   NESTED_IFRAME_NETWORK_ERROR: "Falha de rede no player interno",
   PLAYER_NOT_FOUND: "Nenhum player encontrado",
+  PLAYER_NOT_CONFIRMED: "Player dinâmico não confirmado",
   WEAK_PLAYER_EVIDENCE: "Player não pôde ser comprovado",
   PLAYBACK_NOT_CONFIRMED: "Player abriu, mas o Play não foi confirmado",
   MEDIA_PROBE_FAILED: "Manifesto, arquivo ou segmento de vídeo falhou",
@@ -206,6 +209,9 @@ function ServerDiagnosticDetails({ diagnostic, compact = false }: { diagnostic: 
           <p>{check.message}</p>
           {check.evidence.playerSignals?.length ? <small>Sinais: {check.evidence.playerSignals.join(", ")}</small> : null}
           {check.evidence.mediaProbe ? <small>Mídia: {check.evidence.mediaProbe.message}</small> : null}
+          {check.evidence.mediaProbe?.audioLanguages?.length
+            ? <small>Idiomas de áudio declarados no manifesto: {check.evidence.mediaProbe.audioLanguages.join(", ")}</small>
+            : null}
           {check.issues?.length ? (
             <ul>
               {check.issues.map((item, index) => (
@@ -248,8 +254,6 @@ export default function AdminPage() {
     degraded: servidores.filter((server) => server.last_status === "degraded").length,
     offline: servidores.filter((server) => server.last_status === "offline").length,
     enabled: servidores.filter((server) => server.enabled).length,
-    ptbr: servidores.filter((server) => server.audioProfile === "pt-BR").length,
-    subtitled: servidores.filter((server) => server.audioProfile === "legendado").length,
   }), [servidores]);
 
   function handleUnauthorized(status: number) {
@@ -531,8 +535,6 @@ export default function AdminPage() {
         <>
           <section className="admin-stats admin-server-stats" aria-label="Estado dos servidores">
             <article><strong>{servidores.length}</strong><span>Total</span></article>
-            <article className="is-ptbr"><strong>{serverStats.ptbr}</strong><span>Prioridade PT-BR</span></article>
-            <article className="is-subtitled"><strong>{serverStats.subtitled}</strong><span>Legendados</span></article>
             <article className="is-online"><strong>{serverStats.online}</strong><span>Verdes</span></article>
             <article className="is-degraded"><strong>{serverStats.degraded}</strong><span>Aguardam confirmação</span></article>
             <article className="is-offline"><strong>{serverStats.offline}</strong><span>Vermelhos</span></article>
@@ -577,7 +579,6 @@ export default function AdminPage() {
                     <td><strong>{server.name}</strong><small className="server-domain">{server.domain}</small>{server.blockedReason || !server.protectedEmbedCompatible ? <small className="server-audio-profile is-sub">Alerta: {server.blockedReason || server.compatibilityMessage || "pode ser incompatível com a proteção anti-pop-up"}</small> : null}</td>
                     <td>
                       {[server.supportsMovie ? "Filmes" : null, server.supportsTv ? "Séries" : null].filter(Boolean).join(" + ")}
-                      <small className={`server-audio-profile is-${server.audioProfile === "pt-BR" ? "ptbr" : "sub"}`}>{server.audioProfile === "pt-BR" ? "PT-BR prioritário" : "Legendado"}</small>
                       {server.advertisingProfile === "none-declared" ? <small className="server-audio-profile is-low-ads">Sem anúncios (declarado)</small> : null}
                       {server.advertisingProfile === "minimal-declared" ? <small className="server-audio-profile is-low-ads">Poucos anúncios</small> : null}
                       {server.watchPartySupport === "full" ? <small className="server-audio-profile is-party">Compatível com grupo</small> : null}

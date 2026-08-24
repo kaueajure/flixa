@@ -25,6 +25,15 @@ export type PlayerServerMediaProbe = {
   httpStatus: number | null;
   contentType: string;
   message: string;
+  audioLanguages?: string[];
+  hasPortugueseAudio?: boolean | null;
+  audioMetadataSource?: "hls" | "dash";
+};
+
+export type ManifestAudioMetadata = {
+  audioLanguages: string[];
+  hasPortugueseAudio: boolean | null;
+  audioMetadataSource: "hls" | "dash";
 };
 
 export type PlayerServerEvidence = {
@@ -164,8 +173,9 @@ function uniqueUrls(values: string[], base: string, limit: number) {
 }
 
 async function fetchFollowingPublicRedirects(url: string, init: RequestInit) {
-  let current = publicHttpUrl(url, url);
-  if (!current) throw new Error("URL pública inválida");
+  const initial = publicHttpUrl(url, url);
+  if (!initial) throw new Error("URL pública inválida");
+  let current: URL = initial;
   for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
     const response = await fetch(current, { ...init, redirect: "manual" });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
@@ -348,6 +358,69 @@ function firstManifestResource(text: string, base: string) {
   return candidate ? publicHttpUrl(candidate, base)?.href ?? null : null;
 }
 
+function manifestAttribute(value: string, name: string) {
+  const match = value.match(new RegExp(`(?:^|[,\\s])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^,\\s>]+))`, "i"));
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function normalizeManifestLanguage(value: string) {
+  const raw = value.trim();
+  if (!raw) return "";
+  const normalized = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replaceAll("_", "-");
+  if (/^(?:pt-br|pob)$/.test(normalized) || /portugu.*(?:brasil|brazil)/.test(normalized)) return "pt-BR";
+  if (/^pt-pt$/.test(normalized)) return "pt-PT";
+  if (/^(?:pt|por)$/.test(normalized) || /^portugu/.test(normalized)) return "pt";
+  if (/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(normalized)) {
+    const [language, ...regions] = normalized.split("-");
+    return [language, ...regions.map((region) => region.toUpperCase())].join("-");
+  }
+  return raw.slice(0, 80);
+}
+
+function manifestAudioResult(values: string[], source: "hls" | "dash"): ManifestAudioMetadata {
+  const audioLanguages = [...new Set(values.map(normalizeManifestLanguage).filter(Boolean))];
+  return {
+    audioLanguages,
+    hasPortugueseAudio: audioLanguages.length
+      ? audioLanguages.some((language) => language === "pt" || language.startsWith("pt-"))
+      : null,
+    audioMetadataSource: source,
+  };
+}
+
+/** Lê somente metadados declarados pelo manifesto; não tenta inferir idioma pelo nome do provedor. */
+export function inspectManifestAudio(text: string, source: "hls" | "dash"): ManifestAudioMetadata {
+  if (source === "hls") {
+    const languages = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^#EXT-X-MEDIA:/i.test(line) && /(?:^|,)TYPE=AUDIO(?:,|$)/i.test(line.slice(line.indexOf(":") + 1)))
+      .map((line) => manifestAttribute(line, "LANGUAGE") || manifestAttribute(line, "NAME"))
+      .filter(Boolean);
+    return manifestAudioResult(languages, source);
+  }
+
+  const languages: string[] = [];
+  const adaptationSets = text.match(/<AdaptationSet\b[^>]*(?:\/>|>[\s\S]*?<\/AdaptationSet\s*>)/gi) ?? [];
+  for (const block of adaptationSets) {
+    const openingTag = block.match(/^<AdaptationSet\b[^>]*>/i)?.[0] ?? block;
+    const isAudio = /\bcontentType\s*=\s*["']audio["']/i.test(openingTag)
+      || /\bmimeType\s*=\s*["']audio\//i.test(openingTag)
+      || /<AudioChannelConfiguration\b/i.test(block);
+    if (!isAudio) continue;
+    const declared = manifestAttribute(openingTag, "lang")
+      || manifestAttribute(openingTag, "language")
+      || manifestAttribute(block, "lang")
+      || manifestAttribute(block, "language");
+    if (declared) languages.push(declared);
+  }
+  return manifestAudioResult(languages, source);
+}
+
 async function probeMedia(url: string, referer: string): Promise<PlayerServerMediaProbe> {
   try {
     const { response, bytes } = await fetchMediaPrefix(url, referer);
@@ -362,38 +435,41 @@ async function probeMedia(url: string, referer: string): Promise<PlayerServerMed
       if (!/^#EXTM3U/m.test(text)) {
         return { url, status: "failed", httpStatus: response.status, contentType, message: "A URL HLS não retornou um manifesto válido" };
       }
+      const audioMetadata = inspectManifestAudio(text, "hls");
       const resourceUrl = firstManifestResource(text, response.url || url);
       if (!resourceUrl) {
-        return { url, status: "failed", httpStatus: response.status, contentType, message: "Manifesto HLS sem variante ou segmento utilizável" };
+        return { url, status: "failed", httpStatus: response.status, contentType, message: "Manifesto HLS sem variante ou segmento utilizável", ...audioMetadata };
       }
       const child = await fetchMediaPrefix(resourceUrl, response.url || referer);
       if (!child.response.ok && child.response.status !== 206) {
-        return { url, status: "failed", httpStatus: child.response.status, contentType, message: `Primeiro recurso HLS respondeu HTTP ${child.response.status}` };
+        return { url, status: "failed", httpStatus: child.response.status, contentType, message: `Primeiro recurso HLS respondeu HTTP ${child.response.status}`, ...audioMetadata };
       }
       const childText = new TextDecoder().decode(child.bytes);
       if (/^#EXTM3U/m.test(childText)) {
         const segmentUrl = firstManifestResource(childText, child.response.url || resourceUrl);
         if (!segmentUrl) {
-          return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Variante HLS sem segmento utilizável" };
+          return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Variante HLS sem segmento utilizável", ...audioMetadata };
         }
         const segment = await fetchMediaPrefix(segmentUrl, child.response.url || resourceUrl);
         if ((!segment.response.ok && segment.response.status !== 206) || segment.bytes.byteLength === 0) {
-          return { url, status: "failed", httpStatus: segment.response.status, contentType, message: `Primeiro segmento HLS indisponível · HTTP ${segment.response.status}` };
+          return { url, status: "failed", httpStatus: segment.response.status, contentType, message: `Primeiro segmento HLS indisponível · HTTP ${segment.response.status}`, ...audioMetadata };
         }
       } else if (child.bytes.byteLength === 0) {
-        return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Primeiro segmento HLS retornou vazio" };
+        return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Primeiro segmento HLS retornou vazio", ...audioMetadata };
       }
-      return { url, status: "passed", httpStatus: response.status, contentType, message: "Manifesto HLS e primeiro segmento acessíveis" };
+      return { url, status: "passed", httpStatus: response.status, contentType, message: "Manifesto HLS e primeiro segmento acessíveis", ...audioMetadata };
     }
 
     if (pathname.endsWith(".mpd")) {
       const valid = /<MPD\b/i.test(text) && /<Period\b/i.test(text);
+      const audioMetadata = inspectManifestAudio(text, "dash");
       return {
         url,
         status: valid ? "passed" : "failed",
         httpStatus: response.status,
         contentType,
         message: valid ? "Manifesto DASH válido e acessível" : "A URL DASH não retornou um manifesto válido",
+        ...audioMetadata,
       };
     }
 
@@ -543,8 +619,26 @@ async function testEndpoint(
     evidence.playerSignals = resources.playerSignals;
 
     if (resources.playerSignals.length === 0) {
-      issues.push(issue("PLAYER_NOT_FOUND", "player", "error", "A página abriu, mas nenhum player reconhecível foi encontrado"));
-      return failedCheck(kind, url, startedAt, issues, evidence, response.status, response.url || url);
+      // Muitos embeds montam o player somente depois que o JavaScript roda no
+      // navegador. Uma inspeção HTTP sem marcador estático é inconclusiva,
+      // não evidência suficiente para trocar um servidor que já funciona.
+      issues.push(issue(
+        "PLAYER_NOT_CONFIRMED",
+        "player",
+        "warning",
+        "A página abriu, mas o teste HTTP não consegue confirmar o player criado no navegador",
+      ));
+      evidence.confidence = "low";
+      return {
+        kind,
+        status: "degraded",
+        httpStatus: response.status,
+        latencyMs: Date.now() - startedAt,
+        message: issues.at(-1)?.message ?? "Player dinâmico não confirmado",
+        finalUrl: response.url || url,
+        issues,
+        evidence,
+      };
     }
 
     if (resources.mediaUrls.length > 0) {
