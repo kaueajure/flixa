@@ -2919,7 +2919,7 @@ const PLAYER_UI_SELECTOR =
   ".player-view, .player-chrome, .player-bar, .player-fs-dock, .player-actions, .player-server-menu, .player-episode-drawer, .toast, .flixa-header, .movie-card, .details-panel, .search-panel, .flixa-shell, #__next, [data-flixa]";
 
 function isAllowedPlayerFrame(src: string) {
-  return /pipocacine\.lat|cdn-embed\.com|vidcore\.org|cinezo\.live|screenscape\.me|cinesrc\.st|moviesapi\.to|unlimplay\.com|vidsrc\.wiki|videasy\.(?:net|to)|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
+  return /pipocacine\.lat|cdn-embed\.com|cinezo\.live|screenscape\.me|play\.xpass\.top|cinesrc\.st|moviesapi\.to|unlimplay\.com|vidsrc\.wiki|videasy\.(?:net|to)|autoembed\.co|vidphantom\.com|embed-api\.stream|iembed\.codeera\.dev|themoviedb|image\.tmdb|youtube|googlevideo/.test(src);
 }
 
 function isOverlayAd(node: Element) {
@@ -3074,7 +3074,6 @@ type AdditionalPlayerSource = {
 const ADDITIONAL_PLAYER_SOURCES: AdditionalPlayerSource[] = [
   { id: "pipocacine", name: "PipocaCine", theme: "rose", movieUrl: (id) => `https://pipocacine.lat/embed/${id}`, tvUrl: (id, season, episode) => `https://pipocacine.lat/embed/${id}/${season}/${episode}` },
   { id: "cdn-embed", name: "CDN Brasil", theme: "emerald", movieUrl: (id) => `https://cdn-embed.com/filme/${id}`, tvUrl: (id, season, episode) => `https://cdn-embed.com/serie/${id}/${season}/${episode}` },
-  { id: "vidcore", name: "VidCore PT", theme: "violet", movieUrl: (id) => `https://www.vidcore.org/embed/movie/${id}?lang=pt`, tvUrl: (id, season, episode) => `https://www.vidcore.org/embed/tv/${id}/${season}/${episode}?lang=pt` },
   { id: "cinezo", name: "Cinezo", theme: "cyan", movieUrl: (id) => `https://player.cinezo.live/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://player.cinezo.live/embed/tv/${id}/${season}/${episode}` },
   { id: "screenscape", name: "ScreenScape PT", theme: "violet", movieUrl: (id) => `https://screenscape.me/embed?tmdb=${id}&type=movie&lan=por`, tvUrl: (id, season, episode) => `https://screenscape.me/embed?tmdb=${id}&type=tv&s=${season}&e=${episode}&lan=por` },
   { id: "unlimplay", name: "UnlimPlay", theme: "rose", movieUrl: (id) => `https://unlimplay.com/f/embed/movie/${id}`, tvUrl: (id, season, episode) => `https://unlimplay.com/f/embed/tv/${id}/${season}/${episode}` },
@@ -3211,12 +3210,12 @@ function buildPlayerSources(
           : `https://ezvidapi.com/embed/movie/${tmdbOnlyId}`,
       },
       {
-        id: "vidcore",
-        name: "VidCore PT",
+        id: "xpass",
+        name: "XPass Grupo PT",
         theme: "gold",
         src: isTv
-          ? `https://www.vidcore.org/embed/tv/${tmdbOnlyId}/${episodePath}?lang=pt`
-          : `https://www.vidcore.org/embed/movie/${tmdbOnlyId}?lang=pt`,
+          ? `https://play.xpass.top/e/tv/${tmdbOnlyId}/${episodePath}`
+          : `https://play.xpass.top/e/movie/${tmdbOnlyId}`,
       },
       {
         id: "cinesrc",
@@ -4079,7 +4078,7 @@ function MoviePlayer({
 
         {activeSource ? (
           <iframe
-            key={activeSource.src}
+            key={`${activeSource.src}:${partyProviderId ? "party" : "protected"}`}
             ref={playerIframeRef}
             className="video-stage"
             src={activeSource.src}
@@ -4090,7 +4089,7 @@ function MoviePlayer({
             allowFullScreen
             allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
             referrerPolicy="strict-origin-when-cross-origin"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"
+            sandbox={partyProviderId ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"}
             title={movie.title}
           />
         ) : serverPreparing ? (

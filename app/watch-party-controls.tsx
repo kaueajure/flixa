@@ -10,7 +10,7 @@ import {
 } from "ably";
 import { playerServerIdForSource } from "../lib/player-servers";
 
-type PartyProviderId = "cinesrc" | "moviesapi";
+type PartyProviderId = "xpass" | "cinesrc" | "moviesapi";
 
 type PartySource = {
   id: string;
@@ -75,13 +75,15 @@ type AblyAuthResponse = {
   erro?: string;
 };
 
-const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc", "moviesapi"]);
-const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["cinesrc", "moviesapi"];
+const PARTY_PROVIDERS = new Set<PartyProviderId>(["xpass", "cinesrc", "moviesapi"]);
+const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["xpass", "cinesrc", "moviesapi"];
 const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
-  cinesrc: "Principal · comandos validados no sandbox real",
-  moviesapi: "Fallback · troca automática se a fonte interna bloquear",
+  xpass: "Português detectado · comandos validados sem sandbox",
+  cinesrc: "Sem pop-up observado · comandos validados",
+  moviesapi: "Fallback · compatibilidade ampliada sem sandbox",
 };
 const PARTY_PROVIDER_ORIGINS: Record<PartyProviderId, string> = {
+  xpass: "https://play.xpass.top",
   cinesrc: "https://cinesrc.st",
   moviesapi: "https://moviesapi.to",
 };
@@ -106,6 +108,16 @@ function sendPlayerCommand(
   if (!target) return;
   const targetOrigin = PARTY_PROVIDER_ORIGINS[providerId];
   const safeTime = Math.max(0, Number(time) || 0);
+
+  if (providerId === "xpass") {
+    if (command === "getStatus") return;
+    target.postMessage({
+      type: "player.action",
+      action: command,
+      ...(command === "seek" ? { position: safeTime } : {}),
+    }, targetOrigin);
+    return;
+  }
 
   if (providerId === "cinesrc") {
     const send = (nextCommand: string, args: unknown[] = []) => target.postMessage({
@@ -143,7 +155,11 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
   let eventName = "";
   let command = "";
   let result: unknown = null;
-  if (providerId === "cinesrc") {
+  if (providerId === "xpass") {
+    if (data.type !== "player.event" || !data.event || typeof data.event !== "object") return null;
+    details = data.event as Record<string, unknown>;
+    eventName = typeof details.name === "string" ? details.name : "";
+  } else if (providerId === "cinesrc") {
     if (typeof data.type !== "string" || !data.type.startsWith("cinesrc:")) return null;
     eventName = data.type.slice("cinesrc:".length);
     command = typeof data.command === "string" ? data.command : "";
@@ -153,7 +169,11 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
     eventName = data.event;
   }
 
-  const currentTime = Number(details.currentTime ?? details.time ?? data.currentTime ?? data.time);
+  // XPass currently reports the seek destination in `from`, despite the field name.
+  const xpassSeekPosition = providerId === "xpass" && eventName === "seek" ? details.from : undefined;
+  const currentTime = Number(
+    details.currentTime ?? details.time ?? details.position ?? xpassSeekPosition ?? data.currentTime ?? data.time,
+  );
   const pausedValue = details.paused ?? data.paused;
   return {
     name: eventName.toLowerCase(),
@@ -637,7 +657,7 @@ export default function WatchPartyControls({
       if (event.origin !== expectedOrigin) return;
       const playerEvent = parsePlayerEvent(event, currentProvider);
       if (!playerEvent) return;
-      const confirmsPlayback = ["loadedmetadata", "timeupdate", "play", "pause", "seeked", "playerstatus"].includes(playerEvent.name)
+      const confirmsPlayback = ["ready", "loadedmetadata", "timeupdate", "position", "play", "pause", "seek", "seeked", "playerstatus"].includes(playerEvent.name)
         || (playerEvent.name === "response" && (
           Number.isFinite(Number(playerEvent.result)) || typeof playerEvent.result === "boolean"
         ));
@@ -675,8 +695,8 @@ export default function WatchPartyControls({
       };
       if (playerEvent.name === "play") emitSync("play");
       else if (playerEvent.name === "pause" || playerEvent.name === "ended") emitSync("pause");
-      else if (playerEvent.name === "seeked") emitSync("seek");
-      else if (playerEvent.name === "timeupdate" && Date.now() - lastStateSentAtRef.current >= 3_000) {
+      else if (playerEvent.name === "seek" || playerEvent.name === "seeked") emitSync("seek");
+      else if (["position", "timeupdate"].includes(playerEvent.name) && Date.now() - lastStateSentAtRef.current >= 3_000) {
         lastStateSentAtRef.current = Date.now();
         emitSync("state");
       }
@@ -769,6 +789,10 @@ export default function WatchPartyControls({
 
   useEffect(() => {
     if (!roomCode || !providerId || providerFor(activeSource) !== providerId) return;
+    // XPass só resolve a mídia depois do primeiro gesto no player e então passa
+    // a emitir posição continuamente. Um timeout antes desse gesto descartaria
+    // uma fonte saudável enquanto o usuário ainda está no pôster.
+    if (providerId === "xpass") return;
     lastPlayerSignalRef.current = 0;
     const probe = window.setInterval(() => sendPlayerCommand(playerRef.current, providerId, "getStatus"), 1_500);
     const timeout = window.setTimeout(() => {
@@ -840,7 +864,7 @@ export default function WatchPartyControls({
           {!roomCode ? (
             <div className="watch-party-join">
               <p>{compatibleSources.length
-                ? "Play, pausa e avanço ficam sincronizados. Se uma fonte interna bloquear o sandbox, a sala troca de bridge automaticamente."
+                ? "Play, pausa e avanço ficam sincronizados. Na sala, somente os bridges validados abrem sem sandbox para ampliar a compatibilidade."
                 : "Nenhum bridge de grupo está disponível para este título."}</p>
               <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
                 {connecting ? "Conectando…" : "Criar uma sala"}
