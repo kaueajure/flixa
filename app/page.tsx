@@ -619,10 +619,21 @@ export default function Home() {
   }, [authChecking, authUser]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 16);
-    onScroll();
+    let frame = 0;
+    const updateScrollState = () => {
+      frame = 0;
+      const next = window.scrollY > 16;
+      setScrolled((current) => current === next ? current : next);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateScrollState);
+    };
+    updateScrollState();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   async function resolveTitle(id: string, kind: MediaKind) {
@@ -637,7 +648,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    const syncView = () => {
+    const syncView = (event?: Event) => {
       const route = parseRoute(window.location.hash);
       setView(route.view);
       setGenreId(route.genreId ?? null);
@@ -690,7 +701,7 @@ export default function Home() {
       }
 
       setSelectedMovie(null);
-      if (
+      if (event && (
         route.view === "filmes" ||
         route.view === "series" ||
         route.view === "esportes" ||
@@ -698,8 +709,8 @@ export default function Home() {
         route.view === "surpreenda-me" ||
         route.view === "grupo" ||
         route.view === "amigos"
-      ) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      )) {
+        window.scrollTo({ top: 0, behavior: "auto" });
       }
     };
 
@@ -803,7 +814,6 @@ export default function Home() {
         setBrowseItems(Array.isArray(data?.movies) ? data.movies : []);
         setBrowsePages(Math.max(1, Number(data?.totalPages) || 1));
         setBrowseTotal(Math.max(0, Number(data?.totalResults) || 0));
-        window.scrollTo({ top: 0, behavior: "smooth" });
       })
       .catch(() => {
         if (!controller.signal.aborted) {
