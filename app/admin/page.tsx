@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  PROTECTED_PLAYER_ALLOW,
+  PROTECTED_PLAYER_REFERRER_POLICY,
+  PROTECTED_PLAYER_SANDBOX,
+} from "../../lib/player-frame-policy";
 
 type AdminUser = {
   id: number;
@@ -590,7 +595,7 @@ export default function AdminPage() {
             ) : null}
             <div className="server-test-frame-wrap">
               {!modalLoaded ? <div className="server-test-loading">Carregando o player real…</div> : null}
-              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-fullscreen allow-popups allow-popups-to-escape-sandbox" onLoad={() => setModalLoaded(true)} />
+              <iframe key={modalUrl} src={modalUrl} title={`Player de teste ${modalServer.name}`} allow={PROTECTED_PLAYER_ALLOW} allowFullScreen referrerPolicy={PROTECTED_PLAYER_REFERRER_POLICY} sandbox={PROTECTED_PLAYER_SANDBOX} onLoad={() => setModalLoaded(true)} />
             </div>
             <div className="server-test-diagnostic">
               <strong>Diagnóstico automático de {kindLabel(modalKind)}</strong>

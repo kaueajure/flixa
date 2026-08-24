@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { SportsCatalogResponse, SportsEvent, SportsEventStatus } from "../lib/sports-catalog";
+import {
+  PROTECTED_PLAYER_ALLOW,
+  PROTECTED_PLAYER_REFERRER_POLICY,
+  PROTECTED_PLAYER_SANDBOX,
+} from "../lib/player-frame-policy";
 
 type Filter = "all" | "live" | "upcoming" | "past";
 
@@ -162,10 +167,10 @@ export default function SportsView() {
                   className="sports-iframe"
                   src={active.embedUrl}
                   title={`${active.videoLabel || "Vídeo do evento"} — ${active.title}`}
-                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  allow={PROTECTED_PLAYER_ALLOW}
                   allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                  referrerPolicy={PROTECTED_PLAYER_REFERRER_POLICY}
+                  sandbox={PROTECTED_PLAYER_SANDBOX}
                 />
               ) : (
                 <div

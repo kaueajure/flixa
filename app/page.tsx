@@ -7,6 +7,11 @@ import {
   PLAYER_SERVERS,
   playerServerIdForSource,
 } from "../lib/player-servers";
+import {
+  PROTECTED_PLAYER_ALLOW,
+  PROTECTED_PLAYER_REFERRER_POLICY,
+  PROTECTED_PLAYER_SANDBOX,
+} from "../lib/player-frame-policy";
 import BorderCollieForum from "./border-collie-forum";
 import FriendsView, { type FriendActivity } from "./friends-view";
 import LoginForm from "./login-form";
@@ -1168,8 +1173,13 @@ export default function Home() {
           <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
             Séries
           </a>
-          <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
-            Esportes
+          <a
+            href="#minha-lista"
+            className={view === "lista" ? "is-active" : ""}
+            onClick={() => goTo("minha-lista")}
+          >
+            Minha Lista
+            {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
           </a>
           <a
             href="#surpreenda-me"
@@ -1178,6 +1188,10 @@ export default function Home() {
           >
             Surpreenda-me
           </a>
+          <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
+            Esportes
+          </a>
+          <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
           <a
             href="#assistir-em-grupo"
             className={`nav-group-link ${view === "grupo" ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
@@ -1187,15 +1201,6 @@ export default function Home() {
             <span aria-hidden="true">◉</span>
             Assistir em grupo
           </a>
-          <a
-            href="#minha-lista"
-            className={view === "lista" ? "is-active" : ""}
-            onClick={() => goTo("minha-lista")}
-          >
-            Minha Lista
-            {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
-          </a>
-          <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
         </nav>
 
         <div className="header-actions">
@@ -1669,22 +1674,17 @@ export default function Home() {
         <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
           Séries
         </a>
-        <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
-          Esportes
-        </a>
-        <a
-          href="#assistir-em-grupo"
-          className={`${view === "grupo" ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
-          onClick={() => goTo("assistir-em-grupo")}
-          aria-disabled={!WATCH_PARTY_ENABLED}
-        >
-          Grupo
-        </a>
-        <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
         <a href="#minha-lista" className={view === "lista" ? "is-active" : ""} onClick={() => goTo("minha-lista")}>
           Lista
           {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
         </a>
+        <a href="#surpreenda-me" className={view === "surpreenda-me" ? "is-active" : ""} onClick={() => goTo("surpreenda-me")}>
+          Surpresa
+        </a>
+        <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
+          Esportes
+        </a>
+        <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
       </nav>
     </main>
   );
@@ -2862,8 +2862,10 @@ function MovieDetails({
                 className="trailer-frame"
                 src={`${details.trailer}?autoplay=1`}
                 title={`Trailer de ${details.title}`}
-                allow="autoplay; encrypted-media; picture-in-picture"
+                allow={PROTECTED_PLAYER_ALLOW}
                 allowFullScreen
+                referrerPolicy={PROTECTED_PLAYER_REFERRER_POLICY}
+                sandbox={PROTECTED_PLAYER_SANDBOX}
               />
             ) : (
               <ResilientImage
@@ -3166,11 +3168,17 @@ function PlayerServerMenu({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const menuRef = useRef<HTMLDivElement | null>(null);
   const active = sources.find((source) => source.id === activeId) ?? sources[0];
+  const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
+  const visibleSources = normalizedQuery
+    ? sources.filter((source) => source.name.toLocaleLowerCase("pt-BR").includes(normalizedQuery))
+    : sources;
 
   function updateOpen(next: boolean) {
     setOpen(next);
+    if (!next) setQuery("");
     onOpenChange?.(next);
   }
 
@@ -3202,41 +3210,75 @@ function PlayerServerMenu({
       <button
         type="button"
         className="player-server-trigger"
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Servidor: ${active.name}`}
         onClick={() => updateOpen(!open)}
       >
-        <span className="player-server-dot" aria-hidden="true" />
+        <span className="player-server-icon" aria-hidden="true">
+          <i /><i /><i />
+        </span>
         <span className="player-server-copy">
+          <small>Servidor ativo</small>
           <strong>{active.name}</strong>
+        </span>
+        <span className="player-server-count" aria-label={`${sources.length} servidores`}>
+          {sources.length}
         </span>
         <span className="player-server-chevron" aria-hidden="true" />
       </button>
 
       {open ? (
-        <div className="player-server-dropdown" role="listbox" aria-label="Servidores disponíveis">
-          <p className="player-server-heading">Servidores disponíveis</p>
-          {sources.map((source) => {
-            const selected = source.id === active.id;
-            return (
-              <button
-                key={source.id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
-                onClick={() => {
-                  onSelect(source.id);
-                  updateOpen(false);
-                }}
-              >
-                <span className="player-server-dot" aria-hidden="true" />
-                <span className="player-server-copy"><strong>{source.name}</strong></span>
-                {selected ? <span className="player-server-check" aria-hidden="true" /> : null}
-              </button>
-            );
-          })}
+        <div className="player-server-dropdown" role="dialog" aria-label="Alterar servidor">
+          <div className="player-server-heading">
+            <span>
+              <strong>Alterar servidor</strong>
+              <small>Escolha outra fonte de reprodução</small>
+            </span>
+            <em>{sources.length}</em>
+          </div>
+          <label className="player-server-filter">
+            <span aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar servidor"
+              aria-label="Buscar servidor"
+              autoFocus
+            />
+          </label>
+          <div className="player-server-list" role="listbox" aria-label="Servidores disponíveis">
+            {visibleSources.map((source, index) => {
+              const selected = source.id === active.id;
+              return (
+                <button
+                  key={source.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
+                  onClick={() => {
+                    onSelect(source.id);
+                    updateOpen(false);
+                  }}
+                >
+                  <span className="player-server-rank" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="player-server-dot" aria-hidden="true" />
+                  <span className="player-server-copy">
+                    <strong>{source.name}</strong>
+                    <small>{selected ? "Reproduzindo agora" : "Disponível"}</small>
+                  </span>
+                  {selected
+                    ? <span className="player-server-active-label">Em uso</span>
+                    : <span className="player-server-arrow" aria-hidden="true">›</span>}
+                </button>
+              );
+            })}
+            {!visibleSources.length ? <p className="player-server-empty">Nenhum servidor encontrado.</p> : null}
+          </div>
         </div>
       ) : null}
     </div>
@@ -3269,6 +3311,8 @@ function MoviePlayer({
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fsDockVisible, setFsDockVisible] = useState(false);
+  const [sandboxEnabled, setSandboxEnabled] = useState(true);
+  const [sandboxWarningOpen, setSandboxWarningOpen] = useState(false);
   const [disabledServerIds, setDisabledServerIds] = useState<Set<string>>(
     () => new Set(DEFAULT_DISABLED_PLAYER_SERVER_IDS),
   );
@@ -3547,6 +3591,15 @@ function MoviePlayer({
   }, []);
 
   useEffect(() => {
+    if (!sandboxWarningOpen) return;
+    const closeWarning = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSandboxWarningOpen(false);
+    };
+    window.addEventListener("keydown", closeWarning);
+    return () => window.removeEventListener("keydown", closeWarning);
+  }, [sandboxWarningOpen]);
+
+  useEffect(() => {
     const syncFullscreen = () => {
       const active = document.fullscreenElement;
       setIsFullscreen(Boolean(active && (active === stageRef.current || stageRef.current?.contains(active))));
@@ -3708,6 +3761,19 @@ function MoviePlayer({
         />
         <button
           type="button"
+          className={`player-sandbox-toggle ${sandboxEnabled ? "is-protected" : "is-unprotected"}`}
+          aria-label={sandboxEnabled ? "Sandbox ativo. Desativar proteção" : "Sandbox desativado. Ativar proteção"}
+          aria-pressed={sandboxEnabled}
+          onClick={() => {
+            if (sandboxEnabled) setSandboxWarningOpen(true);
+            else setSandboxEnabled(true);
+          }}
+        >
+          <span className="player-sandbox-shield" aria-hidden="true"><i /></span>
+          <span className="player-sandbox-copy"><small>Sandbox</small><strong>{sandboxEnabled ? "Protegido" : "Desativado"}</strong></span>
+        </button>
+        <button
+          type="button"
           className={`player-icon-btn player-fs-btn ${isFullscreen ? "is-active" : ""}`}
           aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           onClick={() => void toggleFullscreen()}
@@ -3721,7 +3787,7 @@ function MoviePlayer({
 
   return (
     <div
-      className={`player-view ${isFullscreen ? "is-fullscreen" : ""} ${menuPinned || episodePanelOpen ? "is-menu-open" : ""} ${activeSource ? `theme-${activeSource.theme}` : ""}`}
+      className={`player-view ${isFullscreen ? "is-fullscreen" : ""} ${menuPinned || episodePanelOpen ? "is-menu-open" : ""} ${sandboxWarningOpen ? "is-sandbox-warning-open" : ""} ${activeSource ? `theme-${activeSource.theme}` : ""}`}
       data-flixa="player"
     >
       {!isFullscreen ? (
@@ -3796,6 +3862,63 @@ function MoviePlayer({
       ) : null}
 
       <div className="player-stage-wrap" ref={stageRef}>
+        {sandboxWarningOpen ? (
+          <div className="player-sandbox-warning-backdrop" role="presentation">
+            <section
+              className="player-sandbox-warning"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="sandbox-warning-title"
+              aria-describedby="sandbox-warning-description"
+            >
+              <span className="player-sandbox-warning-badge">IMPORTANTE</span>
+              <span className="player-sandbox-warning-icon" aria-hidden="true">!</span>
+              <h2 id="sandbox-warning-title">Desativar a proteção do player?</h2>
+              <p id="sandbox-warning-description">
+                Sem o sandbox, o servidor externo poderá abrir novas abas, popups, sobrepor a tela e exibir anúncios sem o controle do Flixa.
+              </p>
+              <div className="player-sandbox-risk-list" aria-label="Riscos ao desativar o sandbox">
+                <span>Conteúdo adulto</span>
+                <span>Nudez e pornografia</span>
+                <span>Propagandas e golpes</span>
+              </div>
+              <strong className="player-sandbox-disclaimer">
+                O Flixa não controla nem se responsabiliza pelo conteúdo exibido por esses provedores quando a proteção estiver desativada.
+              </strong>
+              <div className="player-sandbox-warning-actions">
+                <button
+                  type="button"
+                  className="player-sandbox-cancel"
+                  autoFocus
+                  onClick={() => setSandboxWarningOpen(false)}
+                >
+                  Manter proteção
+                </button>
+                <button
+                  type="button"
+                  className="player-sandbox-confirm"
+                  onClick={() => {
+                    setSandboxEnabled(false);
+                    setSandboxWarningOpen(false);
+                  }}
+                >
+                  Entendo os riscos, desativar
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {!sandboxEnabled ? (
+          <aside className="player-sandbox-live-warning" role="alert">
+            <span aria-hidden="true">!</span>
+            <p>
+              <strong>IMPORTANTE · SANDBOX DESATIVADO</strong>
+              <small>Este provedor pode exibir anúncios, nudez, pornografia, golpes e abrir novas guias.</small>
+            </p>
+            <button type="button" onClick={() => setSandboxEnabled(true)}>Ativar proteção</button>
+          </aside>
+        ) : null}
         <div className="watch-party-layer">
           <WatchPartyControls
             media={{
@@ -3873,7 +3996,7 @@ function MoviePlayer({
 
         {activeSource ? (
           <iframe
-            key={`${activeSource.src}:${partyProviderId ? "party" : "protected"}`}
+            key={`${activeSource.src}:${sandboxEnabled ? "protected" : "unprotected"}`}
             ref={playerIframeRef}
             className="video-stage"
             src={activeSource.src}
@@ -3882,9 +4005,9 @@ function MoviePlayer({
             }}
             onError={() => switchToNextSource(activeSource.id, "erro ao abrir o iframe")}
             allowFullScreen
-            allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
-            referrerPolicy="strict-origin-when-cross-origin"
-            sandbox={partyProviderId ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-popups allow-popups-to-escape-sandbox"}
+            allow={PROTECTED_PLAYER_ALLOW}
+            referrerPolicy={PROTECTED_PLAYER_REFERRER_POLICY}
+            sandbox={sandboxEnabled ? PROTECTED_PLAYER_SANDBOX : undefined}
             title={movie.title}
           />
         ) : serverPreparing ? (
