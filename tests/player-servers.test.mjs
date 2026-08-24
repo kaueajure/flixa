@@ -4,7 +4,7 @@ import test from "node:test";
 import { PLAYER_SERVERS } from "../lib/player-servers.ts";
 
 const curatedServerIds = [
-  "betterflix", "megaembed", "pipocacine", "cdn-embed", "myembed",
+  "betterflix", "megaembed", "pipocacine", "cdn-embed", "vidspark",
   "vidcore", "strigil", "cinezo", "screenscape", "unlimplay",
   "vidsrc-wiki", "cinesrc", "videasy", "moviesapi", "vidzen",
   "autoembed-co", "vidphantom", "embed-api", "iembed", "mapple",
@@ -34,10 +34,14 @@ test("registers usable endpoints for every declared media kind", () => {
   }
 });
 
-test("uses only Strigil for synchronized watch parties", () => {
+test("offers Strigil plus four synchronized watch-party alternatives", () => {
   const partyServers = PLAYER_SERVERS.filter((server) => server.watchPartySupport === "full");
-  assert.deepEqual(partyServers.map((server) => server.id), ["strigil"]);
-  assert.equal(partyServers[0].advertisingProfile, "none-declared");
+  assert.deepEqual(partyServers.map((server) => server.id), ["vidspark", "strigil", "cinesrc", "moviesapi", "vidzen"]);
+  assert.equal(partyServers.length, 5);
+  assert.equal(partyServers.find((server) => server.id === "strigil").advertisingProfile, "none-declared");
+  for (const server of partyServers) {
+    assert.match(server.compatibilityMessage, /áudio PT-BR depende do título/);
+  }
 });
 
 test("prefers Portuguese audio only where the provider supports it", () => {
@@ -47,7 +51,7 @@ test("prefers Portuguese audio only where the provider supports it", () => {
   assert.match(screenscape.testUrl, /[?&]lan=por(?:&|$)/);
   assert.deepEqual(
     PLAYER_SERVERS.filter((server) => server.prioritizesPortugueseAudio).map((server) => server.id),
-    ["betterflix", "megaembed", "pipocacine", "cdn-embed", "myembed", "vidcore", "screenscape"],
+    ["betterflix", "megaembed", "pipocacine", "cdn-embed", "vidcore", "screenscape"],
   );
 
   for (const server of PLAYER_SERVERS) {
