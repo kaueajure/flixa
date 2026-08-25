@@ -8,6 +8,7 @@ import {
   PROTECTED_PLAYER_REFERRER_POLICY,
   PROTECTED_PLAYER_SANDBOX,
 } from "../../lib/player-frame-policy";
+import { useLivePresence } from "../../lib/use-live-presence";
 
 type AdminUser = {
   id: number;
@@ -18,10 +19,13 @@ type AdminUser = {
   criado_em?: string | null;
   atualizado_em?: string | null;
   ultima_atividade?: string | null;
+  area_ativa?: string | null;
   itens_lista?: number;
-  itens_historico?: number;
-  itens_progresso?: number;
-  sessoes_ativas?: number;
+  minutos_assistidos?: number;
+  minutos_reais?: number;
+  titulos_concluidos?: number;
+  itens_em_andamento?: number;
+  conexoes_online?: number;
 };
 
 type Stats = {
@@ -32,6 +36,12 @@ type Stats = {
   administradores: number;
   novos_30_dias: number;
   usuarios_com_progresso: number;
+  usuarios_online: number;
+  minutos_assistidos: number;
+  minutos_reais: number;
+  minutos_estimados: number;
+  titulos_concluidos: number;
+  reproducoes_em_andamento: number;
 };
 
 type ServerStatus = "unknown" | "online" | "degraded" | "offline";
@@ -112,7 +122,6 @@ type AdminServer = {
 };
 
 type AdminTab = "usuarios" | "servidores";
-const PRESENCE_HEARTBEAT_MS = 30_000;
 const USERS_REFRESH_MS = 15_000;
 
 type CatalogCheck = {
@@ -130,6 +139,20 @@ function formatDate(value: string | null) {
   const parsed = new Date(`${value.replace(" ", "T")}Z`);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function formatWatchTime(minutes = 0) {
+  const safe = Math.max(0, Math.floor(Number(minutes) || 0));
+  if (safe < 60) return `${safe} min`;
+  const hours = Math.floor(safe / 60);
+  const remainder = safe % 60;
+  return remainder ? `${hours}h ${remainder}min` : `${hours}h`;
+}
+
+function areaLabel(area?: string | null) {
+  if (area === "admin") return "Admin";
+  if (area === "settings") return "Configurações";
+  return "Flixa";
 }
 
 function statusLabel(status: ServerStatus) {
@@ -211,6 +234,7 @@ async function responseJson<T>(response: Response): Promise<T & { erro?: string 
 
 export default function AdminPage() {
   const router = useRouter();
+  useLivePresence(true, "admin");
   const [tab, setTab] = useState<AdminTab>("usuarios");
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -241,8 +265,14 @@ export default function AdminPage() {
 
   const filteredUsers = useMemo(() => {
     const term = userSearch.trim().toLocaleLowerCase("pt-BR");
-    if (!term) return usuarios;
-    return usuarios.filter((user) => `${user.nome} ${user.username ?? ""} ${user.email}`.toLocaleLowerCase("pt-BR").includes(term));
+    const matches = term
+      ? usuarios.filter((user) => `${user.nome} ${user.username ?? ""} ${user.email}`.toLocaleLowerCase("pt-BR").includes(term))
+      : [...usuarios];
+    return matches.sort((left, right) => {
+      const onlineDifference = Number((right.conexoes_online ?? 0) > 0) - Number((left.conexoes_online ?? 0) > 0);
+      if (onlineDifference) return onlineDifference;
+      return String(right.ultima_atividade ?? "").localeCompare(String(left.ultima_atividade ?? ""));
+    });
   }, [usuarios, userSearch]);
 
   const filteredServers = useMemo(() => {
@@ -295,20 +325,14 @@ export default function AdminPage() {
   useEffect(() => {
     let active = true;
     const timer = window.setTimeout(() => {
-      void fetch("/api/auth/presence", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "include",
-      })
-        .catch(() => null)
-        .then(() => carregar())
+      void carregar()
         .catch((error) => {
           if (active) setErro(error instanceof Error ? error.message : "Falha ao carregar");
         })
         .finally(() => {
           if (active) setCarregando(false);
         });
-    }, 0);
+    }, 200);
     return () => {
       active = false;
       window.clearTimeout(timer);
@@ -316,27 +340,6 @@ export default function AdminPage() {
     // A carga inicial é intencionalmente executada uma vez por montagem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
-
-  useEffect(() => {
-    const heartbeat = () => {
-      if (document.visibilityState !== "visible") return;
-      void fetch("/api/auth/presence", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "include",
-        keepalive: true,
-      }).catch(() => null);
-    };
-    heartbeat();
-    const interval = window.setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
-    window.addEventListener("focus", heartbeat);
-    document.addEventListener("visibilitychange", heartbeat);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", heartbeat);
-      document.removeEventListener("visibilitychange", heartbeat);
-    };
-  }, []);
 
   useEffect(() => {
     if (carregando || tab !== "usuarios") return;
@@ -561,7 +564,7 @@ export default function AdminPage() {
       <section className="admin-v4-workspace">
         <header className="admin-v4-topbar">
           <div><small>Administração / {tab === "usuarios" ? "Usuários" : "Servidores"}</small><h1>{tab === "usuarios" ? "Visão de usuários" : "Operação dos servidores"}</h1></div>
-          <div className="admin-v4-top-actions"><span className="admin-v4-live"><i /> Ao vivo</span><div className="admin-v4-avatar">A</div></div>
+          <div className="admin-v4-top-actions"><span className="admin-v4-live"><i /> {stats?.usuarios_online ?? 0} online · atualiza em 15s</span><div className="admin-v4-avatar">A</div></div>
         </header>
 
         <div className="admin-v4-content">
@@ -570,15 +573,15 @@ export default function AdminPage() {
           {tab === "usuarios" ? (
             <>
               <section className="admin-v4-hero admin-v4-user-hero">
-                <div className="admin-v4-hero-copy"><span className="admin-v4-kicker">Comunidade Flixa</span><h2>Entenda quem usa a plataforma.</h2><p>Acompanhe crescimento, atividade e consumo sem sair desta tela.</p></div>
+                <div className="admin-v4-hero-copy"><span className="admin-v4-kicker">Comunidade Flixa</span><h2>Atividade real, sem números inflados.</h2><p>Presença por página visível e consumo calculado somente a partir de reprodução medida.</p></div>
                 <div className="admin-v4-hero-number"><small>Base total</small><strong>{stats?.usuarios ?? usuarios.length}</strong><span>contas cadastradas</span></div>
               </section>
 
               <section className="admin-v4-metric-grid" aria-label="Métricas de usuários">
+                <article className="is-green"><div><span aria-hidden="true">●</span><small>Online agora</small></div><strong>{stats?.usuarios_online ?? 0}</strong><p>usuários com uma página visível</p></article>
+                <article className="is-purple"><div><span aria-hidden="true">◷</span><small>Tempo medido</small></div><strong>{formatWatchTime(stats?.minutos_assistidos ?? 0)}</strong><p>{formatWatchTime(stats?.minutos_reais ?? 0)} confirmado · {formatWatchTime(stats?.minutos_estimados ?? 0)} aproximado</p></article>
+                <article className="is-gold"><div><span aria-hidden="true">✓</span><small>Conclusões</small></div><strong>{stats?.titulos_concluidos ?? 0}</strong><p>títulos que atingiram o limiar confiável</p></article>
                 <article className="is-red"><div><span aria-hidden="true">↗</span><small>Crescimento</small></div><strong>+{stats?.novos_30_dias ?? 0}</strong><p>novos usuários em 30 dias</p></article>
-                <article className="is-purple"><div><span aria-hidden="true">◐</span><small>Engajamento</small></div><strong>{stats?.usuarios_com_progresso ?? 0}</strong><p>usuários com reprodução</p></article>
-                <article className="is-gold"><div><span aria-hidden="true">★</span><small>Biblioteca</small></div><strong>{stats?.itens_lista ?? 0}</strong><p>títulos salvos em listas</p></article>
-                <article className="is-blue"><div><span aria-hidden="true">●</span><small>Histórico</small></div><strong>{stats?.itens_historico ?? 0}</strong><p>títulos reproduzidos</p></article>
               </section>
 
               <section className="admin-v4-panel">
@@ -587,12 +590,13 @@ export default function AdminPage() {
                   <div className="admin-v4-user-labels"><span>Perfil</span><span>Consumo</span><span>Atividade</span><span>Acesso</span><span>Ações</span></div>
                   {filteredUsers.map((user) => {
                     const isSelf = user.id === euId;
+                    const isOnline = (user.conexoes_online ?? 0) > 0;
                     return (
                       <article className="admin-v4-user-row" key={user.id}>
                         <div className="admin-v4-person"><span>{user.nome.slice(0, 2).toUpperCase()}</span><div><strong>{user.nome}</strong><small>{user.username ? `@${user.username}` : "Sem username"}</small><p>{user.email}</p></div></div>
-                        <div className="admin-v4-consumption"><span><strong>{user.itens_lista ?? 0}</strong><small>na lista</small></span><span><strong>{user.itens_historico ?? 0}</strong><small>assistidos</small></span><span><strong>{user.itens_progresso ?? 0}</strong><small>em curso</small></span></div>
-                        <div className="admin-v4-activity"><strong>{formatDate(user.ultima_atividade ?? null)}</strong><small>Entrou em {formatDate(user.criado_em ?? null)}</small></div>
-                        <div className="admin-v4-access"><span className={(user.sessoes_ativas ?? 0) > 0 ? "is-online" : "is-idle"}><i />{(user.sessoes_ativas ?? 0) > 0 ? "Online" : "Offline"}</span><small>{user.administrador ? "Administrador" : "Membro"}</small></div>
+                        <div className="admin-v4-consumption"><span title={`${formatWatchTime(user.minutos_reais)} confirmado; ${formatWatchTime((user.minutos_assistidos ?? 0) - (user.minutos_reais ?? 0))} aproximado`}><strong>{formatWatchTime(user.minutos_assistidos)}</strong><small>reprodução</small></span><span><strong>{user.titulos_concluidos ?? 0}</strong><small>concluídos</small></span><span><strong>{user.itens_em_andamento ?? 0}</strong><small>em curso</small></span></div>
+                        <div className="admin-v4-activity"><strong>{isOnline ? `Agora · ${areaLabel(user.area_ativa)}` : formatDate(user.ultima_atividade ?? null)}</strong><small>Entrou em {formatDate(user.criado_em ?? null)}</small></div>
+                        <div className="admin-v4-access"><span className={isOnline ? "is-online" : "is-idle"}><i />{isOnline ? "Online" : "Offline"}</span><small>{isOnline && (user.conexoes_online ?? 0) > 1 ? `${user.conexoes_online} páginas ativas · ` : ""}{user.administrador ? "Administrador" : "Membro"}</small></div>
                         <div className="admin-v4-row-actions"><button type="button" disabled={busyId === `user:${user.id}` || (isSelf && user.administrador)} onClick={() => void toggleAdmin(user)}>{user.administrador ? "Remover admin" : "Promover"}</button><button type="button" className="is-danger" disabled={busyId === `user:${user.id}` || isSelf} onClick={() => void excluir(user)} aria-label={`Excluir ${user.nome}`}>×</button></div>
                       </article>
                     );
@@ -605,7 +609,7 @@ export default function AdminPage() {
             <>
               <section className="admin-v4-server-overview">
                 <article className="admin-v4-health-card"><div className="admin-v4-health-ring" style={{ "--health": `${healthPercent * 3.6}deg` } as React.CSSProperties}><span><strong>{healthPercent}%</strong><small>saúde geral</small></span></div><div><span className="admin-v4-kicker">Infraestrutura</span><h2>Visão da rede</h2><p>Estado consolidado dos provedores e auditorias de reprodução.</p><div className="admin-v4-health-legend"><span><i className="is-online" />{serverStats.online} online</span><span><i className="is-warning" />{serverStats.degraded} instáveis</span><span><i className="is-offline" />{serverStats.offline} offline</span></div></div></article>
-                <div className="admin-v4-server-metrics"><article><span>Provedores</span><strong>{servidores.length}</strong><small>{serverStats.enabled} habilitados</small></article><article><span>Foco PT-BR</span><strong>{serverStats.ptPriority}</strong><small>{serverStats.ptConfirmed} com auditoria 3/3</small></article><article><span>Em progresso</span><strong>{stats?.itens_progresso ?? 0}</strong><small>reproduções salvas</small></article><article><span>Latência média</span><strong>{Math.round(servidores.reduce((sum, server) => sum + (server.last_latency_ms ?? 0), 0) / Math.max(servidores.filter((server) => server.last_latency_ms != null).length, 1))}<em>ms</em></strong><small>entre testes registrados</small></article></div>
+                <div className="admin-v4-server-metrics"><article><span>Provedores</span><strong>{servidores.length}</strong><small>{serverStats.enabled} habilitados</small></article><article><span>Foco PT-BR</span><strong>{serverStats.ptPriority}</strong><small>{serverStats.ptConfirmed} com auditoria 3/3</small></article><article><span>Em andamento</span><strong>{stats?.reproducoes_em_andamento ?? 0}</strong><small>players realmente iniciados</small></article><article><span>Latência média</span><strong>{Math.round(servidores.reduce((sum, server) => sum + (server.last_latency_ms ?? 0), 0) / Math.max(servidores.filter((server) => server.last_latency_ms != null).length, 1))}<em>ms</em></strong><small>entre testes registrados</small></article></div>
               </section>
 
               <section className={`admin-v4-catalog ${catalogCheck ? `is-${catalogCheck.status}` : ""}`}><div className="admin-v4-catalog-icon"><span>✓</span></div><div><span className="admin-v4-kicker">Qualidade do catálogo</span><h3>{catalogCheck ? (catalogCheck.status === "online" ? "Catálogo validado" : "Foram encontrados problemas") : "Validação pendente"}</h3><p>{catalogCheck ? `${catalogCheck.valid}/${catalogCheck.total} títulos válidos nos provedores ativos` : "Verifique IDs, imagens, duplicidades e disponibilidade dos títulos."}</p>{catalogCheck?.problems.length ? <small>{catalogCheck.problems.slice(0, 2).map((problem) => `${problem.title}: ${problem.issues.join(", ")}`).join(" · ")}</small> : null}</div><button type="button" disabled={catalogChecking} onClick={() => void validarCatalogo()}>{catalogChecking ? "Validando…" : "Executar validação"}</button></section>

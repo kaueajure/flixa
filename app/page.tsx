@@ -26,6 +26,7 @@ import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
 import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 import { parsePlayerPlaybackEvent } from "../lib/player-events";
+import { useLivePresence } from "../lib/use-live-presence";
 
 type MediaKind = "movie" | "tv";
 
@@ -67,7 +68,6 @@ type Movie = {
 
 type Genre = { id: number; name: string };
 type View = "home" | "filmes" | "series" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos" | "retrospectiva";
-const PRESENCE_HEARTBEAT_MS = 30_000;
 
 type AuthUser = {
   id: number;
@@ -497,6 +497,7 @@ function useFocusTrap(active: boolean, ref: RefObject<HTMLElement | null>) {
 
 export default function Home() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  useLivePresence(Boolean(authUser), "app");
   const [authChecking, setAuthChecking] = useState(true);
   const [loginOpen, setLoginOpen] = useState(false);
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -704,29 +705,6 @@ export default function Home() {
         .catch(() => {});
     }
     return () => window.clearTimeout(boot);
-  }, [authChecking, authUser]);
-
-  useEffect(() => {
-    if (authChecking || !authUser) return;
-    const heartbeat = () => {
-      if (document.visibilityState !== "visible") return;
-      void fetch("/api/auth/presence", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "include",
-        keepalive: true,
-      }).catch(() => null);
-    };
-    const onVisibilityChange = () => heartbeat();
-    heartbeat();
-    const interval = window.setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
-    window.addEventListener("focus", heartbeat);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", heartbeat);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
   }, [authChecking, authUser]);
 
   useEffect(() => {

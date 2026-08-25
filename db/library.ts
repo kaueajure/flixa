@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withDb } from "./index";
-import { episodios_assistidos, historico_assistidos, lista_colecao_itens, lista_colecoes, lista_titulos, progresso_reproducao, sessoes_visualizacao, usuarios } from "./schema";
+import { episodios_assistidos, historico_assistidos, lista_colecao_itens, lista_colecoes, lista_titulos, presencas_usuarios, progresso_reproducao, sessoes_visualizacao, usuarios } from "./schema";
 
 export type TituloPayload = {
   id: string;
@@ -449,7 +449,23 @@ export async function estatisticasAdmin() {
     const [progressoCount] = await db.select({ total: sql<number>`count(*)` }).from(progresso_reproducao);
     const [adminCount] = await db.select({ total: sql<number>`count(*)` }).from(usuarios).where(sql`${usuarios.administrador} = 1`);
     const [newUsersCount] = await db.select({ total: sql<number>`count(*)` }).from(usuarios).where(sql`${usuarios.criado_em} >= date_sub(current_timestamp, interval 30 day)`);
-    const [activeUsersCount] = await db.select({ total: sql<number>`count(distinct ${progresso_reproducao.usuario_id})` }).from(progresso_reproducao);
+    const [activeUsersCount] = await db.select({ total: sql<number>`count(distinct ${sessoes_visualizacao.usuario_id})` })
+      .from(sessoes_visualizacao)
+      .where(sql`${sessoes_visualizacao.segundos_assistidos} > 0 and ${sessoes_visualizacao.iniciado_em} >= date_sub(utc_timestamp, interval 30 day)`);
+    const [onlineUsersCount] = await db.select({ total: sql<number>`count(distinct ${presencas_usuarios.usuario_id})` })
+      .from(presencas_usuarios)
+      .where(sql`${presencas_usuarios.ativa} = 1 and ${presencas_usuarios.ultima_atividade_em} > date_sub(utc_timestamp, interval 75 second)`);
+    const [watchTime] = await db.select({
+      total: sql<number>`coalesce(floor(sum(${sessoes_visualizacao.segundos_assistidos}) / 60), 0)`,
+      real: sql<number>`coalesce(floor(sum(case when ${sessoes_visualizacao.fonte_progresso} = 'real' then ${sessoes_visualizacao.segundos_assistidos} else 0 end) / 60), 0)`,
+      estimated: sql<number>`coalesce(floor(sum(case when ${sessoes_visualizacao.fonte_progresso} = 'estimado' then ${sessoes_visualizacao.segundos_assistidos} else 0 end) / 60), 0)`,
+    }).from(sessoes_visualizacao);
+    const [completedCount] = await db.select({ total: sql<number>`count(*)` })
+      .from(progresso_reproducao)
+      .where(eq(progresso_reproducao.estado_reproducao, "concluido"));
+    const [inProgressCount] = await db.select({ total: sql<number>`count(*)` })
+      .from(progresso_reproducao)
+      .where(sql`${progresso_reproducao.estado_reproducao} in ('reproduzindo', 'pausado') and ${progresso_reproducao.progresso} > 0 and ${progresso_reproducao.progresso} < 90`);
     return {
       usuarios: Number(usuariosCount?.total || 0),
       itens_lista: Number(listaCount?.total || 0),
@@ -458,6 +474,12 @@ export async function estatisticasAdmin() {
       administradores: Number(adminCount?.total || 0),
       novos_30_dias: Number(newUsersCount?.total || 0),
       usuarios_com_progresso: Number(activeUsersCount?.total || 0),
+      usuarios_online: Number(onlineUsersCount?.total || 0),
+      minutos_assistidos: Number(watchTime?.total || 0),
+      minutos_reais: Number(watchTime?.real || 0),
+      minutos_estimados: Number(watchTime?.estimated || 0),
+      titulos_concluidos: Number(completedCount?.total || 0),
+      reproducoes_em_andamento: Number(inProgressCount?.total || 0),
     };
   });
 }

@@ -1,21 +1,22 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, asc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { withDb } from "./index";
 import { describeDatabaseFailure, safeDatabaseError } from "./errors";
 import { isValidProfileAvatar } from "../lib/profile-avatars";
 import {
-  historico_assistidos,
   lista_titulos,
+  presencas_usuarios,
   progresso_reproducao,
   recuperacoes_senha,
   sessoes,
+  sessoes_visualizacao,
   usuarios,
   type Usuario,
 } from "./schema";
 
 export const SESSAO_COOKIE = "flixa_sessao";
 export const SESSAO_DIAS = 14;
-export const PRESENCA_JANELA_SEGUNDOS = 90;
+export const PRESENCA_JANELA_SEGUNDOS = 75;
 
 export type UsuarioPublico = {
   id: number;
@@ -391,20 +392,45 @@ export async function redefinirSenhaComToken(token: string, novaSenha: string) {
   }));
 }
 
-export async function registrarPresenca(token: string | null) {
+export async function registrarPresenca(usuarioId: number, token: string | null, clienteId: string, area: string) {
   if (!token) return;
+  const agora = agoraSql();
   await withDb(async (db) => {
     await db
       .update(sessoes)
-      .set({ ultima_atividade_em: agoraSql() })
+      .set({ ultima_atividade_em: agora })
       .where(and(eq(sessoes.token, token), gt(sessoes.expira_em, agoraSql())));
+    await db.insert(presencas_usuarios).values({
+      usuario_id: usuarioId,
+      cliente_id: clienteId,
+      area,
+      ativa: 1,
+      ultima_atividade_em: agora,
+      criado_em: agora,
+    }).onDuplicateKeyUpdate({ set: {
+      area,
+      ativa: 1,
+      ultima_atividade_em: agora,
+    } });
+  });
+}
+
+export async function encerrarPresenca(usuarioId: number, clienteId: string) {
+  await withDb(async (db) => {
+    await db.update(presencas_usuarios).set({
+      ativa: 0,
+      ultima_atividade_em: agoraSql(),
+    }).where(and(
+      eq(presencas_usuarios.usuario_id, usuarioId),
+      eq(presencas_usuarios.cliente_id, clienteId),
+    ));
   });
 }
 
 export async function listarUsuariosAdmin() {
   return withDb(async (db) => {
-    const rows = await db
-      .select({
+    const [rows, listRows, watchRows, progressRows, onlineRows, lastPresenceRows, lastSessionRows] = await Promise.all([
+      db.select({
         id: usuarios.id,
         nome: usuarios.nome,
         username: usuarios.username,
@@ -412,25 +438,61 @@ export async function listarUsuariosAdmin() {
         administrador: usuarios.administrador,
         criado_em: usuarios.criado_em,
         atualizado_em: usuarios.atualizado_em,
-        itens_lista: sql<number>`(select count(*) from ${lista_titulos} where ${lista_titulos.usuario_id} = ${usuarios.id})`,
-        itens_historico: sql<number>`(select count(*) from ${historico_assistidos} where ${historico_assistidos.usuario_id} = ${usuarios.id})`,
-        itens_progresso: sql<number>`(select count(*) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id})`,
-        sessoes_ativas: sql<number>`(
-          select count(*)
-          from ${sessoes}
-          where ${sessoes.usuario_id} = ${usuarios.id}
-            and ${sessoes.expira_em} > current_timestamp
-            and ${sessoes.ultima_atividade_em} > date_sub(current_timestamp, interval 90 second)
-        )`,
-        ultima_atividade: sql<string | null>`greatest(
-          ${usuarios.atualizado_em},
-          coalesce((select max(${historico_assistidos.assistido_em}) from ${historico_assistidos} where ${historico_assistidos.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em}),
-          coalesce((select max(${progresso_reproducao.atualizado_em}) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em}),
-          coalesce((select max(${sessoes.ultima_atividade_em}) from ${sessoes} where ${sessoes.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em})
-        )`,
-      })
-      .from(usuarios)
-      .orderBy(asc(usuarios.id));
+      }).from(usuarios).orderBy(asc(usuarios.id)),
+      db.select({
+        userId: lista_titulos.usuario_id,
+        total: sql<number>`count(*)`,
+      }).from(lista_titulos).groupBy(lista_titulos.usuario_id),
+      db.select({
+        userId: sessoes_visualizacao.usuario_id,
+        seconds: sql<number>`coalesce(sum(${sessoes_visualizacao.segundos_assistidos}), 0)`,
+        realSeconds: sql<number>`coalesce(sum(case when ${sessoes_visualizacao.fonte_progresso} = 'real' then ${sessoes_visualizacao.segundos_assistidos} else 0 end), 0)`,
+      }).from(sessoes_visualizacao).groupBy(sessoes_visualizacao.usuario_id),
+      db.select({
+        userId: progresso_reproducao.usuario_id,
+        completed: sql<number>`sum(case when ${progresso_reproducao.estado_reproducao} = 'concluido' then 1 else 0 end)`,
+        inProgress: sql<number>`sum(case when ${progresso_reproducao.estado_reproducao} in ('reproduzindo', 'pausado') and ${progresso_reproducao.progresso} > 0 and ${progresso_reproducao.progresso} < 90 then 1 else 0 end)`,
+      }).from(progresso_reproducao).groupBy(progresso_reproducao.usuario_id),
+      db.select({
+        userId: presencas_usuarios.usuario_id,
+        area: presencas_usuarios.area,
+        lastActivity: presencas_usuarios.ultima_atividade_em,
+      }).from(presencas_usuarios)
+        .where(and(
+          eq(presencas_usuarios.ativa, 1),
+          gt(presencas_usuarios.ultima_atividade_em, sql`date_sub(utc_timestamp, interval 75 second)`),
+        ))
+        .orderBy(desc(presencas_usuarios.ultima_atividade_em)),
+      db.select({
+        userId: presencas_usuarios.usuario_id,
+        lastActivity: sql<string | null>`max(${presencas_usuarios.ultima_atividade_em})`,
+      }).from(presencas_usuarios).groupBy(presencas_usuarios.usuario_id),
+      db.select({
+        userId: sessoes.usuario_id,
+        lastActivity: sql<string | null>`max(${sessoes.ultima_atividade_em})`,
+      }).from(sessoes).groupBy(sessoes.usuario_id),
+    ]);
+
+    const listByUser = new Map(listRows.map((row) => [row.userId, Number(row.total || 0)]));
+    const watchByUser = new Map(watchRows.map((row) => [row.userId, {
+      minutes: Math.floor(Number(row.seconds || 0) / 60),
+      realMinutes: Math.floor(Number(row.realSeconds || 0) / 60),
+    }]));
+    const progressByUser = new Map(progressRows.map((row) => [row.userId, {
+      completed: Number(row.completed || 0),
+      inProgress: Number(row.inProgress || 0),
+    }]));
+    const onlineByUser = new Map<number, { count: number; area: string }>();
+    for (const presence of onlineRows) {
+      const current = onlineByUser.get(presence.userId);
+      onlineByUser.set(presence.userId, {
+        count: (current?.count ?? 0) + 1,
+        area: current?.area ?? presence.area,
+      });
+    }
+    const lastPresenceByUser = new Map(lastPresenceRows.map((row) => [row.userId, row.lastActivity]));
+    const lastSessionByUser = new Map(lastSessionRows.map((row) => [row.userId, row.lastActivity]));
+
     return rows.map((row) => ({
       id: row.id,
       nome: row.nome,
@@ -439,11 +501,17 @@ export async function listarUsuariosAdmin() {
       administrador: Number(row.administrador) === 1,
       criado_em: row.criado_em,
       atualizado_em: row.atualizado_em,
-      itens_lista: Number(row.itens_lista || 0),
-      itens_historico: Number(row.itens_historico || 0),
-      itens_progresso: Number(row.itens_progresso || 0),
-      sessoes_ativas: Number(row.sessoes_ativas || 0),
-      ultima_atividade: row.ultima_atividade,
+      itens_lista: listByUser.get(row.id) ?? 0,
+      minutos_assistidos: watchByUser.get(row.id)?.minutes ?? 0,
+      minutos_reais: watchByUser.get(row.id)?.realMinutes ?? 0,
+      titulos_concluidos: progressByUser.get(row.id)?.completed ?? 0,
+      itens_em_andamento: progressByUser.get(row.id)?.inProgress ?? 0,
+      conexoes_online: onlineByUser.get(row.id)?.count ?? 0,
+      area_ativa: onlineByUser.get(row.id)?.area ?? null,
+      ultima_atividade: [lastPresenceByUser.get(row.id), lastSessionByUser.get(row.id), row.criado_em]
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1) ?? row.criado_em,
     }));
   });
 }

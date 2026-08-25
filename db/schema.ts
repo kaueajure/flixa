@@ -61,6 +61,31 @@ export const sessoes = mysqlTable(
   ],
 );
 
+/** Presença por aba/dispositivo visível. Sessões autenticadas não significam usuários online. */
+export const presencas_usuarios = mysqlTable(
+  "presencas_usuarios",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_id: int("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    cliente_id: varchar("cliente_id", { length: 64 }).notNull(),
+    area: varchar("area", { length: 32 }).notNull().default("app"),
+    ativa: tinyint("ativa").notNull().default(1),
+    ultima_atividade_em: datetime("ultima_atividade_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    criado_em: datetime("criado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("presencas_usuario_cliente_unico").on(table.usuario_id, table.cliente_id),
+    index("presencas_online_idx").on(table.ativa, table.ultima_atividade_em),
+    index("presencas_usuario_idx").on(table.usuario_id, table.ultima_atividade_em),
+  ],
+);
+
 /** Links temporários e de uso único para recuperação de senha. */
 export const recuperacoes_senha = mysqlTable(
   "recuperacoes_senha",
@@ -353,6 +378,7 @@ export const servidores_player = mysqlTable(
 
 export type Usuario = typeof usuarios.$inferSelect;
 export type Sessao = typeof sessoes.$inferSelect;
+export type PresencaUsuario = typeof presencas_usuarios.$inferSelect;
 export type RecuperacaoSenha = typeof recuperacoes_senha.$inferSelect;
 export type Amizade = typeof amizades.$inferSelect;
 export type RecomendacaoAmigo = typeof recomendacoes_amigos.$inferSelect;

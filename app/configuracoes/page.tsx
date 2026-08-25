@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AccountSettingsPage, { type AccountUser } from "../account-settings-page";
-
-const PRESENCE_HEARTBEAT_MS = 30_000;
+import { useLivePresence } from "../../lib/use-live-presence";
 
 export default function AccountSettingsRoute() {
   const router = useRouter();
   const [user, setUser] = useState<AccountUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  useLivePresence(Boolean(user), "settings");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,22 +39,6 @@ export default function AccountSettingsRoute() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, [router]);
-
-  useEffect(() => {
-    if (!user) return;
-    const heartbeat = () => {
-      if (document.visibilityState !== "visible") return;
-      void fetch("/api/auth/presence", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "include",
-        keepalive: true,
-      }).catch(() => null);
-    };
-    heartbeat();
-    const interval = window.setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
-    return () => window.clearInterval(interval);
-  }, [user]);
 
   useEffect(() => {
     document.title = "Configurações da conta — Flixa";

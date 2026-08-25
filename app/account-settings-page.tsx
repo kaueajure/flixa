@@ -29,6 +29,7 @@ async function readResponse(response: Response) {
 }
 
 export default function AccountSettingsPage({ user, onUpdated }: Props) {
+  const [activeSection, setActiveSection] = useState<"profile" | "security">("profile");
   const [nome, setNome] = useState(user.nome);
   const [email, setEmail] = useState(user.email);
   const [senhaEmail, setSenhaEmail] = useState("");
@@ -166,10 +167,34 @@ export default function AccountSettingsPage({ user, onUpdated }: Props) {
       </header>
       <div className="account-page-layout">
         <aside className="account-page-intro">
-          <small>Sua conta</small>
-          <h1>Configurações</h1>
-          <p>Gerencie sua foto, seus dados de acesso e a segurança da conta.</p>
-          <Link href="/#home"><span aria-hidden="true">←</span> Voltar para o Flixa</Link>
+          <div className="account-page-intro-heading">
+            <small>Sua conta</small>
+            <h1>Configurações</h1>
+            <p>Tudo que você precisa, sem complicação.</p>
+          </div>
+          <nav className="account-page-nav" aria-label="Seções das configurações">
+            <button
+              type="button"
+              className={activeSection === "profile" ? "is-active" : ""}
+              onClick={() => setActiveSection("profile")}
+              aria-current={activeSection === "profile" ? "page" : undefined}
+            >
+              <span className="account-page-nav-icon" aria-hidden="true">◉</span>
+              <span><strong>Perfil</strong><small>Foto e dados pessoais</small></span>
+              <i aria-hidden="true">›</i>
+            </button>
+            <button
+              type="button"
+              className={activeSection === "security" ? "is-active" : ""}
+              onClick={() => setActiveSection("security")}
+              aria-current={activeSection === "security" ? "page" : undefined}
+            >
+              <span className="account-page-nav-icon" aria-hidden="true">◆</span>
+              <span><strong>Segurança</strong><small>Senha e sessões</small></span>
+              <i aria-hidden="true">›</i>
+            </button>
+          </nav>
+          <Link className="account-page-back" href="/#home"><span aria-hidden="true">←</span> Voltar para o Flixa</Link>
         </aside>
         <section className={`account-settings-panel${avatarPickerOpen ? " is-avatar-picker" : ""}`} aria-labelledby="account-page-title">
         {avatarPickerOpen ? (
@@ -234,78 +259,99 @@ export default function AccountSettingsPage({ user, onUpdated }: Props) {
           </div>
         ) : (
           <>
-        <header>
-          <div>
-            <small>Visão geral</small>
-            <h2 id="account-page-title">Dados da conta</h2>
-          </div>
-        </header>
+            <header>
+              <div>
+                <small>{activeSection === "profile" ? "Perfil" : "Segurança"}</small>
+                <h2 id="account-page-title">{activeSection === "profile" ? "Seu perfil" : "Proteja sua conta"}</h2>
+              </div>
+              <span className="account-panel-badge">{activeSection === "profile" ? "Público" : "Privado"}</span>
+            </header>
 
-        <section className="account-section account-avatar-section" aria-labelledby="account-avatar-title">
-          <div className="account-avatar-heading">
-            <ProfileAvatar avatarId={user.avatarId} name={user.nome} className="account-avatar-preview" />
-            <div className="account-section-title">
-              <h3 id="account-avatar-title">Foto do perfil</h3>
-              <p>{currentAvatar ? `${currentAvatar.name} · ${currentAvatar.collectionName}` : "Você está usando a inicial do seu nome."}</p>
+            <div className="account-settings-content">
+              {activeSection === "profile" ? (
+                <>
+                  <section className="account-section account-avatar-section" aria-labelledby="account-avatar-title">
+                    <div className="account-avatar-heading">
+                      <ProfileAvatar avatarId={user.avatarId} name={user.nome} className="account-avatar-preview" />
+                      <div className="account-section-title">
+                        <h3 id="account-avatar-title">Foto do perfil</h3>
+                        <p>{currentAvatar ? `${currentAvatar.name} · ${currentAvatar.collectionName}` : "Você está usando a inicial do seu nome."}</p>
+                      </div>
+                      <button type="button" className="account-avatar-change" onClick={openAvatarPicker}>Alterar foto</button>
+                    </div>
+                    <small className="account-avatar-count">{PROFILE_AVATARS.length} personagens organizados em {PROFILE_AVATAR_COLLECTIONS.length} coleções.</small>
+                    {avatarStatus ? <p className={`account-status is-${avatarStatus.kind}`} role="status">{avatarStatus.text}</p> : null}
+                  </section>
+
+                  <form className="account-section account-profile-form" onSubmit={saveProfile}>
+                    <div className="account-section-title">
+                      <h3>Dados pessoais</h3>
+                      <p>Seu nome fica visível para amigos. O username é permanente.</p>
+                    </div>
+                    <div className="account-form-grid">
+                      <label>
+                        <span>Nome</span>
+                        <input type="text" autoComplete="name" value={nome} onChange={(event) => setNome(event.target.value)} minLength={2} maxLength={120} required />
+                      </label>
+                      <label>
+                        <span>Username</span>
+                        <div className="account-locked-field">
+                          <input type="text" value={user.username ? `@${user.username}` : "Ainda não definido"} disabled readOnly />
+                        </div>
+                      </label>
+                    </div>
+                    <label>
+                      <span>E-mail</span>
+                      <input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                    </label>
+                    {emailChanged ? (
+                      <label>
+                        <span>Senha atual para confirmar o novo e-mail</span>
+                        <input type="password" autoComplete="current-password" value={senhaEmail} onChange={(event) => setSenhaEmail(event.target.value)} required />
+                      </label>
+                    ) : null}
+                    <div className="account-form-footer">
+                      {profileStatus ? <p className={`account-status is-${profileStatus.kind}`} role="status">{profileStatus.text}</p> : <small>As alterações são salvas na sua conta.</small>}
+                      <button className="account-save" type="submit" disabled={savingProfile}>{savingProfile ? "Salvando…" : "Salvar alterações"}</button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <section className="account-security-summary" aria-label="Informações de segurança">
+                    <span aria-hidden="true">✓</span>
+                    <div>
+                      <strong>Senha protegida</strong>
+                      <p>Ao trocar sua senha, todas as outras sessões serão encerradas automaticamente.</p>
+                    </div>
+                  </section>
+                  <form className="account-section account-password-form" onSubmit={savePassword}>
+                    <div className="account-section-title">
+                      <h3>Trocar senha</h3>
+                      <p>Use pelo menos 6 caracteres e evite senhas repetidas.</p>
+                    </div>
+                    <label>
+                      <span>Senha atual</span>
+                      <input type="password" autoComplete="current-password" value={senhaAtual} onChange={(event) => setSenhaAtual(event.target.value)} required />
+                    </label>
+                    <div className="account-password-grid">
+                      <label>
+                        <span>Nova senha</span>
+                        <input type="password" autoComplete="new-password" value={novaSenha} onChange={(event) => setNovaSenha(event.target.value)} minLength={6} required />
+                      </label>
+                      <label>
+                        <span>Confirmar nova senha</span>
+                        <input type="password" autoComplete="new-password" value={confirmarSenha} onChange={(event) => setConfirmarSenha(event.target.value)} minLength={6} required />
+                      </label>
+                    </div>
+                    <div className="account-form-footer">
+                      {passwordStatus ? <p className={`account-status is-${passwordStatus.kind}`} role="status">{passwordStatus.text}</p> : <small>Você continuará conectado neste dispositivo.</small>}
+                      <button className="account-save" type="submit" disabled={savingPassword}>{savingPassword ? "Alterando…" : "Atualizar senha"}</button>
+                    </div>
+                  </form>
+                </>
+              )}
             </div>
-            <button type="button" className="account-avatar-change" onClick={openAvatarPicker}>Alterar foto</button>
-          </div>
-          <small className="account-avatar-count">{PROFILE_AVATARS.length} personagens organizados em {PROFILE_AVATAR_COLLECTIONS.length} coleções.</small>
-          {avatarStatus ? <p className={`account-status is-${avatarStatus.kind}`} role="status">{avatarStatus.text}</p> : null}
-        </section>
-
-        <form className="account-section" onSubmit={saveProfile}>
-          <div className="account-section-title">
-            <h3>Perfil e acesso</h3>
-            <p>O nome aparece para você e para seus amigos.</p>
-          </div>
-          <label>
-            <span>Nome</span>
-            <input type="text" autoComplete="name" value={nome} onChange={(event) => setNome(event.target.value)} minLength={2} maxLength={120} required />
-          </label>
-          <label>
-            <span>Username</span>
-            <div className="account-locked-field">
-              <input type="text" value={user.username ? `@${user.username}` : "Ainda não definido"} disabled readOnly />
-              <small>Seu username é permanente e não pode ser alterado.</small>
-            </div>
-          </label>
-          <label>
-            <span>E-mail</span>
-            <input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-          </label>
-          {emailChanged ? (
-            <label>
-              <span>Senha atual para confirmar o novo e-mail</span>
-              <input type="password" autoComplete="current-password" value={senhaEmail} onChange={(event) => setSenhaEmail(event.target.value)} required />
-            </label>
-          ) : null}
-          {profileStatus ? <p className={`account-status is-${profileStatus.kind}`} role="status">{profileStatus.text}</p> : null}
-          <button className="account-save" type="submit" disabled={savingProfile}>{savingProfile ? "Salvando…" : "Salvar dados"}</button>
-        </form>
-
-        <form className="account-section" onSubmit={savePassword}>
-          <div className="account-section-title">
-            <h3>Trocar senha</h3>
-            <p>Ao alterar, suas outras sessões serão encerradas.</p>
-          </div>
-          <label>
-            <span>Senha atual</span>
-            <input type="password" autoComplete="current-password" value={senhaAtual} onChange={(event) => setSenhaAtual(event.target.value)} required />
-          </label>
-          <div className="account-password-grid">
-            <label>
-              <span>Nova senha</span>
-              <input type="password" autoComplete="new-password" value={novaSenha} onChange={(event) => setNovaSenha(event.target.value)} minLength={6} required />
-            </label>
-            <label>
-              <span>Confirmar nova senha</span>
-              <input type="password" autoComplete="new-password" value={confirmarSenha} onChange={(event) => setConfirmarSenha(event.target.value)} minLength={6} required />
-            </label>
-          </div>
-          {passwordStatus ? <p className={`account-status is-${passwordStatus.kind}`} role="status">{passwordStatus.text}</p> : null}
-          <button className="account-save" type="submit" disabled={savingPassword}>{savingPassword ? "Alterando…" : "Alterar senha"}</button>
-        </form>
           </>
         )}
         </section>
