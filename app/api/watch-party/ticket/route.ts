@@ -1,5 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { Rest, type CapabilityOp } from "ably";
 import { requireUsuario } from "../../../../db/auth";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +8,7 @@ const SESSION_TTL = 12 * 60 * 60_000;
 const TOKEN_TTL = 60 * 60_000;
 
 type PartyRole = "host" | "guest";
+type AblyCapabilityOperation = "history" | "presence" | "publish" | "subscribe";
 
 type SessionClaims = {
   uid: number;
@@ -25,6 +25,29 @@ function ablyKey() {
 
 function signingSecret() {
   return (process.env.WATCH_PARTY_SECRET || process.env.MYSQL_PASSWORD || ablyKey()).trim();
+}
+
+function createAblyTokenRequest(
+  clientId: string,
+  resource: string,
+  operations: AblyCapabilityOperation[],
+) {
+  const key = ablyKey();
+  const separator = key.indexOf(":");
+  if (separator <= 0 || separator === key.length - 1) {
+    throw new Error("ABLY_API_KEY inválida.");
+  }
+
+  const keyName = key.slice(0, separator);
+  const keySecret = key.slice(separator + 1);
+  const ttl = TOKEN_TTL;
+  const capability = JSON.stringify({ [resource]: [...operations].sort() });
+  const timestamp = Date.now();
+  const nonce = randomBytes(16).toString("hex");
+  const signText = `${keyName}\n${ttl}\n${capability}\n${clientId}\n${timestamp}\n${nonce}\n`;
+  const mac = createHmac("sha256", keySecret).update(signText, "utf8").digest("base64");
+
+  return { keyName, ttl, capability, clientId, timestamp, nonce, mac };
 }
 
 function normalizeRoomCode(value: unknown) {
@@ -114,17 +137,12 @@ export async function POST(request: Request) {
   }
 
   const resource = `watch-party:${claims.roomCode}`;
-  const operations: CapabilityOp[] = claims.role === "host"
+  const operations: AblyCapabilityOperation[] = claims.role === "host"
     ? ["publish", "subscribe", "presence", "history"]
     : ["publish", "subscribe", "presence", "history"];
 
   try {
-    const client = new Rest({ key: ablyKey() });
-    const tokenRequest = await client.auth.createTokenRequest({
-      clientId: claims.clientId,
-      capability: { [resource]: operations },
-      ttl: TOKEN_TTL,
-    });
+    const tokenRequest = createAblyTokenRequest(claims.clientId, resource, operations);
     return Response.json({
       tokenRequest,
       session: signSession(claims),

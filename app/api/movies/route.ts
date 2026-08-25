@@ -833,8 +833,8 @@ async function discoverByGenre(genreId: string, kind: MediaKind, page: number) {
   return browseCatalog(kind, page, genreId);
 }
 
-/** Pool dos top filmes de um gênero para o Surpreenda-me (várias páginas TMDB). */
-async function roulettePool(genreId: string, pages = 5) {
+/** Pool dos títulos mais populares para o Surpreenda-me (várias páginas TMDB). */
+async function roulettePool(genreId: string, kind: MediaKind, pages = 5, maxMinutes?: number) {
   const pageCount = Math.min(8, Math.max(1, Math.floor(pages) || 5));
   const allGenres = !genreId || genreId === "all" || genreId === "0";
   if (!allGenres && !/^\d+$/.test(genreId)) {
@@ -842,7 +842,7 @@ async function roulettePool(genreId: string, pages = 5) {
   }
 
   try {
-    const { map, list } = await fetchTmdbGenreMap("movie");
+    const { map, list } = await fetchTmdbGenreMap(kind);
     const genreName = allGenres ? "Todos" : map.get(Number(genreId)) || "Gênero";
     const genre = allGenres
       ? { id: 0, name: "Todos" }
@@ -852,14 +852,15 @@ async function roulettePool(genreId: string, pages = 5) {
       page: "1",
       sort_by: "popularity.desc",
       include_adult: "false",
-      "vote_count.gte": "300",
+      "vote_count.gte": kind === "movie" ? "300" : "120",
       "vote_average.gte": "6",
     };
     if (!allGenres) params.with_genres = genreId;
+    if (maxMinutes && maxMinutes >= 30 && maxMinutes <= 300) params["with_runtime.lte"] = String(maxMinutes);
 
     const results = await Promise.all(
       Array.from({ length: pageCount }, (_, index) =>
-        tmdbRequest("/discover/movie", {
+        tmdbRequest(`/discover/${kind}`, {
           ...params,
           page: String(index + 1),
         }),
@@ -870,7 +871,7 @@ async function roulettePool(genreId: string, pages = 5) {
     const movies: CatalogMovie[] = [];
     for (const data of results) {
       for (const item of findMovieItems(data)) {
-        const movie = mapTmdbMovie(item, genreName, map, "movie", allGenres ? "roleta-all" : `roleta-${genreId}`);
+        const movie = mapTmdbMovie(item, genreName, map, kind, allGenres ? `roleta-${kind}-all` : `roleta-${kind}-${genreId}`);
         if (!movie?.poster) continue;
         const key = movie.tmdb_id || movie.id;
         if (seen.has(key)) continue;
@@ -906,6 +907,7 @@ export async function GET(request: Request) {
   const kind = searchParams.get("kind") === "tv" ? "tv" : "movie";
   const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
   const season = Math.max(0, Number(searchParams.get("season") || "0") || 0);
+  const maxMinutes = Math.max(0, Number(searchParams.get("maxMinutes") || "0") || 0);
 
   if (movieId && kind === "tv" && season > 0) {
     return Response.json(await getTmdbSeason(movieId, season));
@@ -936,9 +938,9 @@ export async function GET(request: Request) {
     const pages = Number(searchParams.get("pages") || "5") || 5;
     // genreId vazio ou "all" = top gerais (sem filtro de gênero)
     if (!genreId || genreId === "all" || genreId === "0") {
-      return Response.json(await roulettePool("", pages));
+      return Response.json(await roulettePool("", kind, pages, maxMinutes || undefined));
     }
-    return Response.json(await roulettePool(genreId, pages));
+    return Response.json(await roulettePool(genreId, kind, pages, maxMinutes || undefined));
   }
 
   if (genreId) {

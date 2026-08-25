@@ -164,14 +164,15 @@ function uniqueUrls(values: string[], base: string, limit: number) {
 }
 
 async function fetchFollowingPublicRedirects(url: string, init: RequestInit) {
-  let current = publicHttpUrl(url, url);
-  if (!current) throw new Error("URL pública inválida");
+  const initial = publicHttpUrl(url, url);
+  if (!initial) throw new Error("URL pública inválida");
+  let current: URL = initial;
   for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
-    const response = await fetch(current, { ...init, redirect: "manual" });
+    const response: Response = await fetch(current, { ...init, redirect: "manual" });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
-    const location = response.headers.get("location");
+    const location: string | null = response.headers.get("location");
     await response.body?.cancel().catch(() => undefined);
-    const next = location ? publicHttpUrl(location, current.href) : null;
+    const next: URL | null = location ? publicHttpUrl(location, current.href) : null;
     if (!next) throw new Error("O servidor redirecionou para um endereço inválido");
     current = next;
   }

@@ -174,6 +174,25 @@ function formatScore(value?: string) {
   return Number.isFinite(numeric) ? numeric.toFixed(1) : value;
 }
 
+function ratingValue(movie: Movie) {
+  const value = Number(movie.rating);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function durationMinutes(movie: Movie) {
+  const value = movie.duration?.toLowerCase().trim();
+  if (!value) return null;
+  const hours = Number(value.match(/(\d+)\s*h/)?.[1] || 0);
+  const minutes = Number(value.match(/(\d+)\s*min/)?.[1] || 0);
+  const total = hours * 60 + minutes;
+  return total > 0 ? total : null;
+}
+
+function hasAnyGenre(movie: Movie, expected: string[]) {
+  const genres = (movie.genres || []).map((genre) => genre.toLocaleLowerCase("pt-BR"));
+  return expected.some((name) => genres.some((genre) => genre.includes(name)));
+}
+
 function movieMeta(movie: Movie) {
   return [
     mediaKind(movie) === "tv" ? "Série" : "Filme",
@@ -472,11 +491,13 @@ export default function Home() {
   const [browseLoading, setBrowseLoading] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const toastTimer = useRef<number | null>(null);
   const lastCatalogHash = useRef("home");
   const playerMovieRef = useRef<Movie | null>(null);
   const continueMoviesRef = useRef<Movie[]>([]);
   const searchPanelRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     playerMovieRef.current = playerMovie;
@@ -487,6 +508,39 @@ export default function Home() {
   }, [continueMovies]);
 
   useFocusTrap(searchOpen, searchPanelRef);
+
+  useEffect(() => {
+    const titles: Record<View, string> = {
+      home: "Flixa — Sua próxima história",
+      filmes: "Filmes — Flixa",
+      series: "Séries — Flixa",
+      lista: "Minha Lista — Flixa",
+      "surpreenda-me": "Surpreenda-me — Flixa",
+      grupo: "Assistir em grupo — Flixa",
+      amigos: "Amigos — Flixa",
+    };
+    document.title = authUser ? titles[view] : "Colliepédia — fórum sobre Border Collies";
+
+    let icons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel*="icon"]'));
+    if (!icons.length) {
+      const icon = document.createElement("link");
+      icon.rel = "icon";
+      document.head.append(icon);
+      icons = [icon];
+    }
+    for (const icon of icons) icon.href = authUser ? "/favicon.png" : "/favicon.svg";
+  }, [authUser, view]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target as Element;
+      if (target.closest(".mobile-profile-trigger")) return;
+      if (!profileMenuRef.current?.contains(target)) setProfileMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => window.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [profileMenuOpen]);
 
   useEffect(() => {
     let ativo = true;
@@ -841,18 +895,25 @@ export default function Home() {
   ]).filter(canWatch).slice(0, 18), [continueMovies, listMovies, uniqueMovies, uniqueSeries]);
 
   const catalogRows = useMemo(() => {
-    const order = Array.from(new Set(movies.map((movie) => movie.source).filter((source): source is string => Boolean(source))));
-    return order
-      .map((source) => {
-        const items = dedupeMovies(movies.filter((movie) => movie.source === source));
-        return {
-          title: source,
-          kind: items[0] ? mediaKind(items[0]) : "movie" as MediaKind,
-          listId: items.find((item) => item.list)?.list,
-          items,
-        };
-      })
-      .filter((row) => row.items.length > 0);
+    const all = dedupeMovies([...movies]);
+    const byScore = [...all].sort((left, right) => ratingValue(right) - ratingValue(left));
+    const rows: Array<{ title: string; items: Movie[] }> = [];
+    const add = (title: string, items: Movie[]) => {
+      const unique = dedupeMovies(items).slice(0, 18);
+      if (unique.length >= 4) rows.push({ title, items: unique });
+    };
+
+    add("Todo mundo está comentando", byScore.filter((movie) => (movie.year || 0) >= 2023));
+    add("Para rir e desligar a cabeça", all.filter((movie) => hasAnyGenre(movie, ["comédia", "animação", "família"])));
+    add("Uma dose de mistério para hoje", all.filter((movie) => hasAnyGenre(movie, ["suspense", "mistério", "crime"])));
+    add("Filmes bons sem tomar a noite toda", all.filter((movie) => mediaKind(movie) === "movie" && (durationMinutes(movie) || 999) <= 105));
+    add("Séries para começar neste fim de semana", byScore.filter((movie) => mediaKind(movie) === "tv"));
+    add("Histórias feitas no Brasil", all.filter((movie) => movie.is_brazilian));
+    add("Clássicos que ainda valem o play", byScore.filter((movie) => (movie.year || 9999) <= 2005));
+    add("Aclamados para não ter erro", byScore.filter((movie) => ratingValue(movie) >= 7.5));
+
+    if (rows.length < 4) add("Escolhas do Flixa para hoje", byScore);
+    return rows;
   }, [movies]);
 
   const activeGenre = catalogGenres.find((genre) => String(genre.id) === genreId)
@@ -921,6 +982,7 @@ export default function Home() {
   }
 
   function goTo(hash: string) {
+    setProfileMenuOpen(false);
     const next = `#${hash}`;
     if (window.location.hash === next) return;
     window.history.pushState(null, "", next);
@@ -1097,11 +1159,11 @@ export default function Home() {
       else if (searchOpen) {
         setSearchOpen(false);
         setQuery("");
-      }
+      } else if (profileMenuOpen) setProfileMenuOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [playerMovie, selectedMovie, searchOpen, closeDetails, closePlayer]);
+  }, [playerMovie, selectedMovie, searchOpen, profileMenuOpen, closeDetails, closePlayer]);
 
   if (!authChecking && !authUser) {
     if (loginOpen) return <LoginForm />;
@@ -1157,17 +1219,8 @@ export default function Home() {
             onClick={() => goTo("assistir-em-grupo")}
           >
             <span aria-hidden="true">◉</span>
-            Assistir em grupo
+            Grupo
           </a>
-          <a
-            href="#minha-lista"
-            className={view === "lista" ? "is-active" : ""}
-            onClick={() => goTo("minha-lista")}
-          >
-            Minha Lista
-            {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
-          </a>
-          <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
         </nav>
 
         <div className="header-actions">
@@ -1183,18 +1236,32 @@ export default function Home() {
             <span />
           </button>
           {authUser ? (
-            <div className="header-user">
-              <span className="header-user-name" title={authUser.email}>
-                {authUser.nome}
-              </span>
-              {authUser.administrador ? (
-                <a className="header-user-badge" href="/admin">
-                  Admin
-                </a>
-              ) : null}
-              <button className="logout-button" type="button" onClick={() => void logout()}>
-                Sair
+            <div className="profile-menu" ref={profileMenuRef}>
+              <button
+                className={`profile-trigger ${profileMenuOpen ? "is-active" : ""}`}
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                onClick={() => setProfileMenuOpen((open) => !open)}
+              >
+                <span>{authUser.nome.slice(0, 1).toUpperCase()}</span>
+                <strong>{authUser.nome.split(/\s+/)[0]}</strong>
+                <i aria-hidden="true">⌄</i>
               </button>
+              {profileMenuOpen ? (
+                <div className="profile-dropdown" role="menu">
+                  <div className="profile-dropdown-head">
+                    <strong>{authUser.nome}</strong>
+                    <small>@{authUser.username}</small>
+                  </div>
+                  <button type="button" role="menuitem" onClick={() => goTo("minha-lista")}>
+                    Minha Lista {listMovies.length ? <em>{listMovies.length}</em> : null}
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => goTo("amigos")}>Amigos</button>
+                  {authUser.administrador ? <a role="menuitem" href="/admin">Administração</a> : null}
+                  <button className="profile-logout" type="button" role="menuitem" onClick={() => void logout()}>Sair</button>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1354,6 +1421,11 @@ export default function Home() {
           </div>
 
           {catalogGenres.length ? (
+            <>
+            <div className="catalog-kind-switch" aria-label="Tipo de catálogo">
+              <a href="#filmes" className={view === "filmes" ? "is-active" : ""} onClick={() => goTo("filmes")}>Filmes</a>
+              <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>Séries</a>
+            </div>
             <div className="catalog-filters" role="listbox" aria-label="Filtrar por categoria">
               <button
                 type="button"
@@ -1377,6 +1449,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            </>
           ) : null}
 
           {browseLoading && browseItems.length === 0 ? (
@@ -1573,7 +1646,6 @@ export default function Home() {
                 key={row.title}
                 title={row.title}
                 items={row.items}
-                listId={row.listId}
                 listed={listMovies}
                 onOpen={openDetails}
                 onToggleList={toggleList}
@@ -1602,6 +1674,7 @@ export default function Home() {
 
       {playerMovie ? (
         <MoviePlayer
+          key={`${movieKey(playerMovie)}-${playerMovie.season || 0}-${playerMovie.episode || 0}`}
           movie={playerMovie}
           onClose={closePlayer}
           onProgress={handlePlayerProgress}
@@ -1631,26 +1704,31 @@ export default function Home() {
 
       <nav className="mobile-nav" aria-label="Navegação inferior">
         <a href="#home" className={view === "home" ? "is-active" : ""} onClick={() => goTo("home")}>
-          Início
+          <span aria-hidden="true">⌂</span><small>Início</small>
         </a>
-        <a href="#filmes" className={view === "filmes" ? "is-active" : ""} onClick={() => goTo("filmes")}>
-          Filmes
+        <a href="#filmes" className={view === "filmes" || view === "series" ? "is-active" : ""} onClick={() => goTo("filmes")}>
+          <span aria-hidden="true">▦</span><small>Explorar</small>
         </a>
-        <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
-          Séries
+        <a className={`mobile-surprise ${view === "surpreenda-me" ? "is-active" : ""}`} href="#surpreenda-me" onClick={() => goTo("surpreenda-me")}>
+          <span aria-hidden="true">✦</span><small>Surpreenda</small>
         </a>
         <a
           href="#assistir-em-grupo"
           className={view === "grupo" ? "is-active" : ""}
           onClick={() => goTo("assistir-em-grupo")}
         >
-          Grupo
+          <span aria-hidden="true">◉</span><small>Grupo</small>
         </a>
-        <a href="#amigos" className={view === "amigos" ? "is-active" : ""} onClick={() => goTo("amigos")}>Amigos</a>
-        <a href="#minha-lista" className={view === "lista" ? "is-active" : ""} onClick={() => goTo("minha-lista")}>
-          Lista
+        <button
+          type="button"
+          className={`mobile-profile-trigger ${view === "lista" || view === "amigos" || profileMenuOpen ? "is-active" : ""}`}
+          aria-label="Abrir menu do perfil"
+          aria-expanded={profileMenuOpen}
+          onClick={() => setProfileMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true">●</span><small>Perfil</small>
           {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
-        </a>
+        </button>
       </nav>
     </main>
   );
@@ -1668,6 +1746,14 @@ function shuffleMovies(items: Movie[]) {
 const LOOT_SPIN_MS = 5400;
 const LOOT_REVEAL_DELAY_MS = 1100;
 const TERROR_GENRE: Genre = { id: 27, name: "Terror" };
+type RouletteMood = "any" | "leve" | "intenso" | "sombrio";
+
+const ROULETTE_MOODS: Array<{ id: RouletteMood; label: string; genres: string[] }> = [
+  { id: "any", label: "Qualquer clima", genres: [] },
+  { id: "leve", label: "Leve", genres: ["comédia", "animação", "família", "romance"] },
+  { id: "intenso", label: "Intenso", genres: ["ação", "aventura", "guerra", "ficção"] },
+  { id: "sombrio", label: "Sombrio", genres: ["terror", "suspense", "mistério", "crime"] },
+];
 
 function buildRouletteGenreOptions(all: Genre[]) {
   const byId = new Map<number, Genre>();
@@ -1714,6 +1800,11 @@ function buildLootReel(candidates: Movie[], winner: Movie, visiblePrefix: Movie[
   return { reel, landIndex };
 }
 
+function pickRandomMovie(from: Movie[]) {
+  if (!from.length) return null;
+  return from[Math.floor(Math.random() * from.length)] ?? null;
+}
+
 function RouletteView({
   genres: catalogGenres,
   listed,
@@ -1730,6 +1821,9 @@ function RouletteView({
   onToast: (message: string) => void;
 }) {
   const [genres, setGenres] = useState<Genre[]>(catalogGenres);
+  const [rouletteKind, setRouletteKind] = useState<MediaKind>("movie");
+  const [maxMinutes, setMaxMinutes] = useState(0);
+  const [mood, setMood] = useState<RouletteMood>("any");
   const [genreId, setGenreId] = useState<number | null>(null);
   const [pool, setPool] = useState<Movie[]>([]);
   const [poolLoading, setPoolLoading] = useState(false);
@@ -1740,10 +1834,9 @@ function RouletteView({
   const [reel, setReel] = useState<Movie[]>([]);
   const [offset, setOffset] = useState(0);
   const [animate, setAnimate] = useState(false);
-  const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
-  const [skipped, setSkipped] = useState<string[]>([]);
-  const [watched, setWatched] = useState<RouletteWatched[]>([]);
+  const [skipped, setSkipped] = useState<string[]>(readRouletteSkipped);
+  const [watched, setWatched] = useState<RouletteWatched[]>(readRouletteWatched);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const spinEndTimer = useRef<number | null>(null);
@@ -1771,7 +1864,6 @@ function RouletteView({
     clearRevealTimer();
     setRevealOpen(false);
     setPick(null);
-    setWinnerIndex(null);
     setReel([]);
     setAnimate(false);
     setOffset(0);
@@ -1784,15 +1876,18 @@ function RouletteView({
   const genreOptions = useMemo(() => buildRouletteGenreOptions(genres), [genres]);
   const skippedKeys = useMemo(() => new Set(skipped), [skipped]);
   const watchedKeys = useMemo(() => new Set(watched.map((item) => movieKey(item))), [watched]);
+  const activeMood = ROULETTE_MOODS.find((item) => item.id === mood) ?? ROULETTE_MOODS[0];
   const available = useMemo(
-    () => pool.filter((movie) => !skippedKeys.has(movieKey(movie)) && !watchedKeys.has(movieKey(movie))),
-    [pool, skippedKeys, watchedKeys],
+    () => pool.filter((movie) =>
+      !skippedKeys.has(movieKey(movie)) &&
+      !watchedKeys.has(movieKey(movie)) &&
+      (mood === "any" || hasAnyGenre(movie, activeMood.genres)),
+    ),
+    [pool, skippedKeys, watchedKeys, mood, activeMood.genres],
   );
 
   useEffect(() => {
     migrateRouletteStorage();
-    setSkipped(readRouletteSkipped());
-    setWatched(readRouletteWatched());
     return () => {
       if (spinEndTimer.current) window.clearTimeout(spinEndTimer.current);
       if (revealTimer.current) window.clearTimeout(revealTimer.current);
@@ -1801,28 +1896,67 @@ function RouletteView({
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/movies?genres=1&kind=movie", { cache: "no-store", signal: controller.signal })
+    fetch(`/api/movies?genres=1&kind=${rouletteKind}`, { cache: "no-store", signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { genres?: Genre[] } | null) => {
         const list = Array.isArray(data?.genres) ? data.genres : [];
         if (list.length) setGenres(list);
-        else if (catalogGenres.length) setGenres(catalogGenres);
+        else if (rouletteKind === "movie" && catalogGenres.length) setGenres(catalogGenres);
       })
       .catch(() => {
-        if (!controller.signal.aborted && catalogGenres.length) setGenres(catalogGenres);
+        if (!controller.signal.aborted && rouletteKind === "movie" && catalogGenres.length) setGenres(catalogGenres);
       });
     return () => controller.abort();
-  }, [catalogGenres]);
+  }, [catalogGenres, rouletteKind]);
 
   useEffect(() => {
-    if (genreId == null) {
-      setPool([]);
-      resetPickState();
-      setPoolError(null);
-      return;
-    }
+    if (genreId == null) return;
 
     const controller = new AbortController();
+    const genreParam = genreId === 0 ? "all" : String(genreId);
+    const durationParam = maxMinutes ? `&maxMinutes=${maxMinutes}` : "";
+    fetch(`/api/movies?genre=${encodeURIComponent(genreParam)}&kind=${rouletteKind}&roulette=1&pages=5${durationParam}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { movies?: Movie[]; error?: string | null } | null) => {
+        const movies = asMovieList(data?.movies);
+        setPool(movies);
+        if (!movies.length) setPoolError(data?.error || "Nenhum título encontrado com esses filtros.");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPool([]);
+          setPoolError("Não foi possível carregar títulos para este sorteio.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPoolLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [genreId, rouletteKind, maxMinutes]);
+
+  useEffect(() => {
+    if (genreId == null || poolLoading || available.length >= 14 || replenishRef.current) return;
+    replenishRef.current = true;
+    const genreParam = genreId === 0 ? "all" : String(genreId);
+    const durationParam = maxMinutes ? `&maxMinutes=${maxMinutes}` : "";
+    fetch(`/api/movies?genre=${encodeURIComponent(genreParam)}&kind=${rouletteKind}&roulette=1&pages=8${durationParam}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { movies?: Movie[] } | null) => {
+        const extra = asMovieList(data?.movies);
+        if (!extra.length) return;
+        setPool((current) => dedupeMovies([...current, ...extra]));
+      })
+      .finally(() => {
+        replenishRef.current = false;
+      });
+  }, [genreId, rouletteKind, maxMinutes, poolLoading, available.length]);
+
+  function preparePoolChange() {
+    setPool([]);
     setPoolLoading(true);
     setPoolError(null);
     resetPickState();
@@ -1834,46 +1968,34 @@ function RouletteView({
       window.clearTimeout(spinEndTimer.current);
       spinEndTimer.current = null;
     }
+  }
 
-    const genreParam = genreId === 0 ? "all" : String(genreId);
-    fetch(`/api/movies?genre=${encodeURIComponent(genreParam)}&kind=movie&roulette=1&pages=5`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { movies?: Movie[]; error?: string | null } | null) => {
-        const movies = asMovieList(data?.movies);
-        setPool(movies);
-        if (!movies.length) setPoolError(data?.error || "Nenhum filme encontrado neste gênero.");
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setPool([]);
-          setPoolError("Não foi possível carregar os top filmes deste gênero.");
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setPoolLoading(false);
-      });
+  function selectKind(kind: MediaKind) {
+    if (kind === rouletteKind) return;
+    preparePoolChange();
+    setRouletteKind(kind);
+    setGenreId(null);
+    setGenres([]);
+    setPoolLoading(false);
+  }
 
-    return () => controller.abort();
-  }, [genreId]);
+  function selectDuration(minutes: number) {
+    if (minutes === maxMinutes) return;
+    preparePoolChange();
+    setMaxMinutes(minutes);
+    if (genreId == null) setPoolLoading(false);
+  }
 
-  useEffect(() => {
-    if (genreId == null || poolLoading || available.length >= 14 || replenishRef.current) return;
-    replenishRef.current = true;
-    const genreParam = genreId === 0 ? "all" : String(genreId);
-    fetch(`/api/movies?genre=${encodeURIComponent(genreParam)}&kind=movie&roulette=1&pages=8`, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { movies?: Movie[] } | null) => {
-        const extra = asMovieList(data?.movies);
-        if (!extra.length) return;
-        setPool((current) => dedupeMovies([...current, ...extra]));
-      })
-      .finally(() => {
-        replenishRef.current = false;
-      });
-  }, [genreId, poolLoading, available.length]);
+  function selectGenre(id: number) {
+    preparePoolChange();
+    setGenreId(id);
+  }
+
+  function selectMood(nextMood: RouletteMood) {
+    if (nextMood === mood) return;
+    resetPickState();
+    setMood(nextMood);
+  }
 
   function persistSkipped(next: string[]) {
     setSkipped(next);
@@ -1895,18 +2017,13 @@ function RouletteView({
   function markWatched(movie: Movie) {
     const entry: RouletteWatched = {
       ...movie,
-      kind: "movie",
+      kind: mediaKind(movie),
       watchedAt: new Date().toISOString(),
       genreName: activeGenre?.name || movie.genres?.[0],
     };
     const next = [entry, ...watched.filter((item) => movieKey(item) !== movieKey(movie))].slice(0, 200);
     persistWatched(next);
     return next;
-  }
-
-  function pickRandom(from: Movie[]) {
-    if (!from.length) return null;
-    return from[Math.floor(Math.random() * from.length)] ?? null;
   }
 
   function cardStep() {
@@ -1936,11 +2053,11 @@ function RouletteView({
 
     if (!candidates.length) {
       resetPickState();
-      onToast("Não há mais filmes neste gênero. Restaure o sorteio ou troque o gênero.");
+      onToast("Não há mais títulos com esses filtros. Restaure o sorteio ou mude uma opção.");
       return;
     }
 
-    const finalPick = pickRandom(candidates);
+    const finalPick = pickRandomMovie(candidates);
     if (!finalPick) return;
 
     const built = buildLootReel(candidates, finalPick, visibleStripRef.current.slice(0, 12));
@@ -1948,7 +2065,6 @@ function RouletteView({
     clearRevealTimer();
     setRevealOpen(false);
     setPick(null);
-    setWinnerIndex(null);
     setSpinning(false);
     setPreparingSpin(true);
     setAnimate(false);
@@ -1979,7 +2095,6 @@ function RouletteView({
     });
 
     spinEndTimer.current = window.setTimeout(() => {
-      setWinnerIndex(landIndex);
       setPick(finalPick);
       setSpinning(false);
       pendingSpinRef.current = null;
@@ -1999,12 +2114,6 @@ function RouletteView({
       }
     };
   }, [reel, spinning, preparingSpin]);
-
-  useLayoutEffect(() => {
-    if (!pick || spinning || preparingSpin || !reel.length || winnerIndex == null) return;
-    setAnimate(false);
-    setOffset(Math.max(0, centerOffset(winnerIndex)));
-  }, [pick, reel, winnerIndex, spinning, preparingSpin]);
 
   function handleAlreadySeen() {
     if (!pick || spinning || preparingSpin) return;
@@ -2028,7 +2137,10 @@ function RouletteView({
   const showCenterLoading = preparingSpin;
   const showReel = reel.length > 0 && (spinning || Boolean(pick));
   const idleStrip = useMemo(() => buildIdleStrip(available), [available]);
-  visibleStripRef.current = idleStrip;
+
+  useEffect(() => {
+    visibleStripRef.current = idleStrip;
+  }, [idleStrip]);
 
   const previewPosters: Movie[] = showReel ? reel : idleStrip;
 
@@ -2039,7 +2151,7 @@ function RouletteView({
 
   function clearSkipped() {
     persistSkipped([]);
-    onToast("Filmes restaurados no sorteio");
+    onToast("Títulos restaurados no sorteio");
   }
 
   function removeFromHistory(movie: Movie) {
@@ -2057,7 +2169,7 @@ function RouletteView({
         <div>
           <h1>Surpreenda-me</h1>
           <p className="hero-description">
-            Escolha um gênero e gire. Se já viu o filme sorteado, use &quot;Já vi&quot; para tirá-lo do sorteio — assistindo, ele vai para o histórico.
+            Diga o formato, o tempo e o clima da sessão. O Flixa cuida do resto.
           </p>
         </div>
         <div className="list-tools">
@@ -2074,6 +2186,31 @@ function RouletteView({
         </div>
       </div>
 
+      <div className="roleta-preferences" aria-label="Preferências do sorteio">
+        <fieldset>
+          <legend>Formato</legend>
+          <div>
+            <button type="button" className={rouletteKind === "movie" ? "is-active" : ""} onClick={() => selectKind("movie")} disabled={lootBusy}>Filme</button>
+            <button type="button" className={rouletteKind === "tv" ? "is-active" : ""} onClick={() => selectKind("tv")} disabled={lootBusy}>Série</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Tempo</legend>
+          <div>
+            <button type="button" className={maxMinutes === 0 ? "is-active" : ""} onClick={() => selectDuration(0)} disabled={lootBusy}>Qualquer</button>
+            <button type="button" className={maxMinutes === 100 ? "is-active" : ""} onClick={() => selectDuration(100)} disabled={lootBusy}>Até 100 min</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Clima</legend>
+          <div>
+            {ROULETTE_MOODS.map((option) => (
+              <button key={option.id} type="button" className={mood === option.id ? "is-active" : ""} onClick={() => selectMood(option.id)} disabled={lootBusy}>{option.label}</button>
+            ))}
+          </div>
+        </fieldset>
+      </div>
+
       <div className="roleta-genres" role="listbox" aria-label="Gêneros para sortear">
         {genreOptions.map((genre) => (
           <button
@@ -2082,7 +2219,7 @@ function RouletteView({
             role="option"
             aria-selected={genre.id === genreId}
             className={`roleta-genre ${genre.id === genreId ? "is-active" : ""}`}
-            onClick={() => setGenreId(genre.id)}
+            onClick={() => selectGenre(genre.id)}
             disabled={lootBusy}
           >
             {genre.name}
@@ -2192,7 +2329,7 @@ function RouletteView({
                     </div>
                   </>
                 ) : (
-                  <h2>Sem filmes neste gênero</h2>
+                  <h2>Sem títulos com esses filtros</h2>
                 )}
               </div>
             ) : null}
@@ -2216,6 +2353,7 @@ function RouletteView({
             onOpen(pick);
           }}
           onToggleList={() => onToggleList(pick)}
+          reason={[activeGenre?.name, rouletteKind === "tv" ? "série" : "filme", maxMinutes ? `até ${maxMinutes} min` : null, mood !== "any" ? activeMood.label.toLowerCase() : null].filter(Boolean).join(" · ")}
         />
       ) : null}
 
@@ -2266,6 +2404,7 @@ function RouletteView({
 function RouletteRevealModal({
   movie,
   listed,
+  reason,
   onClose,
   onWatch,
   onAlreadySeen,
@@ -2275,6 +2414,7 @@ function RouletteRevealModal({
 }: {
   movie: Movie;
   listed: Movie[];
+  reason: string;
   onClose: () => void;
   onWatch: () => void;
   onAlreadySeen: () => void;
@@ -2321,8 +2461,9 @@ function RouletteRevealModal({
           {poster ? <img src={poster} alt={`Pôster de ${movie.title}`} /> : <span>{movie.title.slice(0, 1)}</span>}
         </div>
         <div className="roleta-reveal-copy">
-          <p className="roleta-reveal-label">Filme sorteado</p>
+          <p className="roleta-reveal-label">{mediaKind(movie) === "tv" ? "Série sorteada" : "Filme sorteado"}</p>
           <h2>{movie.title}</h2>
+          {reason ? <p className="roleta-reveal-reason">Escolhido para você · {reason}</p> : null}
           <div className="meta-line">
             {movieMeta(movie).map((item) => (
               <span key={String(item)}>{item}</span>
@@ -2613,7 +2754,7 @@ function TvEpisodePicker({
   const [season, setSeason] = useState(savedSeason);
   const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
   const [episodes, setEpisodes] = useState<TvEpisodeInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -2626,6 +2767,8 @@ function TvEpisodePicker({
         const list = Array.isArray(data?.seasons) ? data.seasons.filter((item) => item.season_number > 0) : [];
         setSeasons(list);
         if (list.length > 0 && !list.some((item) => item.season_number === season)) {
+          setLoading(true);
+          setEpisodes([]);
           setSeason(list[0].season_number);
         }
       })
@@ -2637,7 +2780,6 @@ function TvEpisodePicker({
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
     fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv&season=${season}`, {
       cache: "no-store",
       signal: controller.signal,
@@ -2684,7 +2826,11 @@ function TvEpisodePicker({
               role="tab"
               aria-selected={item.season_number === season}
               className={item.season_number === season ? "is-active" : ""}
-              onClick={() => setSeason(item.season_number)}
+              onClick={() => {
+                setLoading(true);
+                setEpisodes([]);
+                setSeason(item.season_number);
+              }}
             >
               {item.name || `Temporada ${item.season_number}`}
             </button>
@@ -3585,7 +3731,7 @@ function MoviePlayer({
   const [episode, setEpisode] = useState(Math.max(1, movie.episode || 1));
   const [seasons, setSeasons] = useState<TvSeasonInfo[]>([]);
   const [episodes, setEpisodes] = useState<TvEpisodeInfo[]>([]);
-  const [seasonLoading, setSeasonLoading] = useState(false);
+  const [seasonLoading, setSeasonLoading] = useState(isTv);
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fsDockVisible, setFsDockVisible] = useState(false);
@@ -3640,13 +3786,6 @@ function MoviePlayer({
   useEffect(() => {
     onProgressRef.current = onProgress;
   }, [onProgress]);
-
-  useEffect(() => {
-    if (!isTv) return;
-    setSeason(Math.max(1, movie.season || 1));
-    setEpisode(Math.max(1, movie.episode || 1));
-    progressRef.current = Math.max(5, Number(movie.progress || 5));
-  }, [isTv, movie.id, movie.season, movie.episode, movie.progress]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -3793,6 +3932,8 @@ function MoviePlayer({
         const list = Array.isArray(data?.seasons) ? data.seasons.filter((item) => item.season_number > 0) : [];
         setSeasons(list);
         if (list.length > 0 && !list.some((item) => item.season_number === season)) {
+          setSeasonLoading(true);
+          setEpisodes([]);
           setSeason(list[0].season_number);
         }
       })
@@ -3805,7 +3946,6 @@ function MoviePlayer({
   useEffect(() => {
     if (!isTv || !localEpisodeControls) return;
     const controller = new AbortController();
-    setSeasonLoading(true);
     fetch(`/api/movies?id=${encodeURIComponent(titleId(movie))}&kind=tv&season=${season}`, {
       cache: "no-store",
       signal: controller.signal,
@@ -3836,7 +3976,12 @@ function MoviePlayer({
   useEffect(() => {
     const syncFullscreen = () => {
       const active = document.fullscreenElement;
-      setIsFullscreen(Boolean(active && (active === stageRef.current || stageRef.current?.contains(active))));
+      const nextFullscreen = Boolean(active && (active === stageRef.current || stageRef.current?.contains(active)));
+      setIsFullscreen(nextFullscreen);
+      if (!nextFullscreen) {
+        setFsDockVisible(false);
+        if (fsHideTimer.current) window.clearTimeout(fsHideTimer.current);
+      }
     };
     syncFullscreen();
     document.addEventListener("fullscreenchange", syncFullscreen);
@@ -3845,7 +3990,6 @@ function MoviePlayer({
 
   useEffect(() => {
     if (!isFullscreen) {
-      setFsDockVisible(false);
       if (fsHideTimer.current) window.clearTimeout(fsHideTimer.current);
       return;
     }
@@ -3888,6 +4032,8 @@ function MoviePlayer({
   }
 
   function applyEpisode(nextSeason: number, nextEpisode: number, resetProgress = true) {
+    setSeasonLoading(true);
+    setEpisodes([]);
     setSeason(nextSeason);
     setEpisode(nextEpisode);
     if (resetProgress) progressRef.current = 8;

@@ -93,6 +93,10 @@ function normalizeRoomCode(value: string) {
   return value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6);
 }
 
+function currentTimestamp() {
+  return Date.now();
+}
+
 function sendPlayerCommand(
   iframe: HTMLIFrameElement | null,
   providerId: PartyProviderId,
@@ -190,6 +194,7 @@ export default function WatchPartyControls({
   const [unlocked, setUnlocked] = useState(true);
   const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [participantName, setParticipantName] = useState("");
 
   const realtimeRef = useRef<Realtime | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -248,6 +253,7 @@ export default function WatchPartyControls({
     setUnlocked(true);
     setChatMessages([]);
     setChatInput("");
+    setParticipantName("");
     unlockedRef.current = true;
     onSessionProviderChange?.(null);
     if (removeInvite && typeof window !== "undefined") {
@@ -427,6 +433,7 @@ export default function WatchPartyControls({
       let initialToken: TokenRequest | null = data.tokenRequest;
       sessionRef.current = data.session;
       participantNameRef.current = String(data.name || "Convidado").slice(0, 80);
+      setParticipantName(participantNameRef.current);
       clientIdRef.current = data.clientId;
 
       const realtime = new Realtime({
@@ -761,13 +768,14 @@ export default function WatchPartyControls({
   function sendChat(textValue = chatInput) {
     const channel = channelRef.current;
     const text = textValue.trim().slice(0, 240);
-    if (!channel || !roomCodeRef.current || !text || Date.now() - lastChatSentAtRef.current < 600) return;
-    lastChatSentAtRef.current = Date.now();
+    const now = currentTimestamp();
+    if (!channel || !roomCodeRef.current || !text || now - lastChatSentAtRef.current < 600) return;
+    lastChatSentAtRef.current = now;
     const message: PartyChatMessage = {
-      id: `${clientIdRef.current}:${Date.now()}`,
+      id: `${clientIdRef.current}:${now}`,
       name: participantNameRef.current || "Convidado",
       text,
-      sentAt: Date.now() + serverClockOffsetRef.current,
+      sentAt: now + serverClockOffsetRef.current,
     };
     setChatInput("");
     void channel.publish("chat", message).catch(() => setError("Não foi possível enviar a mensagem."));
@@ -845,7 +853,7 @@ export default function WatchPartyControls({
                 <div className="watch-party-chat-head"><strong>Chat da sala</strong><small>{chatMessages.length} mensagens</small></div>
                 <div className="watch-party-chat-messages" aria-live="polite">
                   {chatMessages.length ? chatMessages.map((message) => (
-                    <article className={message.name === participantNameRef.current ? "is-mine" : ""} key={message.id}>
+                    <article className={message.name === participantName ? "is-mine" : ""} key={message.id}>
                       <small>{message.name}</small>
                       <p>{message.text}</p>
                     </article>

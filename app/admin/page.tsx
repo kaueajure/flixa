@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 type AdminUser = {
@@ -281,15 +282,18 @@ export default function AdminPage() {
 
   useEffect(() => {
     let active = true;
-    carregar()
-      .catch((error) => {
-        if (active) setErro(error instanceof Error ? error.message : "Falha ao carregar");
-      })
-      .finally(() => {
-        if (active) setCarregando(false);
-      });
+    const timer = window.setTimeout(() => {
+      void carregar()
+        .catch((error) => {
+          if (active) setErro(error instanceof Error ? error.message : "Falha ao carregar");
+        })
+        .finally(() => {
+          if (active) setCarregando(false);
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [router]);
 
@@ -485,7 +489,7 @@ export default function AdminPage() {
           <h1>Painel Admin</h1>
           <p>Usuários, disponibilidade e testes reais dos servidores de reprodução.</p>
         </div>
-        <a className="admin-back" href="/">Voltar ao catálogo</a>
+        <Link className="admin-back" href="/">Voltar ao catálogo</Link>
       </header>
 
       {erro ? <p className="login-error">{erro}</p> : null}

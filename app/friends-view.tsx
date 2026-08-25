@@ -38,6 +38,7 @@ export default function FriendsView({
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [activityClock, setActivityClock] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     const response = await fetch("/api/amigos", { cache: "no-store", credentials: "include" });
@@ -50,16 +51,20 @@ export default function FriendsView({
 
   useEffect(() => {
     let active = true;
-    load().catch((cause) => active && setError(cause instanceof Error ? cause.message : "Falha ao carregar.")).finally(() => active && setLoading(false));
-    return () => { active = false; };
+    const timer = window.setTimeout(() => {
+      void load().catch((cause) => active && setError(cause instanceof Error ? cause.message : "Falha ao carregar.")).finally(() => active && setLoading(false));
+    }, 0);
+    return () => { active = false; window.clearTimeout(timer); };
   }, [load]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setActivityClock(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     const normalized = query.trim().replace(/^@+/, "");
-    if (normalized.length < 2) {
-      setResults([]);
-      return;
-    }
+    if (normalized.length < 2) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       fetch(`/api/amigos?q=${encodeURIComponent(normalized)}`, { cache: "no-store", credentials: "include", signal: controller.signal })
@@ -98,7 +103,7 @@ export default function FriendsView({
 
   function activityLabel(activity: FriendActivity) {
     const normalized = activity.updatedAt.includes("T") ? activity.updatedAt : `${activity.updatedAt.replace(" ", "T")}Z`;
-    const age = Date.now() - Date.parse(normalized);
+    const age = activityClock - Date.parse(normalized);
     return Number.isFinite(age) && age >= 0 && age < 5 * 60_000 ? "Assistindo agora" : "Assistiu recentemente";
   }
 
@@ -115,7 +120,11 @@ export default function FriendsView({
 
       <div className="friends-search">
         <label htmlFor="friend-search">Encontrar amigos</label>
-        <div><b aria-hidden="true">@</b><input id="friend-search" value={query} onChange={(event) => setQuery(event.target.value.toLowerCase().replace(/[^a-z0-9._@]/g, "").slice(0, 21))} placeholder="buscar.username" /></div>
+        <div><b aria-hidden="true">@</b><input id="friend-search" value={query} onChange={(event) => {
+          const next = event.target.value.toLowerCase().replace(/[^a-z0-9._@]/g, "").slice(0, 21);
+          setQuery(next);
+          if (next.trim().replace(/^@+/, "").length < 2) setResults([]);
+        }} placeholder="buscar.username" /></div>
         {query.trim().replace(/^@+/, "").length >= 2 ? (
           <div className="friends-search-results">
             {results.length ? results.map((person) => (
