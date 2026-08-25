@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { SportsCatalogResponse, SportsEvent, SportsEventStatus } from "../lib/sports-catalog";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  SPORTS_VIDEO_PROVIDERS,
+  type SportsCatalogResponse,
+  type SportsEvent,
+  type SportsEventStatus,
+  type SportsVideoSource,
+} from "../lib/sports-catalog";
 import {
   PROTECTED_PLAYER_ALLOW,
   PROTECTED_PLAYER_REFERRER_POLICY,
@@ -33,6 +39,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 const INITIAL_EVENT_LIMIT = 24;
 const EVENT_LIMIT_INCREMENT = 24;
+const subscribeToHost = () => () => {};
 
 function eventDate(event: SportsEvent, compact = false) {
   const date = new Date(event.startAt);
@@ -64,12 +71,41 @@ function sportMark(sport: string) {
     .toLocaleUpperCase("pt-BR");
 }
 
+function eventSources(event: SportsEvent | null) {
+  if (!event) return [];
+  if (Array.isArray(event.sources) && event.sources.length) return event.sources;
+  if (!event.embedUrl) return [];
+  return [{
+    id: event.embedUrl,
+    providerId: "youtube",
+    name: event.sourceName,
+    sourceUrl: event.sourceUrl,
+    embedUrl: event.embedUrl,
+    label: event.videoLabel || "Vídeo do evento",
+  }] satisfies SportsVideoSource[];
+}
+
+function playerUrl(source: SportsVideoSource | null, parent: string) {
+  if (!source) return "";
+  if (source.providerId !== "twitch") return source.embedUrl;
+  if (!parent) return "";
+  const url = new URL(source.embedUrl);
+  url.searchParams.set("parent", parent);
+  return url.toString();
+}
+
 export default function SportsView() {
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [activeId, setActiveId] = useState("");
+  const [activeSourceId, setActiveSourceId] = useState("");
+  const embedParent = useSyncExternalStore(
+    subscribeToHost,
+    () => window.location.hostname,
+    () => "",
+  );
   const [eventLimit, setEventLimit] = useState(INITIAL_EVENT_LIMIT);
 
   useEffect(() => {
@@ -83,6 +119,7 @@ export default function SportsView() {
       .then((data) => {
         setCatalog({ ...EMPTY_CATALOG, ...data, events: Array.isArray(data.events) ? data.events : [] });
         setActiveId(data.events?.[0]?.id || "");
+        setActiveSourceId(eventSources(data.events?.[0] || null)[0]?.id || "");
         setFailure("");
       })
       .catch((error) => {
@@ -101,6 +138,12 @@ export default function SportsView() {
     () => visibleEvents.find((event) => event.id === activeId) || visibleEvents[0] || null,
     [activeId, visibleEvents],
   );
+  const activeSources = useMemo(() => eventSources(active), [active]);
+  const activeSource = useMemo(
+    () => activeSources.find((source) => source.id === activeSourceId) || activeSources[0] || null,
+    [activeSourceId, activeSources],
+  );
+  const activePlayerUrl = playerUrl(activeSource, embedParent);
   const renderedEvents = useMemo(
     () => visibleEvents.slice(0, eventLimit),
     [eventLimit, visibleEvents],
@@ -112,6 +155,18 @@ export default function SportsView() {
     setEventLimit(INITIAL_EVENT_LIMIT);
     const first = catalog.events.find((event) => matchesFilter(event, next));
     setActiveId(first?.id || "");
+    setActiveSourceId(eventSources(first || null)[0]?.id || "");
+  }
+
+  function selectEvent(event: SportsEvent) {
+    setActiveId(event.id);
+    setActiveSourceId(eventSources(event)[0]?.id || "");
+  }
+
+  function selectNextSource() {
+    if (activeSources.length < 2) return;
+    const current = Math.max(0, activeSources.findIndex((source) => source.id === activeSource?.id));
+    setActiveSourceId(activeSources[(current + 1) % activeSources.length].id);
   }
 
   return (
@@ -161,16 +216,19 @@ export default function SportsView() {
         <>
           <div className="sports-feature">
             <div className="sports-stage">
-              {active.embedUrl ? (
+              {activeSource && activePlayerUrl ? (
                 <iframe
-                  key={active.embedUrl}
+                  key={activePlayerUrl}
                   className="sports-iframe"
-                  src={active.embedUrl}
-                  title={`${active.videoLabel || "Vídeo do evento"} — ${active.title}`}
+                  src={activePlayerUrl}
+                  title={`${activeSource.label} — ${active.title}`}
                   allow={PROTECTED_PLAYER_ALLOW}
                   allowFullScreen
-                  referrerPolicy={PROTECTED_PLAYER_REFERRER_POLICY}
+                  referrerPolicy={activeSource.providerId === "youtube" || activeSource.providerId === "twitch"
+                    ? "strict-origin-when-cross-origin"
+                    : PROTECTED_PLAYER_REFERRER_POLICY}
                   sandbox={PROTECTED_PLAYER_SANDBOX}
+                  onError={selectNextSource}
                 />
               ) : (
                 <div
@@ -178,14 +236,37 @@ export default function SportsView() {
                   style={active.thumbnail ? { backgroundImage: `linear-gradient(180deg, rgba(5, 6, 8, .16), #050608), url(${JSON.stringify(active.thumbnail).slice(1, -1)})` } : undefined}
                 >
                   <span className="sports-provider-mark is-large">{sportMark(active.sport)}</span>
-                  <strong>{active.status === "upcoming" ? "Transmissão a confirmar" : "Evento encerrado"}</strong>
+                  <strong>{active.status === "live" ? "Evento ao vivo — sem vídeo" : active.status === "upcoming" ? "Transmissão a confirmar" : "Evento encerrado"}</strong>
                   <p>
-                    {active.status === "upcoming"
+                    {active.status === "live"
+                      ? "A partida está acontecendo, mas nenhuma fonte oficial liberou um player incorporável."
+                      : active.status === "upcoming"
                       ? "O player aparecerá somente se uma fonte oficial liberar a transmissão incorporável."
                       : "Ainda não há replay oficial incorporável para este evento."}
                   </p>
                 </div>
               )}
+              <div className="sports-provider-switcher" aria-label="Servidores de vídeo">
+                <span>Servidores</span>
+                <div>
+                  {SPORTS_VIDEO_PROVIDERS.map((provider) => {
+                    const source = activeSources.find((item) => item.providerId === provider.id);
+                    return (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        disabled={!source}
+                        className={source?.id === activeSource?.id ? "is-active" : ""}
+                        title={source ? `Usar ${provider.name}` : `${provider.name} não disponibilizou este evento`}
+                        onClick={() => source && setActiveSourceId(source.id)}
+                      >
+                        <i aria-hidden="true" />{provider.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <small>{activeSources.length} de {SPORTS_VIDEO_PROVIDERS.length} disponíveis</small>
+              </div>
             </div>
 
             <div className="sports-feature-info">
@@ -203,10 +284,10 @@ export default function SportsView() {
               <dl className="sports-event-details">
                 <div><dt>Data</dt><dd>{eventDate(active)}</dd></div>
                 {active.venue ? <div><dt>Local</dt><dd>{active.venue}</dd></div> : null}
-                <div><dt>Fonte</dt><dd>{active.sourceName}</dd></div>
+                <div><dt>Fonte</dt><dd>{activeSource?.name || active.sourceName}</dd></div>
               </dl>
-              <a className="primary-action" href={active.sourceUrl} target="_blank" rel="noreferrer">
-                {active.embedUrl ? "Abrir na fonte" : "Ver detalhes do evento"}
+              <a className="primary-action" href={activeSource?.sourceUrl || active.sourceUrl} target="_blank" rel="noreferrer">
+                {activeSource ? "Abrir na fonte" : "Ver detalhes do evento"}
               </a>
             </div>
           </div>
@@ -225,7 +306,7 @@ export default function SportsView() {
                 key={event.id}
                 type="button"
                 className={`sports-event-card ${event.id === active.id ? "is-active" : ""}`}
-                onClick={() => setActiveId(event.id)}
+                onClick={() => selectEvent(event)}
               >
                 <span className="sports-event-thumb">
                   {event.thumbnail ? (
@@ -241,7 +322,7 @@ export default function SportsView() {
                   ) : null}
                   {!event.thumbnail ? sportMark(event.sport) : null}
                   <i className={`sports-status is-${event.status}`}>{STATUS_LABELS[event.status]}</i>
-                  {event.embedUrl ? <b>Assistir</b> : null}
+                  {eventSources(event).length ? <b>Assistir</b> : null}
                 </span>
                 <span className="sports-event-copy">
                   <small>{event.competition}</small>
@@ -273,8 +354,8 @@ export default function SportsView() {
       <div className="sports-note">
         <strong>Fontes verificadas</strong>
         <p>
-          Agenda e links de vídeo vêm da TheSportsDB. O ScoreBat fornece transmissões e destaques de fontes oficiais;
-          o player só aceita embeds HTTPS validados. Direitos, região e disponibilidade continuam sob controle do publicador.
+          Agenda e links de vídeo vêm da TheSportsDB. YouTube, ScoreBat, Twitch, Dailymotion e Vimeo são aceitos
+          somente por URLs HTTPS validadas; direitos, região e disponibilidade continuam sob controle do publicador.
         </p>
       </div>
     </section>

@@ -71,6 +71,13 @@
       "when": 1787716800000,
       "tag": "0009_usuario_avatar",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787716860000,
+      "tag": "0010_presenca_usuarios",
+      "breakpoints": true
     }
   ]
 }

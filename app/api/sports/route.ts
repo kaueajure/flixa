@@ -1,5 +1,6 @@
 import {
   SPORTS_LEAGUES,
+  addSportsVideoSource,
   dedupeSportsEvents,
   mapScoreBatEvent,
   mapSportsDbEvent,
@@ -57,6 +58,40 @@ async function scoreBatFeed(feed: "live" | "highlights", token: string) {
     .filter((event): event is SportsEvent => Boolean(event));
 }
 
+type AuthorizedEmbed = { eventId: string; url: string; label?: string };
+
+function authorizedEmbedRecords(value: unknown): AuthorizedEmbed[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const entry = item as Record<string, unknown>;
+    const eventId = typeof entry.eventId === "string" ? entry.eventId.trim() : "";
+    const url = typeof entry.url === "string" ? entry.url.trim() : "";
+    const label = typeof entry.label === "string" ? entry.label.trim() : undefined;
+    return eventId && url ? [{ eventId, url, label }] : [];
+  });
+}
+
+async function authorizedEmbeds() {
+  const entries: AuthorizedEmbed[] = [];
+  const inline = process.env.SPORTS_AUTHORIZED_EMBEDS_JSON?.trim();
+  if (inline) {
+    try {
+      entries.push(...authorizedEmbedRecords(JSON.parse(inline)));
+    } catch {
+      throw new Error("SPORTS_AUTHORIZED_EMBEDS_JSON contém JSON inválido");
+    }
+  }
+
+  const feed = process.env.SPORTS_AUTHORIZED_EMBEDS_URL?.trim();
+  if (feed) {
+    const url = new URL(feed);
+    if (url.protocol !== "https:") throw new Error("SPORTS_AUTHORIZED_EMBEDS_URL precisa usar HTTPS");
+    entries.push(...authorizedEmbedRecords(await jsonRequest(url)));
+  }
+  return entries;
+}
+
 async function buildCatalog(): Promise<SportsCatalogResponse> {
   const errors: string[] = [];
   const scoreBatToken = process.env.SCOREBAT_API_TOKEN?.trim() || "";
@@ -73,11 +108,29 @@ async function buildCatalog(): Promise<SportsCatalogResponse> {
   }
 
   const settled = await Promise.allSettled(jobs.map((job) => job.request));
-  const events: SportsEvent[] = [];
+  let events: SportsEvent[] = [];
   settled.forEach((result, index) => {
     if (result.status === "fulfilled") events.push(...result.value);
     else errors.push(`${jobs[index].label}: ${message(result.reason)}`);
   });
+
+  try {
+    const configured = await authorizedEmbeds();
+    if (configured.length) {
+      const byEvent = new Map<string, AuthorizedEmbed[]>();
+      for (const entry of configured) {
+        byEvent.set(entry.eventId, [...(byEvent.get(entry.eventId) || []), entry]);
+      }
+      events = events.map((event) => (
+        (byEvent.get(event.id) || []).reduce(
+          (current, entry) => addSportsVideoSource(current, entry.url, entry.label),
+          event,
+        )
+      ));
+    }
+  } catch (error) {
+    errors.push(`Embeds autorizados: ${message(error)}`);
+  }
 
   const statusOrder = { live: 0, upcoming: 1, replay: 2, finished: 3 } as const;
   const unique = dedupeSportsEvents(events).sort((left, right) => {
@@ -91,7 +144,11 @@ async function buildCatalog(): Promise<SportsCatalogResponse> {
     events: unique,
     errors,
     updatedAt: new Date().toISOString(),
-    liveSourceConfigured: Boolean(scoreBatToken),
+    liveSourceConfigured: Boolean(
+      scoreBatToken
+      || process.env.SPORTS_AUTHORIZED_EMBEDS_JSON?.trim().replace(/^\[\s*\]$/, "")
+      || process.env.SPORTS_AUTHORIZED_EMBEDS_URL?.trim(),
+    ),
   };
 }
 

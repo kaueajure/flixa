@@ -50,10 +50,14 @@ export const sessoes = mysqlTable(
     criado_em: datetime("criado_em", { mode: "string" })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
+    ultima_atividade_em: datetime("ultima_atividade_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex("sessoes_token_unico").on(table.token),
     index("sessoes_usuario_idx").on(table.usuario_id),
+    index("sessoes_presenca_idx").on(table.usuario_id, table.ultima_atividade_em),
   ],
 );
 

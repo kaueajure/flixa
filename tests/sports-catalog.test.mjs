@@ -3,14 +3,42 @@ import test from "node:test";
 
 import {
   SPORTS_LEAGUES,
+  SPORTS_VIDEO_PROVIDERS,
+  addSportsVideoSource,
   dedupeSportsEvents,
   mapScoreBatEvent,
   mapSportsDbEvent,
+  mapSportsVideoSource,
 } from "../lib/sports-catalog.ts";
 
 test("uses a multi-sport league catalog instead of static stream providers", () => {
   assert.ok(SPORTS_LEAGUES.length > 5);
   assert.equal(new Set(SPORTS_LEAGUES.map((league) => league.id)).size, SPORTS_LEAGUES.length);
+});
+
+test("supports exactly five validated official iframe providers", () => {
+  assert.deepEqual(SPORTS_VIDEO_PROVIDERS.map((provider) => provider.id), [
+    "youtube", "scorebat", "twitch", "dailymotion", "vimeo",
+  ]);
+
+  const examples = [
+    ["https://www.youtube.com/watch?v=abcDEF_1234", "youtube", "youtube-nocookie.com"],
+    ['<iframe src="https://www.scorebat.com/embed/v/123/"></iframe>', "scorebat", "scorebat.com"],
+    ["https://www.twitch.tv/nba", "twitch", "player.twitch.tv"],
+    ["https://www.dailymotion.com/video/x84sh87", "dailymotion", "dailymotion.com"],
+    ["https://vimeo.com/123456789", "vimeo", "player.vimeo.com"],
+  ];
+  for (const [url, provider, embedHost] of examples) {
+    const source = mapSportsVideoSource(url);
+    assert.equal(source?.providerId, provider);
+    assert.equal(new URL(source?.embedUrl || "https://invalid.local").hostname.endsWith(embedHost), true);
+  }
+});
+
+test("rejects unsupported, insecure and lookalike sports embeds", () => {
+  assert.equal(mapSportsVideoSource("http://www.youtube.com/watch?v=abcDEF_1234"), null);
+  assert.equal(mapSportsVideoSource("https://youtube.example.com/watch?v=abcDEF_1234"), null);
+  assert.equal(mapSportsVideoSource('<iframe src="https://scorebat.com.attacker.example/embed/1"></iframe>'), null);
 });
 
 test("maps past TheSportsDB events to safe YouTube embeds without overstating their origin", () => {
@@ -75,4 +103,18 @@ test("deduplicates the same event and date across feeds", () => {
     strTimestamp: "2026-08-23T19:00:00Z",
   }, "past");
   assert.equal(dedupeSportsEvents([event, { ...event, id: "other" }]).length, 1);
+});
+
+test("adds authorized providers to an event and promotes a finished event to replay", () => {
+  const event = mapSportsDbEvent({
+    idEvent: "45",
+    strEvent: "Equipe A vs Equipe B",
+    strLeague: "NBA",
+    strSport: "Basketball",
+    strTimestamp: "2026-08-22T19:00:00Z",
+  }, "past");
+  const withTwitch = addSportsVideoSource(event, "https://www.twitch.tv/nba", "Canal oficial da NBA");
+  assert.equal(withTwitch.status, "replay");
+  assert.equal(withTwitch.sources.length, 1);
+  assert.equal(withTwitch.sources[0].providerId, "twitch");
 });

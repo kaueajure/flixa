@@ -15,6 +15,7 @@ import {
 
 export const SESSAO_COOKIE = "flixa_sessao";
 export const SESSAO_DIAS = 14;
+export const PRESENCA_JANELA_SEGUNDOS = 90;
 
 export type UsuarioPublico = {
   id: number;
@@ -198,6 +199,7 @@ export async function criarSessao(usuarioId: number) {
       token,
       expira_em: expiraEmSql(),
       criado_em: agoraSql(),
+      ultima_atividade_em: agoraSql(),
     });
   });
   return token;
@@ -389,6 +391,16 @@ export async function redefinirSenhaComToken(token: string, novaSenha: string) {
   }));
 }
 
+export async function registrarPresenca(token: string | null) {
+  if (!token) return;
+  await withDb(async (db) => {
+    await db
+      .update(sessoes)
+      .set({ ultima_atividade_em: agoraSql() })
+      .where(and(eq(sessoes.token, token), gt(sessoes.expira_em, agoraSql())));
+  });
+}
+
 export async function listarUsuariosAdmin() {
   return withDb(async (db) => {
     const rows = await db
@@ -403,11 +415,18 @@ export async function listarUsuariosAdmin() {
         itens_lista: sql<number>`(select count(*) from ${lista_titulos} where ${lista_titulos.usuario_id} = ${usuarios.id})`,
         itens_historico: sql<number>`(select count(*) from ${historico_assistidos} where ${historico_assistidos.usuario_id} = ${usuarios.id})`,
         itens_progresso: sql<number>`(select count(*) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id})`,
-        sessoes_ativas: sql<number>`(select count(*) from ${sessoes} where ${sessoes.usuario_id} = ${usuarios.id} and ${sessoes.expira_em} > current_timestamp)`,
+        sessoes_ativas: sql<number>`(
+          select count(*)
+          from ${sessoes}
+          where ${sessoes.usuario_id} = ${usuarios.id}
+            and ${sessoes.expira_em} > current_timestamp
+            and ${sessoes.ultima_atividade_em} > date_sub(current_timestamp, interval 90 second)
+        )`,
         ultima_atividade: sql<string | null>`greatest(
           ${usuarios.atualizado_em},
           coalesce((select max(${historico_assistidos.assistido_em}) from ${historico_assistidos} where ${historico_assistidos.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em}),
-          coalesce((select max(${progresso_reproducao.atualizado_em}) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em})
+          coalesce((select max(${progresso_reproducao.atualizado_em}) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em}),
+          coalesce((select max(${sessoes.ultima_atividade_em}) from ${sessoes} where ${sessoes.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em})
         )`,
       })
       .from(usuarios)

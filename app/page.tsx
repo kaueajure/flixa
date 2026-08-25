@@ -56,6 +56,8 @@ type Movie = {
 
 type Genre = { id: number; name: string };
 type View = "home" | "filmes" | "series" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos";
+const PRESENCE_HEARTBEAT_MS = 30_000;
+
 type AuthUser = {
   id: number;
   nome: string;
@@ -678,6 +680,29 @@ export default function Home() {
         .catch(() => {});
     }
     return () => window.clearTimeout(boot);
+  }, [authChecking, authUser]);
+
+  useEffect(() => {
+    if (authChecking || !authUser) return;
+    const heartbeat = () => {
+      if (document.visibilityState !== "visible") return;
+      void fetch("/api/auth/presence", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+        keepalive: true,
+      }).catch(() => null);
+    };
+    const onVisibilityChange = () => heartbeat();
+    heartbeat();
+    const interval = window.setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
+    window.addEventListener("focus", heartbeat);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", heartbeat);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [authChecking, authUser]);
 
   useEffect(() => {

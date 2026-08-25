@@ -112,6 +112,8 @@ type AdminServer = {
 };
 
 type AdminTab = "usuarios" | "servidores";
+const PRESENCE_HEARTBEAT_MS = 30_000;
+const USERS_REFRESH_MS = 15_000;
 
 type CatalogCheck = {
   status: "online" | "offline";
@@ -280,10 +282,26 @@ export default function AdminPage() {
     setServidores(Array.isArray(serversData.servidores) ? serversData.servidores : []);
   }
 
+  async function carregarUsuarios() {
+    const response = await fetch("/api/admin/usuarios", { cache: "no-store", credentials: "include" });
+    if (handleUnauthorized(response.status)) return;
+    const data = await responseJson<{ usuarios?: AdminUser[]; estatisticas?: Stats; eu?: { id: number } }>(response);
+    if (!response.ok) throw new Error(data.erro || "Falha ao atualizar usuários");
+    setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
+    setStats(data.estatisticas ?? null);
+    setEuId(data.eu?.id ?? null);
+  }
+
   useEffect(() => {
     let active = true;
     const timer = window.setTimeout(() => {
-      void carregar()
+      void fetch("/api/auth/presence", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+      })
+        .catch(() => null)
+        .then(() => carregar())
         .catch((error) => {
           if (active) setErro(error instanceof Error ? error.message : "Falha ao carregar");
         })
@@ -298,6 +316,43 @@ export default function AdminPage() {
     // A carga inicial é intencionalmente executada uma vez por montagem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  useEffect(() => {
+    const heartbeat = () => {
+      if (document.visibilityState !== "visible") return;
+      void fetch("/api/auth/presence", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+        keepalive: true,
+      }).catch(() => null);
+    };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
+    window.addEventListener("focus", heartbeat);
+    document.addEventListener("visibilitychange", heartbeat);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", heartbeat);
+      document.removeEventListener("visibilitychange", heartbeat);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (carregando || tab !== "usuarios") return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void carregarUsuarios().catch(() => null);
+    };
+    const interval = window.setInterval(refresh, USERS_REFRESH_MS);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+    // A atualização periódica deve acompanhar somente a aba de usuários.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando, tab]);
 
   useEffect(() => {
     if (!modalServer) return;
