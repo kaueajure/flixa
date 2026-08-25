@@ -614,7 +614,7 @@ function parseTmdbId(movieId: string) {
   return movieId.replace(/^(tmdb-)?(movie-|tv-)?/i, "");
 }
 
-async function getTmdbDetails(movieId: string, kind: MediaKind) {
+export async function getTmdbDetails(movieId: string, kind: MediaKind) {
   const { token, apiKey } = getTmdbCredentials();
   if (!token && !apiKey) {
     return { movie: null, similar: [] as CatalogMovie[], error: "TMDB: chave ausente (TMDB_ACCESS_TOKEN ou TMDB_API_KEY)" };

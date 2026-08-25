@@ -6,6 +6,7 @@ type PublicUser = {
   id: number;
   nome: string;
   username: string | null;
+  avatarId: string | null;
   email: string;
   administrador: boolean;
 };

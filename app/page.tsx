@@ -12,8 +12,10 @@ import {
   PROTECTED_PLAYER_SANDBOX,
 } from "../lib/player-frame-policy";
 import BorderCollieForum from "./border-collie-forum";
+import AccountSettingsModal from "./account-settings-modal";
 import FriendsView, { type FriendActivity } from "./friends-view";
 import LoginForm from "./login-form";
+import ProfileAvatar from "./profile-avatar";
 import SeriesRecapModal from "./series-recap-modal";
 import SiteIntro from "./site-intro";
 import SportsView from "./sports-view";
@@ -58,6 +60,7 @@ type AuthUser = {
   id: number;
   nome: string;
   username: string | null;
+  avatarId: string | null;
   email: string;
   administrador: boolean;
 };
@@ -497,6 +500,7 @@ export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const toastTimer = useRef<number | null>(null);
   const lastCatalogHash = useRef("home");
   const playerMovieRef = useRef<Movie | null>(null);
@@ -1277,7 +1281,7 @@ export default function Home() {
                 aria-expanded={profileMenuOpen}
                 onClick={() => setProfileMenuOpen((open) => !open)}
               >
-                <span>{authUser.nome.slice(0, 1).toUpperCase()}</span>
+                <ProfileAvatar avatarId={authUser.avatarId} name={authUser.nome} className="profile-trigger-avatar" />
                 <strong>{authUser.nome.split(/\s+/)[0]}</strong>
                 <i aria-hidden="true">⌄</i>
               </button>
@@ -1291,6 +1295,9 @@ export default function Home() {
                     Minha Lista {listMovies.length ? <em>{listMovies.length}</em> : null}
                   </button>
                   <button type="button" role="menuitem" onClick={() => goTo("amigos")}>Amigos</button>
+                  <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); setAccountSettingsOpen(true); }}>
+                    Configurações da conta
+                  </button>
                   <button
                     type="button"
                     role="menuitem"
@@ -1743,6 +1750,14 @@ export default function Home() {
 
       {!authUser.username ? <UsernameSetupModal user={authUser} onComplete={setAuthUser} /> : null}
 
+      {accountSettingsOpen ? (
+        <AccountSettingsModal
+          user={authUser}
+          onClose={() => setAccountSettingsOpen(false)}
+          onUpdated={setAuthUser}
+        />
+      ) : null}
+
       {toast ? <div className="toast" role="status">{toast}</div> : null}
 
       <nav className="mobile-nav" aria-label="Navegação inferior">
@@ -1765,7 +1780,7 @@ export default function Home() {
           aria-expanded={profileMenuOpen}
           onClick={() => setProfileMenuOpen((open) => !open)}
         >
-          <span aria-hidden="true">●</span><small>Perfil</small>
+          <ProfileAvatar avatarId={authUser.avatarId} name={authUser.nome} className="mobile-profile-avatar" /><small>Perfil</small>
           {listMovies.length > 0 ? <em>{listMovies.length}</em> : null}
         </button>
       </nav>

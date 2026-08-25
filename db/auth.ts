@@ -1,8 +1,17 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, asc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { withDb } from "./index";
 import { describeDatabaseFailure, safeDatabaseError } from "./errors";
-import { historico_assistidos, lista_titulos, progresso_reproducao, sessoes, usuarios, type Usuario } from "./schema";
+import { isValidProfileAvatar } from "../lib/profile-avatars";
+import {
+  historico_assistidos,
+  lista_titulos,
+  progresso_reproducao,
+  recuperacoes_senha,
+  sessoes,
+  usuarios,
+  type Usuario,
+} from "./schema";
 
 export const SESSAO_COOKIE = "flixa_sessao";
 export const SESSAO_DIAS = 14;
@@ -11,6 +20,7 @@ export type UsuarioPublico = {
   id: number;
   nome: string;
   username: string | null;
+  avatarId: string | null;
   email: string;
   administrador: boolean;
 };
@@ -21,6 +31,10 @@ function agoraSql() {
 
 function expiraEmSql(dias = SESSAO_DIAS) {
   const date = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function dataSql(date: Date) {
   return date.toISOString().slice(0, 19).replace("T", " ");
 }
 
@@ -48,6 +62,7 @@ export function paraUsuarioPublico(usuario: Usuario): UsuarioPublico {
     id: usuario.id,
     nome: usuario.nome,
     username: usuario.username,
+    avatarId: usuario.avatar_id,
     email: usuario.email,
     administrador: Number(usuario.administrador) === 1,
   };
@@ -195,6 +210,7 @@ export async function obterUsuarioPorToken(token: string | null) {
       id: usuarios.id,
       nome: usuarios.nome,
       username: usuarios.username,
+      avatar_id: usuarios.avatar_id,
       email: usuarios.email,
       senha: usuarios.senha,
       administrador: usuarios.administrador,
@@ -242,6 +258,135 @@ export async function encerrarSessao(token: string | null) {
   await withDb(async (db) => {
     await db.delete(sessoes).where(eq(sessoes.token, token));
   });
+}
+
+export async function atualizarPerfil(
+  usuarioId: number,
+  input: { nome: string; email: string; senhaAtual?: string },
+) {
+  const nome = input.nome.trim().replace(/\s+/g, " ");
+  const email = input.email.trim().toLowerCase();
+  if (nome.length < 2 || nome.length > 120) {
+    return { erro: "O nome precisa ter entre 2 e 120 caracteres.", usuario: null as Usuario | null };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { erro: "Informe um e-mail válido.", usuario: null as Usuario | null };
+  }
+
+  return withDb(async (db) => {
+    const rows = await db.select().from(usuarios).where(eq(usuarios.id, usuarioId)).limit(1);
+    const usuario = rows[0];
+    if (!usuario) return { erro: "Usuário não encontrado.", usuario: null as Usuario | null };
+
+    if (email !== usuario.email) {
+      if (!input.senhaAtual || !verificarSenha(input.senhaAtual, usuario.senha)) {
+        return { erro: "Digite sua senha atual para alterar o e-mail.", usuario: null as Usuario | null };
+      }
+      const existente = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.email, email)).limit(1);
+      if (existente[0] && existente[0].id !== usuarioId) {
+        return { erro: "Este e-mail já está cadastrado.", usuario: null as Usuario | null };
+      }
+    }
+
+    await db.update(usuarios).set({ nome, email, atualizado_em: agoraSql() }).where(eq(usuarios.id, usuarioId));
+    const atualizados = await db.select().from(usuarios).where(eq(usuarios.id, usuarioId)).limit(1);
+    return { erro: null as string | null, usuario: atualizados[0] ?? null };
+  });
+}
+
+export async function atualizarAvatar(usuarioId: number, avatarId: string | null) {
+  if (avatarId !== null && !isValidProfileAvatar(avatarId)) {
+    return { erro: "Escolha uma foto de perfil válida.", usuario: null as Usuario | null };
+  }
+  return withDb(async (db) => {
+    await db.update(usuarios).set({ avatar_id: avatarId, atualizado_em: agoraSql() }).where(eq(usuarios.id, usuarioId));
+    const rows = await db.select().from(usuarios).where(eq(usuarios.id, usuarioId)).limit(1);
+    if (!rows[0]) return { erro: "Usuário não encontrado.", usuario: null as Usuario | null };
+    return { erro: null as string | null, usuario: rows[0] };
+  });
+}
+
+export async function alterarSenha(
+  usuarioId: number,
+  senhaAtual: string,
+  novaSenha: string,
+  tokenSessaoAtual: string | null,
+) {
+  if (novaSenha.length < 6) return { erro: "A nova senha precisa ter pelo menos 6 caracteres." };
+  if (senhaAtual === novaSenha) return { erro: "Escolha uma senha diferente da atual." };
+
+  return withDb(async (db) => {
+    const rows = await db.select().from(usuarios).where(eq(usuarios.id, usuarioId)).limit(1);
+    const usuario = rows[0];
+    if (!usuario || !verificarSenha(senhaAtual, usuario.senha)) {
+      return { erro: "A senha atual está incorreta." };
+    }
+    await db.update(usuarios).set({ senha: hashSenha(novaSenha), atualizado_em: agoraSql() }).where(eq(usuarios.id, usuarioId));
+    if (tokenSessaoAtual) {
+      await db.delete(sessoes).where(and(eq(sessoes.usuario_id, usuarioId), ne(sessoes.token, tokenSessaoAtual)));
+    } else {
+      await db.delete(sessoes).where(eq(sessoes.usuario_id, usuarioId));
+    }
+    return { erro: null as string | null };
+  });
+}
+
+export async function criarRecuperacaoSenha(emailInformado: string) {
+  const email = emailInformado.trim().toLowerCase();
+  return withDb(async (db) => {
+    const rows = await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1);
+    const usuario = rows[0];
+    if (!usuario) return null;
+
+    const limite = dataSql(new Date(Date.now() - 60_000));
+    const recentes = await db
+      .select({ id: recuperacoes_senha.id })
+      .from(recuperacoes_senha)
+      .where(and(eq(recuperacoes_senha.usuario_id, usuario.id), gt(recuperacoes_senha.criado_em, limite)))
+      .limit(1);
+    if (recentes[0]) return null;
+
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await db.insert(recuperacoes_senha).values({
+      usuario_id: usuario.id,
+      token_hash: tokenHash,
+      expira_em: dataSql(new Date(Date.now() + 30 * 60_000)),
+      criado_em: agoraSql(),
+    });
+    return { token, nome: usuario.nome, email: usuario.email };
+  });
+}
+
+export async function redefinirSenhaComToken(token: string, novaSenha: string) {
+  if (token.length < 32 || token.length > 128) return { erro: "Link inválido ou expirado." };
+  if (novaSenha.length < 6) return { erro: "A nova senha precisa ter pelo menos 6 caracteres." };
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+
+  return withDb(async (db) => db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: recuperacoes_senha.id, usuarioId: recuperacoes_senha.usuario_id })
+      .from(recuperacoes_senha)
+      .where(and(
+        eq(recuperacoes_senha.token_hash, tokenHash),
+        isNull(recuperacoes_senha.usado_em),
+        gt(recuperacoes_senha.expira_em, agoraSql()),
+      ))
+      .limit(1)
+      .for("update");
+    const recuperacao = rows[0];
+    if (!recuperacao) return { erro: "Link inválido ou expirado." };
+
+    const usadoEm = agoraSql();
+    await tx.update(recuperacoes_senha)
+      .set({ usado_em: usadoEm })
+      .where(and(eq(recuperacoes_senha.id, recuperacao.id), isNull(recuperacoes_senha.usado_em)));
+    await tx.update(usuarios)
+      .set({ senha: hashSenha(novaSenha), atualizado_em: usadoEm })
+      .where(eq(usuarios.id, recuperacao.usuarioId));
+    await tx.delete(sessoes).where(eq(sessoes.usuario_id, recuperacao.usuarioId));
+    return { erro: null as string | null };
+  }));
 }
 
 export async function listarUsuariosAdmin() {

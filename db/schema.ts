@@ -20,6 +20,7 @@ export const usuarios = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     nome: varchar("nome", { length: 120 }).notNull(),
     username: varchar("username", { length: 32 }),
+    avatar_id: varchar("avatar_id", { length: 80 }),
     email: varchar("email", { length: 190 }).notNull(),
     senha: varchar("senha", { length: 255 }).notNull(),
     administrador: tinyint("administrador").notNull().default(0),
@@ -53,6 +54,28 @@ export const sessoes = mysqlTable(
   (table) => [
     uniqueIndex("sessoes_token_unico").on(table.token),
     index("sessoes_usuario_idx").on(table.usuario_id),
+  ],
+);
+
+/** Links temporários e de uso único para recuperação de senha. */
+export const recuperacoes_senha = mysqlTable(
+  "recuperacoes_senha",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_id: int("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    token_hash: varchar("token_hash", { length: 64 }).notNull(),
+    expira_em: datetime("expira_em", { mode: "string" }).notNull(),
+    usado_em: datetime("usado_em", { mode: "string" }),
+    criado_em: datetime("criado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("recuperacoes_senha_token_unico").on(table.token_hash),
+    index("recuperacoes_senha_usuario_idx").on(table.usuario_id),
+    index("recuperacoes_senha_expiracao_idx").on(table.expira_em),
   ],
 );
 
@@ -167,6 +190,36 @@ export const amizades = mysqlTable(
   ],
 );
 
+/** Títulos enviados entre amigos; não aceita mensagens de texto livre. */
+export const recomendacoes_amigos = mysqlTable(
+  "recomendacoes_amigos",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    remetente_id: int("remetente_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    destinatario_id: int("destinatario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    chave_titulo: varchar("chave_titulo", { length: 64 }).notNull(),
+    tmdb_id: varchar("tmdb_id", { length: 32 }),
+    imdb_id: varchar("imdb_id", { length: 32 }),
+    tipo: mysqlEnum("tipo", ["filme", "serie"]).notNull().default("filme"),
+    titulo: varchar("titulo", { length: 255 }).notNull(),
+    poster: text("poster"),
+    backdrop: text("backdrop"),
+    ano: int("ano"),
+    visualizado_em: datetime("visualizado_em", { mode: "string" }),
+    enviado_em: datetime("enviado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("recomendacoes_remetente_idx").on(table.remetente_id, table.enviado_em),
+    index("recomendacoes_destinatario_idx").on(table.destinatario_id, table.visualizado_em, table.enviado_em),
+  ],
+);
+
 /** Estado operacional dos provedores externos controlado pelo painel admin. */
 export const servidores_player = mysqlTable(
   "servidores_player",
@@ -195,5 +248,7 @@ export const servidores_player = mysqlTable(
 
 export type Usuario = typeof usuarios.$inferSelect;
 export type Sessao = typeof sessoes.$inferSelect;
+export type RecuperacaoSenha = typeof recuperacoes_senha.$inferSelect;
 export type Amizade = typeof amizades.$inferSelect;
+export type RecomendacaoAmigo = typeof recomendacoes_amigos.$inferSelect;
 export type ServidorPlayer = typeof servidores_player.$inferSelect;

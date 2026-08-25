@@ -28,7 +28,8 @@ function isMysqlApiPath(pathname: string) {
     pathname === "/api/movies/availability" ||
     pathname === "/api/movies/servers" ||
     pathname === "/api/watch-party/ticket" ||
-    pathname === "/api/amigos"
+    pathname === "/api/amigos" ||
+    pathname === "/api/amigos/recomendacoes"
   );
 }
 
@@ -81,6 +82,8 @@ async function loadRouteModule(pathname: string): Promise<RouteModule | null> {
   if (pathname === "/api/auth/register") return import("../app/api/auth/register/route");
   if (pathname === "/api/auth/logout") return import("../app/api/auth/logout/route");
   if (pathname === "/api/auth/me") return import("../app/api/auth/me/route");
+  if (pathname === "/api/auth/account") return import("../app/api/auth/account/route");
+  if (pathname === "/api/auth/password-recovery") return import("../app/api/auth/password-recovery/route");
   if (pathname === "/api/lista") return import("../app/api/lista/route");
   if (pathname === "/api/historico") return import("../app/api/historico/route");
   if (pathname === "/api/progresso") return import("../app/api/progresso/route");
@@ -92,6 +95,7 @@ async function loadRouteModule(pathname: string): Promise<RouteModule | null> {
   if (pathname === "/api/movies/servers") return import("../app/api/movies/servers/route");
   if (pathname === "/api/watch-party/ticket") return import("../app/api/watch-party/ticket/route");
   if (pathname === "/api/amigos") return import("../app/api/amigos/route");
+  if (pathname === "/api/amigos/recomendacoes") return import("../app/api/amigos/recomendacoes/route");
   return null;
 }
 
