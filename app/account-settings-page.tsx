@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { PROFILE_AVATAR_COLLECTIONS, PROFILE_AVATARS, findProfileAvatar } from "../lib/profile-avatars";
 import ProfileAvatar from "./profile-avatar";
@@ -148,6 +148,13 @@ export default function AccountSettingsPage({ user, onUpdated }: Props) {
     setSelectedAvatarId(user.avatarId);
   }
 
+  useEffect(() => {
+    if (!avatarPickerOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") closeAvatarPicker(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [avatarPickerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <main className={`account-page${avatarPickerOpen ? " is-avatar-picker" : ""}`}>
       <header className="account-page-topbar">
@@ -166,7 +173,7 @@ export default function AccountSettingsPage({ user, onUpdated }: Props) {
         </aside>
         <section className={`account-settings-panel${avatarPickerOpen ? " is-avatar-picker" : ""}`} aria-labelledby="account-page-title">
         {avatarPickerOpen ? (
-          <div className="avatar-picker">
+          <div className="avatar-picker" role="dialog" aria-modal="true" aria-label="Alterar foto do perfil">
             <header className="avatar-picker-header">
               <button type="button" className="avatar-picker-back" onClick={avatarCollection ? () => setAvatarCollectionId(null) : closeAvatarPicker} aria-label="Voltar">
                 <span aria-hidden="true">←</span>
@@ -241,7 +248,7 @@ export default function AccountSettingsPage({ user, onUpdated }: Props) {
               <h3 id="account-avatar-title">Foto do perfil</h3>
               <p>{currentAvatar ? `${currentAvatar.name} · ${currentAvatar.collectionName}` : "Você está usando a inicial do seu nome."}</p>
             </div>
-            <button type="button" className="account-avatar-change" onClick={openAvatarPicker}>Trocar foto</button>
+            <button type="button" className="account-avatar-change" onClick={openAvatarPicker}>Alterar foto</button>
           </div>
           <small className="account-avatar-count">{PROFILE_AVATARS.length} personagens organizados em {PROFILE_AVATAR_COLLECTIONS.length} coleções.</small>
           {avatarStatus ? <p className={`account-status is-${avatarStatus.kind}`} role="status">{avatarStatus.text}</p> : null}

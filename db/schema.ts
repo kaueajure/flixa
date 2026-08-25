@@ -100,13 +100,66 @@ export const lista_titulos = mysqlTable(
     backdrop: text("backdrop"),
     ano: int("ano"),
     dados_json: json("dados_json"),
+    estado: mysqlEnum("estado", ["quero_assistir", "assistindo", "concluido", "abandonado"])
+      .notNull()
+      .default("quero_assistir"),
+    favorito: tinyint("favorito").notNull().default(0),
+    nao_e_para_mim: tinyint("nao_e_para_mim").notNull().default(0),
     criado_em: datetime("criado_em", { mode: "string" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    atualizado_em: datetime("atualizado_em", { mode: "string" })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex("lista_usuario_titulo_unico").on(table.usuario_id, table.chave_titulo),
     index("lista_usuario_idx").on(table.usuario_id),
+  ],
+);
+
+/** Coleções personalizadas dentro da biblioteca do usuário. */
+export const lista_colecoes = mysqlTable(
+  "lista_colecoes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_id: int("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+    nome: varchar("nome", { length: 60 }).notNull(),
+    criado_em: datetime("criado_em", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("lista_colecoes_usuario_nome_unico").on(table.usuario_id, table.nome),
+    index("lista_colecoes_usuario_idx").on(table.usuario_id),
+  ],
+);
+
+export const lista_colecao_itens = mysqlTable(
+  "lista_colecao_itens",
+  {
+    colecao_id: int("colecao_id").notNull().references(() => lista_colecoes.id, { onDelete: "cascade" }),
+    titulo_id: int("titulo_id").notNull().references(() => lista_titulos.id, { onDelete: "cascade" }),
+    criado_em: datetime("criado_em", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("lista_colecao_item_unico").on(table.colecao_id, table.titulo_id),
+    index("lista_colecao_itens_titulo_idx").on(table.titulo_id),
+  ],
+);
+
+/** Episódios explicitamente concluídos pelo usuário. */
+export const episodios_assistidos = mysqlTable(
+  "episodios_assistidos",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_id: int("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+    chave_titulo: varchar("chave_titulo", { length: 64 }).notNull(),
+    temporada: int("temporada").notNull(),
+    episodio: int("episodio").notNull(),
+    assistido_em: datetime("assistido_em", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("episodios_usuario_titulo_unico").on(table.usuario_id, table.chave_titulo, table.temporada, table.episodio),
+    index("episodios_usuario_idx").on(table.usuario_id, table.chave_titulo),
   ],
 );
 
@@ -154,6 +207,15 @@ export const progresso_reproducao = mysqlTable(
     posicao_segundos: int("posicao_segundos").notNull().default(0),
     temporada: int("temporada"),
     episodio: int("episodio"),
+    estado_reproducao: mysqlEnum("estado_reproducao", ["aberto", "reproduzindo", "pausado", "concluido"])
+      .notNull()
+      .default("aberto"),
+    fonte_progresso: mysqlEnum("fonte_progresso", ["real", "estimado"])
+      .notNull()
+      .default("estimado"),
+    duracao_segundos: int("duracao_segundos"),
+    iniciado_em: datetime("iniciado_em", { mode: "string" }),
+    concluido_em: datetime("concluido_em", { mode: "string" }),
     atualizado_em: datetime("atualizado_em", { mode: "string" })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
@@ -162,6 +224,45 @@ export const progresso_reproducao = mysqlTable(
     uniqueIndex("progresso_usuario_titulo_unico").on(table.usuario_id, table.chave_titulo),
     index("progresso_usuario_idx").on(table.usuario_id),
   ],
+);
+
+/** Sessões agregadas usadas pela Retrospectiva sem confundir abertura com reprodução. */
+export const sessoes_visualizacao = mysqlTable(
+  "sessoes_visualizacao",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_id: int("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+    sessao_chave: varchar("sessao_chave", { length: 80 }).notNull(),
+    chave_titulo: varchar("chave_titulo", { length: 64 }).notNull(),
+    titulo: varchar("titulo", { length: 255 }).notNull(),
+    tipo: mysqlEnum("tipo", ["filme", "serie"]).notNull(),
+    ano: int("ano"),
+    generos_json: json("generos_json"),
+    segundos_assistidos: int("segundos_assistidos").notNull().default(0),
+    fonte_progresso: mysqlEnum("fonte_progresso", ["real", "estimado"]).notNull().default("estimado"),
+    concluido: tinyint("concluido").notNull().default(0),
+    iniciado_em: datetime("iniciado_em", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+    atualizado_em: datetime("atualizado_em", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("sessoes_visualizacao_chave_unica").on(table.usuario_id, table.sessao_chave),
+    index("sessoes_visualizacao_periodo_idx").on(table.usuario_id, table.iniciado_em),
+    index("sessoes_visualizacao_titulo_idx").on(table.usuario_id, table.chave_titulo),
+  ],
+);
+
+export const descobertas_roleta = mysqlTable(
+  "descobertas_roleta",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    usuario_id: int("usuario_id").notNull().references(() => usuarios.id, { onDelete: "cascade" }),
+    chave_titulo: varchar("chave_titulo", { length: 64 }).notNull(),
+    titulo: varchar("titulo", { length: 255 }).notNull(),
+    poster: text("poster"),
+    genero: varchar("genero", { length: 80 }),
+    escolhido_em: datetime("escolhido_em", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("descobertas_roleta_usuario_idx").on(table.usuario_id, table.escolhido_em)],
 );
 
 /** Relações de amizade e solicitações entre usuários. */

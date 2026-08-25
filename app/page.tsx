@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   DEFAULT_DISABLED_PLAYER_SERVER_IDS,
   PLAYER_SERVERS,
+  getPlayerServer,
   playerServerIdForSource,
 } from "../lib/player-servers";
 import {
@@ -15,13 +16,16 @@ import {
 import BorderCollieForum from "./border-collie-forum";
 import FriendsView, { type FriendActivity } from "./friends-view";
 import LoginForm from "./login-form";
+import LibraryView, { type LibraryMovie } from "./library-view";
 import ProfileAvatar from "./profile-avatar";
+import RetrospectiveView from "./retrospective-view";
 import SeriesRecapModal from "./series-recap-modal";
 import SiteIntro from "./site-intro";
 import SportsView from "./sports-view";
 import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
 import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
+import { parsePlayerPlaybackEvent } from "../lib/player-events";
 
 type MediaKind = "movie" | "tv";
 
@@ -52,10 +56,17 @@ type Movie = {
   server_count?: number;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
+  libraryState?: "quero_assistir" | "assistindo" | "concluido" | "abandonado";
+  favorite?: boolean;
+  notForMe?: boolean;
+  collections?: Array<{ id: number; name: string }>;
+  playbackState?: "aberto" | "reproduzindo" | "pausado" | "concluido";
+  progressSource?: "real" | "estimado";
+  durationSeconds?: number;
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos";
+type View = "home" | "filmes" | "series" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos" | "retrospectiva";
 const PRESENCE_HEARTBEAT_MS = 30_000;
 
 type AuthUser = {
@@ -82,6 +93,18 @@ type TvEpisodeInfo = {
   still?: string;
   runtime?: number;
   air_date?: string;
+};
+
+type PlaybackPatch = {
+  progresso?: number;
+  posicao_segundos?: number;
+  temporada?: number | null;
+  episodio?: number | null;
+  estado?: "aberto" | "reproduzindo" | "pausado" | "concluido";
+  fonte?: "real" | "estimado";
+  duracao_segundos?: number | null;
+  sessao_chave?: string;
+  delta_segundos?: number;
 };
 
 const LIST_KEY = "flixa-saved-movies";
@@ -398,6 +421,7 @@ function parseRoute(hash: string) {
   if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
   if (raw === "assistir-em-grupo" || raw === "grupo") return { view: "grupo" as View };
   if (raw === "amigos" || raw === "amizades") return { view: "amigos" as View };
+  if (raw === "retrospectiva" || raw === "retro") return { view: "retrospectiva" as View };
 
   const genre = raw.match(/^genero\/(\d+)$/);
   if (genre) {
@@ -529,6 +553,7 @@ export default function Home() {
       esportes: "Esportes ao vivo — Flixa",
       grupo: "Assistir em grupo — Flixa",
       amigos: "Amigos — Flixa",
+      retrospectiva: "Sua Retrospectiva — Flixa",
     };
     document.title = authUser ? titles[view] : "Colliepédia — fórum sobre Border Collies";
 
@@ -802,7 +827,8 @@ export default function Home() {
         route.view === "lista" ||
         route.view === "surpreenda-me" ||
         route.view === "grupo" ||
-        route.view === "amigos"
+        route.view === "amigos" ||
+        route.view === "retrospectiva"
       )) {
         window.scrollTo({ top: 0, behavior: "auto" });
       }
@@ -1060,20 +1086,10 @@ export default function Home() {
     goTo(catalogReturnHash(lastCatalogHash.current));
   }, []);
 
-  function rememberWatch(movie: Movie) {
-    setRecentMovies((current) => dedupeMovies([movie, ...current]).slice(0, 16));
-    void fetch("/api/historico", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ movie }),
-    }).catch(() => null);
-  }
-
   const saveProgress = useCallback(
     (
       movie: Movie,
-      patch: { progresso?: number; posicao_segundos?: number; temporada?: number | null; episodio?: number | null },
+      patch: PlaybackPatch,
     ) => {
       const nextMovie: Movie = {
         ...movie,
@@ -1081,10 +1097,13 @@ export default function Home() {
         positionSeconds: patch.posicao_segundos ?? movie.positionSeconds,
         season: patch.temporada ?? movie.season,
         episode: patch.episodio ?? movie.episode,
+        playbackState: patch.estado ?? movie.playbackState,
+        progressSource: patch.fonte ?? movie.progressSource,
+        durationSeconds: patch.duracao_segundos ?? movie.durationSeconds,
       };
-      setContinueMovies((current) =>
-        dedupeMovies([{ ...nextMovie, progress: Math.max(1, Number(nextMovie.progress || 1)) }, ...current]).slice(0, 16),
-      );
+      setContinueMovies((current) => patch.estado === "concluido"
+        ? current.filter((item) => movieKey(item) !== movieKey(nextMovie))
+        : dedupeMovies([{ ...nextMovie, progress: Math.max(1, Number(nextMovie.progress || 1)) }, ...current]).slice(0, 16));
       void fetch("/api/progresso", {
         method: "PUT",
         credentials: "include",
@@ -1095,6 +1114,11 @@ export default function Home() {
           posicao_segundos: patch.posicao_segundos,
           temporada: patch.temporada,
           episodio: patch.episodio,
+          estado: patch.estado,
+          fonte: patch.fonte,
+          duracao_segundos: patch.duracao_segundos,
+          sessao_chave: patch.sessao_chave,
+          delta_segundos: patch.delta_segundos,
         }),
       }).catch(() => null);
     },
@@ -1102,14 +1126,12 @@ export default function Home() {
   );
 
   const handlePlayerProgress = useCallback(
-    (patch: {
-      progresso?: number;
-      posicao_segundos?: number;
-      temporada?: number | null;
-      episodio?: number | null;
-    }) => {
+    (patch: PlaybackPatch) => {
       const current = playerMovieRef.current;
-      if (current) saveProgress(current, patch);
+      if (current) {
+        saveProgress(current, patch);
+        if (patch.estado === "concluido") setRecentMovies((items) => dedupeMovies([{ ...current, progress: 100, playbackState: "concluido" }, ...items]).slice(0, 16));
+      }
     },
     [saveProgress],
   );
@@ -1122,12 +1144,13 @@ export default function Home() {
     setSelectedMovie(null);
     setRecapMovie(null);
     setPlayerMovie(payload);
-    rememberWatch(payload);
     saveProgress(payload, {
-      progresso: Math.max(Number(payload.progress || 0), 5),
+      progresso: Math.max(Number(payload.progress || 0), 1),
       posicao_segundos: payload.positionSeconds || 0,
       temporada: season ?? null,
       episodio: episode ?? null,
+      estado: "aberto",
+      fonte: "estimado",
     });
     goTo(playerHash(payload, season, episode));
   }
@@ -1319,6 +1342,7 @@ export default function Home() {
                     Minha Lista {listMovies.length ? <em>{listMovies.length}</em> : null}
                   </button>
                   <button type="button" role="menuitem" onClick={() => goTo("amigos")}>Amigos</button>
+                  <button type="button" role="menuitem" onClick={() => goTo("retrospectiva")}>Retrospectiva</button>
                   <Link role="menuitem" href="/configuracoes" onClick={() => setProfileMenuOpen(false)}>
                     Configurações da conta
                   </Link>
@@ -1392,6 +1416,8 @@ export default function Home() {
 
       {view === "esportes" ? (
         <SportsView />
+      ) : view === "retrospectiva" ? (
+        <RetrospectiveView name={authUser.nome} />
       ) : view === "amigos" ? (
         <FriendsView username={authUser.username || ""} onOpenActivity={(activity) => void openFriendActivity(activity)} />
       ) : view === "grupo" ? (
@@ -1401,46 +1427,12 @@ export default function Home() {
           onExplore={() => goTo("filmes")}
         />
       ) : view === "lista" ? (
-        <section className="list-view" id="minha-lista">
-          <div className="list-view-head">
-            <div>
-              <p className="eyebrow">Sua coleção</p>
-              <h1>Minha Lista</h1>
-              <p className="hero-description">
-                {listMovies.length
-                  ? `${listMovies.length} ${listMovies.length === 1 ? "título salvo" : "títulos salvos"} na sua conta.`
-                  : "Salve títulos do catálogo para assistir depois. A lista sincroniza com sua conta."}
-              </p>
-            </div>
-            <div className="list-tools">
-              <a className="secondary-action" href="#filmes" onClick={() => goTo("filmes")}>
-                Explorar catálogo
-              </a>
-            </div>
-          </div>
-
-          {listMovies.length ? (
-            <div className="poster-grid">
-              {listMovies.map((movie) => (
-                <MovieCard
-                  key={movieKey(movie)}
-                  movie={movie}
-                  inList
-                  onOpen={openDetails}
-                  onToggleList={toggleList}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <p>Sua lista ainda está vazia</p>
-              <span>Abra um título e toque em “Minha Lista”, ou use Adicionar a Lista na busca.</span>
-              <a className="primary-action" href="#filmes" onClick={() => goTo("filmes")}>
-                Ver filmes
-              </a>
-            </div>
-          )}
-        </section>
+        <LibraryView
+          items={listMovies}
+          onItemsChange={(items) => setListMovies(items as Movie[])}
+          onOpen={(movie: LibraryMovie) => openDetails(movie as Movie)}
+          onExplore={() => goTo("filmes")}
+        />
       ) : view === "surpreenda-me" ? (
         <RouletteView
           genres={genres}
@@ -1791,7 +1783,7 @@ export default function Home() {
         </a>
         <button
           type="button"
-          className={`mobile-profile-trigger ${view === "lista" || view === "amigos" || view === "grupo" || profileMenuOpen ? "is-active" : ""}`}
+          className={`mobile-profile-trigger ${view === "lista" || view === "amigos" || view === "grupo" || view === "retrospectiva" || profileMenuOpen ? "is-active" : ""}`}
           aria-label="Abrir menu do perfil"
           aria-expanded={profileMenuOpen}
           onClick={() => setProfileMenuOpen((open) => !open)}
@@ -2166,6 +2158,12 @@ function RouletteView({
 
     spinEndTimer.current = window.setTimeout(() => {
       setPick(finalPick);
+      void fetch("/api/retrospectiva", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: movieKey(finalPick), title: finalPick.title, poster: finalPick.poster, genre: activeGenre?.name || finalPick.genres?.[0] }),
+      }).catch(() => null);
       setSpinning(false);
       pendingSpinRef.current = null;
       spinEndTimer.current = null;
@@ -2813,6 +2811,7 @@ function MovieCard({
       </div>
       <div className="card-meta">
         <strong>{movie.title}</strong>
+        {onRemoveProgress && Number(movie.progress || 0) > 0 ? <div className="card-watch-progress"><span style={{ width: `${Math.min(100, Number(movie.progress))}%` }} /><small>{movie.progressSource === "real" ? `${Math.round(Number(movie.progress))}% confirmado` : `${Math.round(Number(movie.progress))}% aproximado`}</small></div> : null}
         <div className="card-tags">
           {mediaKind(movie) === "tv" ? <span className="card-kind">Série</span> : null}
           {tvProgressLabel(movie) ? <span className="card-progress">{tvProgressLabel(movie)}</span> : null}
@@ -3475,12 +3474,7 @@ function MoviePlayer({
 }: {
   movie: Movie;
   onClose: () => void;
-  onProgress: (patch: {
-    progresso?: number;
-    posicao_segundos?: number;
-    temporada?: number | null;
-    episodio?: number | null;
-  }) => void;
+  onProgress: (patch: PlaybackPatch) => void;
   onEpisodeChange?: (movie: Movie, season: number, episode: number) => void;
 }) {
   const isTv = mediaKind(movie) === "tv";
@@ -3503,6 +3497,8 @@ function MoviePlayer({
   const [serverPreparing, setServerPreparing] = useState(true);
   const [failedSourceIds, setFailedSourceIds] = useState<Set<string>>(() => new Set());
   const [serverNotice, setServerNotice] = useState("");
+  const [realProgressSourceId, setRealProgressSourceId] = useState("");
+  const [episodeWatched, setEpisodeWatched] = useState(false);
   const [partyProviderId, setPartyProviderId] = useState<string | null>(null);
   const [partyFailure, setPartyFailure] = useState<{ sourceId: string; reason: string; sequence: number } | null>(null);
   const availableSources = useMemo(() => buildPlayerSources(
@@ -3521,6 +3517,9 @@ function MoviePlayer({
   }, [availableSources, sourceOrder]);
   const [menuPinned, setMenuPinned] = useState(false);
   const progressRef = useRef(Math.max(5, Number(movie.progress || 5)));
+  const sessionKeyRef = useRef("");
+  const realPositionRef = useRef<number | null>(null);
+  const playbackStateRef = useRef<"aberto" | "reproduzindo" | "pausado" | "concluido">("aberto");
   const onProgressRef = useRef(onProgress);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const playerIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -3532,6 +3531,7 @@ function MoviePlayer({
     : sources.find((source) => source.id === sourceId);
   const activeSourceSrc = activeSource?.src ?? "";
   const activeSourceName = activeSource?.name ?? "";
+  const progressMode: "real" | "estimado" = activeSource?.id && realProgressSourceId === activeSource.id ? "real" : "estimado";
   const currentEpisodeInfo = episodes.find((item) => item.episode_number === episode);
   const currentSeasonInfo = seasons.find((item) => item.season_number === season);
   const episodeLabel = isTv
@@ -3549,6 +3549,10 @@ function MoviePlayer({
   useEffect(() => {
     onProgressRef.current = onProgress;
   }, [onProgress]);
+
+  useEffect(() => {
+    sessionKeyRef.current = `watch-${crypto.randomUUID()}`;
+  }, []);
 
   useEffect(() => {
     sourceIdRef.current = sourceId;
@@ -3712,6 +3716,42 @@ function MoviePlayer({
   }, [activeSource, switchToNextSource]);
 
   useEffect(() => {
+    if (!activeSource) return;
+    const server = getPlayerServer(playerServerIdForSource(activeSource.id));
+    if (server?.watchPartySupport !== "full") return;
+    let expectedOrigin = "";
+    try { expectedOrigin = new URL(activeSource.src).origin; } catch { return; }
+    const onPlaybackMessage = (event: MessageEvent) => {
+      if (event.origin !== expectedOrigin || event.source !== playerIframeRef.current?.contentWindow) return;
+      const playback = parsePlayerPlaybackEvent(event.data);
+      if (!playback) return;
+      setRealProgressSourceId(activeSource.id);
+      const duration = playback.durationSeconds || movie.durationSeconds || ((durationMinutes(movie) ?? 0) * 60) || (isTv ? 2700 : 7200);
+      const position = playback.positionSeconds;
+      if (position != null && duration > 0) progressRef.current = Math.min(100, Math.max(0, position / duration * 100));
+      const previous = realPositionRef.current;
+      const delta = position != null && previous != null ? Math.min(120, Math.max(0, position - previous)) : 0;
+      if (position != null) realPositionRef.current = position;
+      const completed = playback.state === "ended" || progressRef.current >= 90;
+      playbackStateRef.current = completed ? "concluido" : playback.state === "paused" ? "pausado" : "reproduzindo";
+      onProgressRef.current({
+        progresso: completed ? 100 : progressRef.current,
+        posicao_segundos: Math.round(position ?? (progressRef.current / 100 * duration)),
+        temporada: isTv ? season : null,
+        episodio: isTv ? episode : null,
+        estado: playbackStateRef.current,
+        fonte: "real",
+        duracao_segundos: Math.round(duration),
+        sessao_chave: sessionKeyRef.current,
+        delta_segundos: Math.round(delta),
+      });
+      if (completed && isTv) setEpisodeWatched(true);
+    };
+    window.addEventListener("message", onPlaybackMessage);
+    return () => window.removeEventListener("message", onPlaybackMessage);
+  }, [activeSource, episode, isTv, movie, season]);
+
+  useEffect(() => {
     if (serverPreparing || !sourceId || !serverNotice) return;
     const timer = window.setTimeout(() => setServerNotice(""), 6_000);
     return () => window.clearTimeout(timer);
@@ -3828,12 +3868,18 @@ function MoviePlayer({
     }
   }
 
-  function emitProgress(nextSeason = season, nextEpisode = episode) {
+  function emitProgress(nextSeason = season, nextEpisode = episode, state = playbackStateRef.current, deltaSeconds = 0) {
+    const duration = movie.durationSeconds || ((durationMinutes(movie) ?? 0) * 60) || (isTv ? 2700 : 7200);
     onProgressRef.current({
       progresso: progressRef.current,
-      posicao_segundos: Math.round(progressRef.current * 60),
+      posicao_segundos: Math.round(progressRef.current / 100 * duration),
       temporada: isTv && localEpisodeControls ? nextSeason : null,
       episodio: isTv && localEpisodeControls ? nextEpisode : null,
+      estado: state,
+      fonte: progressMode,
+      duracao_segundos: duration,
+      sessao_chave: sessionKeyRef.current,
+      delta_segundos: deltaSeconds,
     });
   }
 
@@ -3842,7 +3888,9 @@ function MoviePlayer({
     setEpisodes([]);
     setSeason(nextSeason);
     setEpisode(nextEpisode);
-    if (resetProgress) progressRef.current = 8;
+    if (resetProgress) progressRef.current = 1;
+    playbackStateRef.current = "aberto";
+    setEpisodeWatched(false);
     onEpisodeChange?.(movie, nextSeason, nextEpisode);
     emitProgress(nextSeason, nextEpisode);
   }
@@ -3876,15 +3924,34 @@ function MoviePlayer({
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      progressRef.current = Math.min(95, progressRef.current + 2);
-      emitProgress();
+      if (progressMode !== "estimado" || !iframeLoadedRef.current || document.visibilityState !== "visible") return;
+      const duration = movie.durationSeconds || ((durationMinutes(movie) ?? 0) * 60) || (isTv ? 2700 : 7200);
+      progressRef.current = Math.min(89, progressRef.current + 45 / duration * 100);
+      playbackStateRef.current = "reproduzindo";
+      emitProgress(season, episode, "reproduzindo", 45);
     }, 45000);
-    emitProgress();
+    emitProgress(season, episode, "aberto", 0);
     return () => {
       window.clearInterval(timer);
-      emitProgress();
+      if (playbackStateRef.current !== "concluido") emitProgress(season, episode, "pausado", 0);
     };
-  }, [episode, isTv, season]);
+  }, [episode, isTv, movie.durationSeconds, progressMode, season]);
+
+  useEffect(() => {
+    if (!isTv) return;
+    const controller = new AbortController();
+    fetch(`/api/lista/episodios?chave=${encodeURIComponent(movieKey(movie))}`, { cache: "no-store", credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => setEpisodeWatched(Array.isArray(data?.episodios) && data.episodios.some((item: { season: number; episode: number }) => item.season === season && item.episode === episode)))
+      .catch(() => null);
+    return () => controller.abort();
+  }, [episode, isTv, movie, season]);
+
+  function toggleEpisodeWatched() {
+    if (!isTv) return;
+    const watched = !episodeWatched; setEpisodeWatched(watched);
+    void fetch("/api/lista/episodios", { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chave: movieKey(movie), season, episode, watched }) });
+  }
 
   const canGoPrev = Boolean(prevEpisode || prevSeason);
   const canGoNext = Boolean(nextEpisode || nextSeason);
@@ -3903,11 +3970,15 @@ function MoviePlayer({
           {movie.title}
         </strong>
         {isTv && localEpisodeControls ? <span className="player-ep-badge">{episodeLabel ?? `T${season} E${episode}`}</span> : null}
+        <span className={`player-progress-mode is-${progressMode}`}>{progressMode === "real" ? "Progresso confirmado" : "Progresso aproximado"}</span>
       </div>
 
       <div className="player-actions">
         {isTv && localEpisodeControls ? (
           <>
+            <button type="button" className={`player-icon-btn player-watched-btn ${episodeWatched ? "is-active" : ""}`} aria-label={episodeWatched ? "Desmarcar episódio assistido" : "Marcar episódio assistido"} onClick={toggleEpisodeWatched}>
+              {episodeWatched ? "✓ Ep" : "Ep ✓"}
+            </button>
             <button
               type="button"
               className="player-icon-btn"

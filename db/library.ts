@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withDb } from "./index";
-import { historico_assistidos, lista_titulos, progresso_reproducao, usuarios } from "./schema";
+import { episodios_assistidos, historico_assistidos, lista_colecao_itens, lista_colecoes, lista_titulos, progresso_reproducao, sessoes_visualizacao, usuarios } from "./schema";
 
 export type TituloPayload = {
   id: string;
@@ -28,6 +28,15 @@ export type TituloPayload = {
   provider_available?: boolean;
   playback_locale?: "pt-BR";
   is_brazilian?: boolean;
+  libraryState?: "quero_assistir" | "assistindo" | "concluido" | "abandonado";
+  favorite?: boolean;
+  notForMe?: boolean;
+  collections?: Array<{ id: number; name: string }>;
+  playbackState?: "aberto" | "reproduzindo" | "pausado" | "concluido";
+  progressSource?: "real" | "estimado";
+  durationSeconds?: number;
+  addedAt?: string;
+  updatedAt?: string;
 };
 
 function agoraSql() {
@@ -57,6 +66,14 @@ function movieFromRow(row: {
   posicao_segundos?: number | null;
   temporada?: number | null;
   episodio?: number | null;
+  estado?: "quero_assistir" | "assistindo" | "concluido" | "abandonado";
+  favorito?: number | null;
+  nao_e_para_mim?: number | null;
+  estado_reproducao?: "aberto" | "reproduzindo" | "pausado" | "concluido";
+  fonte_progresso?: "real" | "estimado";
+  duracao_segundos?: number | null;
+  criado_em?: string;
+  atualizado_em?: string;
 }): TituloPayload {
   const fromJson =
     row.dados_json && typeof row.dados_json === "object" && !Array.isArray(row.dados_json)
@@ -94,16 +111,28 @@ function movieFromRow(row: {
     playback_locale: fromJson?.playback_locale,
     is_brazilian: fromJson?.is_brazilian,
     positionSeconds: row.posicao_segundos ?? fromJson?.positionSeconds,
+    libraryState: row.estado ?? fromJson?.libraryState,
+    favorite: row.favorito != null ? Boolean(row.favorito) : fromJson?.favorite,
+    notForMe: row.nao_e_para_mim != null ? Boolean(row.nao_e_para_mim) : fromJson?.notForMe,
+    playbackState: row.estado_reproducao ?? fromJson?.playbackState,
+    progressSource: row.fonte_progresso ?? fromJson?.progressSource,
+    durationSeconds: row.duracao_segundos ?? fromJson?.durationSeconds,
+    addedAt: row.criado_em ?? fromJson?.addedAt,
+    updatedAt: row.atualizado_em ?? fromJson?.updatedAt,
   };
 }
 
 export async function listarMinhaLista(usuarioId: number) {
-  const rows = await withDb((db) => db
-      .select()
-      .from(lista_titulos)
-      .where(eq(lista_titulos.usuario_id, usuarioId))
-      .orderBy(desc(lista_titulos.criado_em)));
-  return rows.map(movieFromRow);
+  return withDb(async (db) => {
+    const rows = await db.select().from(lista_titulos).where(eq(lista_titulos.usuario_id, usuarioId)).orderBy(desc(lista_titulos.atualizado_em));
+    const titleIds = rows.map((row) => row.id);
+    const memberships = titleIds.length ? await db
+      .select({ tituloId: lista_colecao_itens.titulo_id, id: lista_colecoes.id, name: lista_colecoes.nome })
+      .from(lista_colecao_itens)
+      .innerJoin(lista_colecoes, eq(lista_colecao_itens.colecao_id, lista_colecoes.id))
+      .where(and(eq(lista_colecoes.usuario_id, usuarioId), inArray(lista_colecao_itens.titulo_id, titleIds))) : [];
+    return rows.map((row) => ({ ...movieFromRow(row), collections: memberships.filter((item) => item.tituloId === row.id).map(({ id, name }) => ({ id, name })) }));
+  });
 }
 
 export async function adicionarNaLista(usuarioId: number, movie: TituloPayload) {
@@ -123,7 +152,11 @@ export async function adicionarNaLista(usuarioId: number, movie: TituloPayload) 
         backdrop: movie.backdrop || null,
         ano: movie.year ?? null,
         dados_json: movie,
+        estado: movie.libraryState ?? "quero_assistir",
+        favorito: movie.favorite ? 1 : 0,
+        nao_e_para_mim: movie.notForMe ? 1 : 0,
         criado_em: agora,
+        atualizado_em: agora,
       })
       .onDuplicateKeyUpdate({
         set: {
@@ -135,6 +168,7 @@ export async function adicionarNaLista(usuarioId: number, movie: TituloPayload) 
           backdrop: movie.backdrop || null,
           ano: movie.year ?? null,
           dados_json: movie,
+          atualizado_em: agora,
         },
       });
   });
@@ -146,6 +180,74 @@ export async function removerDaLista(usuarioId: number, chave: string) {
     await db
       .delete(lista_titulos)
       .where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave)));
+  });
+}
+
+export type LibraryState = "quero_assistir" | "assistindo" | "concluido" | "abandonado";
+
+export async function atualizarItemLista(usuarioId: number, chave: string, patch: { estado?: LibraryState; favorito?: boolean; naoEParaMim?: boolean }) {
+  const changes: { estado?: LibraryState; favorito?: number; nao_e_para_mim?: number; atualizado_em: string } = { atualizado_em: agoraSql() };
+  if (patch.estado) changes.estado = patch.estado;
+  if (typeof patch.favorito === "boolean") {
+    changes.favorito = patch.favorito ? 1 : 0;
+    if (patch.favorito) changes.nao_e_para_mim = 0;
+  }
+  if (typeof patch.naoEParaMim === "boolean") {
+    changes.nao_e_para_mim = patch.naoEParaMim ? 1 : 0;
+    if (patch.naoEParaMim) changes.favorito = 0;
+  }
+  return withDb(async (db) => {
+    await db.update(lista_titulos).set(changes).where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave)));
+    const rows = await db.select().from(lista_titulos).where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave))).limit(1);
+    return rows[0] ? movieFromRow(rows[0]) : null;
+  });
+}
+
+export async function listarColecoes(usuarioId: number) {
+  return withDb((db) => db.select({ id: lista_colecoes.id, name: lista_colecoes.nome }).from(lista_colecoes)
+    .where(eq(lista_colecoes.usuario_id, usuarioId)).orderBy(desc(lista_colecoes.criado_em)));
+}
+
+export async function criarColecao(usuarioId: number, rawName: string) {
+  const name = rawName.trim().replace(/\s+/g, " ").slice(0, 60);
+  if (name.length < 2) return { erro: "Dê um nome com pelo menos 2 caracteres.", colecao: null };
+  return withDb(async (db) => {
+    await db.insert(lista_colecoes).values({ usuario_id: usuarioId, nome: name, criado_em: agoraSql() });
+    const rows = await db.select({ id: lista_colecoes.id, name: lista_colecoes.nome }).from(lista_colecoes)
+      .where(and(eq(lista_colecoes.usuario_id, usuarioId), eq(lista_colecoes.nome, name))).limit(1);
+    return { erro: null as string | null, colecao: rows[0] ?? null };
+  });
+}
+
+export async function excluirColecao(usuarioId: number, id: number) {
+  await withDb((db) => db.delete(lista_colecoes).where(and(eq(lista_colecoes.usuario_id, usuarioId), eq(lista_colecoes.id, id))));
+}
+
+export async function definirColecoesTitulo(usuarioId: number, chave: string, collectionIds: number[]) {
+  return withDb(async (db) => {
+    const titles = await db.select({ id: lista_titulos.id }).from(lista_titulos)
+      .where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave))).limit(1);
+    if (!titles[0]) return false;
+    const wanted = [...new Set(collectionIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 20);
+    const allowed = wanted.length ? await db.select({ id: lista_colecoes.id }).from(lista_colecoes)
+      .where(and(eq(lista_colecoes.usuario_id, usuarioId), inArray(lista_colecoes.id, wanted))) : [];
+    await db.delete(lista_colecao_itens).where(eq(lista_colecao_itens.titulo_id, titles[0].id));
+    if (allowed.length) await db.insert(lista_colecao_itens).values(allowed.map((item) => ({ colecao_id: item.id, titulo_id: titles[0].id, criado_em: agoraSql() })));
+    return true;
+  });
+}
+
+export async function listarEpisodiosAssistidos(usuarioId: number, chave: string) {
+  return withDb((db) => db.select({ season: episodios_assistidos.temporada, episode: episodios_assistidos.episodio })
+    .from(episodios_assistidos).where(and(eq(episodios_assistidos.usuario_id, usuarioId), eq(episodios_assistidos.chave_titulo, chave))));
+}
+
+export async function marcarEpisodioAssistido(usuarioId: number, chave: string, season: number, episode: number, watched: boolean) {
+  await withDb(async (db) => {
+    const where = and(eq(episodios_assistidos.usuario_id, usuarioId), eq(episodios_assistidos.chave_titulo, chave), eq(episodios_assistidos.temporada, season), eq(episodios_assistidos.episodio, episode));
+    if (!watched) { await db.delete(episodios_assistidos).where(where); return; }
+    await db.insert(episodios_assistidos).values({ usuario_id: usuarioId, chave_titulo: chave, temporada: season, episodio: episode, assistido_em: agoraSql() })
+      .onDuplicateKeyUpdate({ set: { assistido_em: agoraSql() } });
   });
 }
 
@@ -234,6 +336,11 @@ export async function salvarProgresso(
     posicao_segundos?: number;
     temporada?: number | null;
     episodio?: number | null;
+    estado?: "aberto" | "reproduzindo" | "pausado" | "concluido";
+    fonte?: "real" | "estimado";
+    duracao_segundos?: number | null;
+    sessao_chave?: string;
+    delta_segundos?: number;
   },
 ) {
   const chave = chaveTitulo(movie);
@@ -252,6 +359,9 @@ export async function salvarProgresso(
         ? Math.max(1, Math.floor(Number(input.episodio ?? movie.episode)))
         : null;
   const agora = agoraSql();
+  const estado = input.estado ?? (progresso >= 90 ? "concluido" : "reproduzindo");
+  const fonte = input.fonte === "real" ? "real" : "estimado";
+  const duracao = Number.isFinite(Number(input.duracao_segundos)) ? Math.max(1, Math.floor(Number(input.duracao_segundos))) : null;
 
   await withDb(async (db) => {
     await db
@@ -267,6 +377,11 @@ export async function salvarProgresso(
         posicao_segundos: posicao,
         temporada,
         episodio,
+        estado_reproducao: estado,
+        fonte_progresso: fonte,
+        duracao_segundos: duracao,
+        iniciado_em: estado !== "aberto" ? agora : null,
+        concluido_em: estado === "concluido" ? agora : null,
         atualizado_em: agora,
       })
       .onDuplicateKeyUpdate({
@@ -279,10 +394,49 @@ export async function salvarProgresso(
           posicao_segundos: posicao,
           temporada,
           episodio,
+          estado_reproducao: estado,
+          fonte_progresso: fonte,
+          duracao_segundos: duracao,
+          iniciado_em: estado !== "aberto" ? sql`coalesce(${progresso_reproducao.iniciado_em}, ${agora})` : sql`${progresso_reproducao.iniciado_em}`,
+          concluido_em: estado === "concluido" ? agora : null,
           atualizado_em: agora,
         },
       });
+
+    const sessionKey = String(input.sessao_chave || "").slice(0, 80);
+    const delta = Math.min(300, Math.max(0, Math.floor(Number(input.delta_segundos) || 0)));
+    if (sessionKey && estado !== "aberto") {
+      await db.insert(sessoes_visualizacao).values({
+        usuario_id: usuarioId,
+        sessao_chave: sessionKey,
+        chave_titulo: chave,
+        titulo: movie.title.slice(0, 255),
+        tipo: tipoTitulo(movie),
+        ano: movie.year ?? null,
+        generos_json: Array.isArray(movie.genres) ? movie.genres.slice(0, 12) : [],
+        segundos_assistidos: delta,
+        fonte_progresso: fonte,
+        concluido: estado === "concluido" ? 1 : 0,
+        iniciado_em: agora,
+        atualizado_em: agora,
+      }).onDuplicateKeyUpdate({ set: {
+        segundos_assistidos: sql`${sessoes_visualizacao.segundos_assistidos} + ${delta}`,
+        fonte_progresso: fonte === "real" ? "real" : sql`${sessoes_visualizacao.fonte_progresso}`,
+        concluido: estado === "concluido" ? 1 : sql`${sessoes_visualizacao.concluido}`,
+        atualizado_em: agora,
+      } });
+    }
+    if (estado === "concluido") {
+      await db.update(lista_titulos).set({ estado: "concluido", atualizado_em: agora }).where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave)));
+    } else if (estado === "reproduzindo") {
+      await db.update(lista_titulos).set({ estado: "assistindo", atualizado_em: agora }).where(and(eq(lista_titulos.usuario_id, usuarioId), eq(lista_titulos.chave_titulo, chave), eq(lista_titulos.estado, "quero_assistir")));
+    }
   });
+
+  if (estado === "concluido" || progresso >= 90) {
+    await registrarHistorico(usuarioId, movie);
+    if (movie.kind === "tv" && temporada && episodio) await marcarEpisodioAssistido(usuarioId, chave, temporada, episodio, true);
+  }
 
   return obterProgresso(usuarioId, chave);
 }

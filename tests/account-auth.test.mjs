@@ -16,7 +16,9 @@ test("configurações permitem nome e e-mail, mas mantêm o username imutável",
 
   assert.match(accountPage, /username é permanente/i);
   assert.match(accountPage, /disabled readOnly/);
-  assert.doesNotMatch(accountPage, /role="dialog"|aria-modal|account-modal-backdrop/);
+  assert.match(accountPage, /role="dialog"/);
+  assert.match(accountPage, /aria-modal="true"/);
+  assert.match(accountPage, /Alterar foto/);
   assert.match(route, /api\/auth\/me/);
   assert.match(home, /href="\/configuracoes"/);
   assert.doesNotMatch(home, /AccountSettingsModal|accountSettingsOpen/);

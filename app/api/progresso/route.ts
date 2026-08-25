@@ -42,6 +42,11 @@ export async function PUT(request: Request) {
       posicao_segundos?: number;
       temporada?: number | null;
       episodio?: number | null;
+      estado?: "aberto" | "reproduzindo" | "pausado" | "concluido";
+      fonte?: "real" | "estimado";
+      duracao_segundos?: number | null;
+      sessao_chave?: string;
+      delta_segundos?: number;
     };
     const movie = body.movie;
     if (!movie?.id || !movie?.title) {
@@ -52,6 +57,11 @@ export async function PUT(request: Request) {
       posicao_segundos: body.posicao_segundos,
       temporada: body.temporada,
       episodio: body.episodio,
+      estado: body.estado,
+      fonte: body.fonte,
+      duracao_segundos: body.duracao_segundos,
+      sessao_chave: body.sessao_chave,
+      delta_segundos: body.delta_segundos,
     });
     return Response.json(
       { ok: true, chave: chaveTitulo(movie), item },
