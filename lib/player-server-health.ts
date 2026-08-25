@@ -25,6 +25,21 @@ export type PlayerServerMediaProbe = {
   httpStatus: number | null;
   contentType: string;
   message: string;
+  audioLanguages?: string[];
+  hasPortugueseAudio?: boolean | null;
+  audioMetadataSource?: "hls" | "dash" | "mp4";
+};
+
+export type ManifestAudioMetadata = {
+  audioLanguages: string[];
+  hasPortugueseAudio: boolean | null;
+  audioMetadataSource: "hls" | "dash";
+};
+
+export type EmbedPolicyViolation = {
+  code: "SANDBOX_REQUIRES_POPUPS" | "FORCED_POPUP_ADVERTISING";
+  message: string;
+  evidence: string;
 };
 
 export type PlayerServerEvidence = {
@@ -61,6 +76,17 @@ export type PlayerServerHealthResult = {
   finalUrl: string;
   testedAt: string;
   checks: PlayerServerEndpointCheck[];
+  audioAudit: PlayerServerAudioAuditSample[];
+};
+
+export type PlayerServerAudioAuditSample = {
+  tmdbId: string;
+  title: string;
+  url: string;
+  status: PlayerServerStatus;
+  portugueseAudio: "confirmed" | "not-detected" | "unverified";
+  message: string;
+  check: PlayerServerEndpointCheck;
 };
 
 const BAD_PAGE = /(?:captcha|valida[cç][aã]o segura|verifica[cç][aã]o humana|checking your browser|just a moment|attention required|404\s*(?:not found)?|page not found|domain (?:is )?for sale|access denied|forbidden|investidor\.blog|site suspenso|account suspended)/i;
@@ -124,6 +150,33 @@ function normalizeEmbeddedText(html: string) {
     .replace(/\\u002f/gi, "/")
     .replace(/\\\//g, "/")
     .replace(/&amp;/gi, "&");
+}
+
+/**
+ * Rejeita sinais inequívocos de comportamento incompatível com a política
+ * do player. HTTP 200 não é sucesso quando a página exige relaxar o sandbox
+ * ou injeta um pop-under/smartlink em cliques do usuário.
+ */
+export function inspectEmbedPolicy(html: string): EmbedPolicyViolation | null {
+  const normalized = normalizeEmbeddedText(html);
+  const sandboxPopup = normalized.match(/allow-popups(?:-to-escape-sandbox)?/i);
+  if (sandboxPopup) {
+    return {
+      code: "SANDBOX_REQUIRES_POPUPS",
+      message: "O provedor exige permissão de pop-up incompatível com o sandbox protegido",
+      evidence: sandboxPopup[0],
+    };
+  }
+
+  const forcedPopup = normalized.match(/adcash-popunder|runPop\s*\(|effectivecpmnetwork|onclickperformance|mypopads|popunder-init|smartlink[^\n]{0,160}window\.open/i);
+  if (forcedPopup) {
+    return {
+      code: "FORCED_POPUP_ADVERTISING",
+      message: "O provedor injeta publicidade que abre pop-up ou outra guia",
+      evidence: forcedPopup[0].slice(0, 180),
+    };
+  }
+  return null;
 }
 
 function publicHttpUrl(value: string, base: string) {
@@ -328,6 +381,14 @@ async function inspectNestedFrame(url: string, parentUrl: string) {
     if (contentType && !/text\/html|application\/xhtml\+xml/.test(contentType)) {
       return { resources: null, problem: issue("NESTED_IFRAME_CONTENT_TYPE", "document", "warning", "O iframe interno retornou conteúdo inesperado", contentType), blocking: false };
     }
+    const policyViolation = inspectEmbedPolicy(html);
+    if (policyViolation) {
+      return {
+        resources: null,
+        problem: issue(policyViolation.code, "embed", "error", policyViolation.message, policyViolation.evidence),
+        blocking: true,
+      };
+    }
     return { resources: extractResourceEvidence(html, response.url || url), problem: null, blocking: false };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha no iframe interno";
@@ -349,6 +410,124 @@ function firstManifestResource(text: string, base: string) {
   return candidate ? publicHttpUrl(candidate, base)?.href ?? null : null;
 }
 
+function manifestAttribute(value: string, name: string) {
+  const match = value.match(new RegExp(`(?:^|[,\\s])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^,\\s>]+))`, "i"));
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function normalizeManifestLanguage(value: string) {
+  const raw = value.trim();
+  if (!raw) return "";
+  const normalized = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replaceAll("_", "-");
+  if (/^(?:pt-br|pob)$/.test(normalized) || /portugu.*(?:brasil|brazil)/.test(normalized)) return "pt-BR";
+  if (/^pt-pt$/.test(normalized)) return "pt-PT";
+  if (/^(?:pt|por)$/.test(normalized) || /^portugu/.test(normalized)) return "pt";
+  if (/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(normalized)) {
+    const [language, ...regions] = normalized.split("-");
+    return [language, ...regions.map((region) => region.toUpperCase())].join("-");
+  }
+  return raw.slice(0, 80);
+}
+
+function manifestAudioResult(values: string[], source: "hls" | "dash"): ManifestAudioMetadata {
+  const audioLanguages = [...new Set(values.map(normalizeManifestLanguage).filter(Boolean))];
+  return {
+    audioLanguages,
+    hasPortugueseAudio: audioLanguages.length
+      ? audioLanguages.some((language) => language === "pt" || language.startsWith("pt-"))
+      : null,
+    audioMetadataSource: source,
+  };
+}
+
+/** Lê somente metadados declarados pelo manifesto; não tenta inferir idioma pelo nome do provedor. */
+export function inspectManifestAudio(text: string, source: "hls" | "dash"): ManifestAudioMetadata {
+  if (source === "hls") {
+    const languages = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^#EXT-X-MEDIA:/i.test(line) && /(?:^|,)TYPE=AUDIO(?:,|$)/i.test(line.slice(line.indexOf(":") + 1)))
+      .map((line) => manifestAttribute(line, "LANGUAGE") || manifestAttribute(line, "NAME"))
+      .filter(Boolean);
+    return manifestAudioResult(languages, source);
+  }
+
+  const languages: string[] = [];
+  const adaptationSets = text.match(/<AdaptationSet\b[^>]*(?:\/>|>[\s\S]*?<\/AdaptationSet\s*>)/gi) ?? [];
+  for (const block of adaptationSets) {
+    const openingTag = block.match(/^<AdaptationSet\b[^>]*>/i)?.[0] ?? block;
+    const isAudio = /\bcontentType\s*=\s*["']audio["']/i.test(openingTag)
+      || /\bmimeType\s*=\s*["']audio\//i.test(openingTag)
+      || /<AudioChannelConfiguration\b/i.test(block);
+    if (!isAudio) continue;
+    const declared = manifestAttribute(openingTag, "lang")
+      || manifestAttribute(openingTag, "language")
+      || manifestAttribute(block, "lang")
+      || manifestAttribute(block, "language");
+    if (declared) languages.push(declared);
+  }
+  return manifestAudioResult(languages, source);
+}
+
+/** Lê o código ISO-639 do box `mdhd` apenas dentro de tracks MP4 de áudio. */
+export function inspectMp4Audio(bytes: Uint8Array) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const ascii = (offset: number, length: number) => String.fromCharCode(...bytes.slice(offset, offset + length));
+  const languages: string[] = [];
+
+  function boxes(start: number, end: number) {
+    let offset = start;
+    while (offset + 8 <= end) {
+      let size = view.getUint32(offset);
+      const type = ascii(offset + 4, 4);
+      let header = 8;
+      if (size === 1 && offset + 16 <= end) {
+        const large = view.getBigUint64(offset + 8);
+        size = large <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(large) : 0;
+        header = 16;
+      }
+      if (size === 0) size = end - offset;
+      if (size < header) break;
+      const declaredEnd = offset + size;
+      const boxEnd = Math.min(declaredEnd, end);
+      if (type === "trak") {
+        const trackText = ascii(offset + header, Math.max(0, boxEnd - offset - header));
+        if (trackText.includes("soun")) {
+          for (let marker = offset + header + 4; marker + 40 < boxEnd; marker += 1) {
+            if (ascii(marker, 4) !== "mdhd") continue;
+            const version = bytes[marker + 4];
+            const languageOffset = marker + (version === 1 ? 36 : 24);
+            if (languageOffset + 2 > boxEnd) continue;
+            const packed = view.getUint16(languageOffset);
+            const language = String.fromCharCode(
+              ((packed >> 10) & 31) + 0x60,
+              ((packed >> 5) & 31) + 0x60,
+              (packed & 31) + 0x60,
+            );
+            if (/^[a-z]{3}$/.test(language) && language !== "und") languages.push(language);
+          }
+        }
+      } else if (["moov", "mdia", "minf", "stbl"].includes(type)) {
+        boxes(offset + header, boxEnd);
+      }
+      if (declaredEnd > end || size === 0) break;
+      offset = declaredEnd;
+    }
+  }
+
+  boxes(0, bytes.byteLength);
+  const normalized = [...new Set(languages.map(normalizeManifestLanguage).filter(Boolean))];
+  return {
+    audioLanguages: normalized,
+    hasPortugueseAudio: normalized.length ? normalized.some((language) => language === "pt" || language.startsWith("pt-")) : null,
+    audioMetadataSource: "mp4" as const,
+  };
+}
+
 async function probeMedia(url: string, referer: string): Promise<PlayerServerMediaProbe> {
   try {
     const { response, bytes } = await fetchMediaPrefix(url, referer);
@@ -363,49 +542,54 @@ async function probeMedia(url: string, referer: string): Promise<PlayerServerMed
       if (!/^#EXTM3U/m.test(text)) {
         return { url, status: "failed", httpStatus: response.status, contentType, message: "A URL HLS não retornou um manifesto válido" };
       }
+      const audioMetadata = inspectManifestAudio(text, "hls");
       const resourceUrl = firstManifestResource(text, response.url || url);
       if (!resourceUrl) {
-        return { url, status: "failed", httpStatus: response.status, contentType, message: "Manifesto HLS sem variante ou segmento utilizável" };
+        return { url, status: "failed", httpStatus: response.status, contentType, message: "Manifesto HLS sem variante ou segmento utilizável", ...audioMetadata };
       }
       const child = await fetchMediaPrefix(resourceUrl, response.url || referer);
       if (!child.response.ok && child.response.status !== 206) {
-        return { url, status: "failed", httpStatus: child.response.status, contentType, message: `Primeiro recurso HLS respondeu HTTP ${child.response.status}` };
+        return { url, status: "failed", httpStatus: child.response.status, contentType, message: `Primeiro recurso HLS respondeu HTTP ${child.response.status}`, ...audioMetadata };
       }
       const childText = new TextDecoder().decode(child.bytes);
       if (/^#EXTM3U/m.test(childText)) {
         const segmentUrl = firstManifestResource(childText, child.response.url || resourceUrl);
         if (!segmentUrl) {
-          return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Variante HLS sem segmento utilizável" };
+          return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Variante HLS sem segmento utilizável", ...audioMetadata };
         }
         const segment = await fetchMediaPrefix(segmentUrl, child.response.url || resourceUrl);
         if ((!segment.response.ok && segment.response.status !== 206) || segment.bytes.byteLength === 0) {
-          return { url, status: "failed", httpStatus: segment.response.status, contentType, message: `Primeiro segmento HLS indisponível · HTTP ${segment.response.status}` };
+          return { url, status: "failed", httpStatus: segment.response.status, contentType, message: `Primeiro segmento HLS indisponível · HTTP ${segment.response.status}`, ...audioMetadata };
         }
       } else if (child.bytes.byteLength === 0) {
-        return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Primeiro segmento HLS retornou vazio" };
+        return { url, status: "failed", httpStatus: child.response.status, contentType, message: "Primeiro segmento HLS retornou vazio", ...audioMetadata };
       }
-      return { url, status: "passed", httpStatus: response.status, contentType, message: "Manifesto HLS e primeiro segmento acessíveis" };
+      return { url, status: "passed", httpStatus: response.status, contentType, message: "Manifesto HLS e primeiro segmento acessíveis", ...audioMetadata };
     }
 
     if (pathname.endsWith(".mpd")) {
       const valid = /<MPD\b/i.test(text) && /<Period\b/i.test(text);
+      const audioMetadata = inspectManifestAudio(text, "dash");
       return {
         url,
         status: valid ? "passed" : "failed",
         httpStatus: response.status,
         contentType,
         message: valid ? "Manifesto DASH válido e acessível" : "A URL DASH não retornou um manifesto válido",
+        ...audioMetadata,
       };
     }
 
     const signature = new TextDecoder("latin1").decode(bytes.slice(0, 32));
     const validMp4 = /video\/mp4/i.test(contentType) || /ftyp/.test(signature);
+    const audioMetadata = validMp4 ? inspectMp4Audio(bytes) : null;
     return {
       url,
       status: validMp4 && bytes.byteLength > 0 ? "passed" : "failed",
       httpStatus: response.status,
       contentType,
       message: validMp4 && bytes.byteLength > 0 ? "Arquivo MP4 respondeu com bytes de vídeo" : "A URL MP4 não retornou dados reconhecíveis de vídeo",
+      ...(audioMetadata ?? {}),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao acessar mídia";
@@ -520,6 +704,11 @@ async function testEndpoint(
       return failedCheck(kind, url, startedAt, issues, evidence, response.status, response.url || url);
     }
 
+    const policyViolation = inspectEmbedPolicy(html);
+    if (policyViolation) {
+      issues.push(issue(policyViolation.code, "embed", "warning", policyViolation.message, policyViolation.evidence));
+    }
+
     const resources = extractResourceEvidence(html, response.url || url);
     evidence.iframeUrls = resources.iframeUrls;
     evidence.mediaUrls = resources.mediaUrls;
@@ -544,8 +733,26 @@ async function testEndpoint(
     evidence.playerSignals = resources.playerSignals;
 
     if (resources.playerSignals.length === 0) {
-      issues.push(issue("PLAYER_NOT_FOUND", "player", "error", "A página abriu, mas nenhum player reconhecível foi encontrado"));
-      return failedCheck(kind, url, startedAt, issues, evidence, response.status, response.url || url);
+      // Muitos embeds montam o player somente depois que o JavaScript roda no
+      // navegador. Uma inspeção HTTP sem marcador estático é inconclusiva,
+      // não evidência suficiente para trocar um servidor que já funciona.
+      issues.push(issue(
+        "PLAYER_NOT_CONFIRMED",
+        "player",
+        "warning",
+        "A página abriu, mas o teste HTTP não consegue confirmar o player criado no navegador",
+      ));
+      evidence.confidence = "low";
+      return {
+        kind,
+        status: "degraded",
+        httpStatus: response.status,
+        latencyMs: Date.now() - startedAt,
+        message: issues.at(-1)?.message ?? "Player dinâmico não confirmado",
+        finalUrl: response.url || url,
+        issues,
+        evidence,
+      };
     }
 
     if (resources.mediaUrls.length > 0) {
@@ -638,22 +845,42 @@ export async function testPlayerServer(server: PlayerServerDefinition): Promise<
   const targets: Array<{ kind: "movie" | "tv"; url: string }> = [];
   if (server.supportsMovie && server.testUrl) targets.push({ kind: "movie", url: server.testUrl });
   if (server.supportsTv && server.testTvUrl) targets.push({ kind: "tv", url: server.testTvUrl });
-  const checks = await Promise.all(targets.map((target) => testEndpoint(server, target.kind, target.url)));
+  const [checks, audioChecks] = await Promise.all([
+    Promise.all(targets.map((target) => testEndpoint(server, target.kind, target.url))),
+    Promise.all(server.audioTestUrls.map((sample) => testEndpoint(server, "movie", sample.url))),
+  ]);
+  const audioAudit = server.audioTestUrls.map((sample, index): PlayerServerAudioAuditSample => {
+    const check = audioChecks[index];
+    const detected = check.evidence.mediaProbe?.hasPortugueseAudio;
+    const portugueseAudio = detected === true ? "confirmed" : detected === false ? "not-detected" : "unverified";
+    const message = detected === true
+      ? "Faixa de áudio em português declarada no manifesto"
+      : detected === false
+        ? "O manifesto declarou idiomas, mas não encontrou português"
+        : check.status === "offline"
+          ? check.message
+          : "O player abriu, mas não expôs metadados de idioma ao teste automático";
+    return { ...sample, status: check.status, portugueseAudio, message, check };
+  });
   const primary = checks[0];
-  const status = aggregateStatus(checks);
+  const endpointStatus = aggregateStatus([...checks, ...audioChecks]);
+  const audioComplete = audioAudit.every((sample) => sample.portugueseAudio === "confirmed");
+  const status = endpointStatus === "offline" ? "offline" : endpointStatus === "online" && audioComplete ? "online" : "degraded";
   const summary = checks
     .map((check) => `${check.kind === "movie" ? "Filme" : "Série"}: ${check.status === "online" ? "reprodução acessível" : check.status === "degraded" ? `parcial (${check.message})` : check.message}`)
     .join(" · ");
+  const confirmedAudio = audioAudit.filter((sample) => sample.portugueseAudio === "confirmed").length;
 
   return {
     id: server.id,
     status,
     httpStatus: primary?.httpStatus ?? null,
     latencyMs: checks.reduce((highest, check) => Math.max(highest, check.latencyMs), 0),
-    message: summary || "Nenhum endpoint configurado",
+    message: `${summary || "Nenhum endpoint configurado"} · PT-BR confirmado em ${confirmedAudio}/${audioAudit.length} filmes`,
     finalUrl: primary?.finalUrl ?? server.testUrl,
     testedAt: new Date().toISOString(),
     checks,
+    audioAudit,
   };
 }
 
@@ -688,5 +915,6 @@ export function applyManualPlaybackConfirmation(
       .join(" · "),
     testedAt: new Date().toISOString(),
     checks,
+    audioAudit: result.audioAudit ?? [],
   };
 }

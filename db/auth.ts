@@ -1,8 +1,8 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, asc, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { withDb } from "./index";
 import { describeDatabaseFailure, safeDatabaseError } from "./errors";
-import { sessoes, usuarios, type Usuario } from "./schema";
+import { historico_assistidos, lista_titulos, progresso_reproducao, sessoes, usuarios, type Usuario } from "./schema";
 
 export const SESSAO_COOKIE = "flixa_sessao";
 export const SESSAO_DIAS = 14;
@@ -254,6 +254,16 @@ export async function listarUsuariosAdmin() {
         email: usuarios.email,
         administrador: usuarios.administrador,
         criado_em: usuarios.criado_em,
+        atualizado_em: usuarios.atualizado_em,
+        itens_lista: sql<number>`(select count(*) from ${lista_titulos} where ${lista_titulos.usuario_id} = ${usuarios.id})`,
+        itens_historico: sql<number>`(select count(*) from ${historico_assistidos} where ${historico_assistidos.usuario_id} = ${usuarios.id})`,
+        itens_progresso: sql<number>`(select count(*) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id})`,
+        sessoes_ativas: sql<number>`(select count(*) from ${sessoes} where ${sessoes.usuario_id} = ${usuarios.id} and ${sessoes.expira_em} > current_timestamp)`,
+        ultima_atividade: sql<string | null>`greatest(
+          ${usuarios.atualizado_em},
+          coalesce((select max(${historico_assistidos.assistido_em}) from ${historico_assistidos} where ${historico_assistidos.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em}),
+          coalesce((select max(${progresso_reproducao.atualizado_em}) from ${progresso_reproducao} where ${progresso_reproducao.usuario_id} = ${usuarios.id}), ${usuarios.atualizado_em})
+        )`,
       })
       .from(usuarios)
       .orderBy(asc(usuarios.id));
@@ -264,6 +274,12 @@ export async function listarUsuariosAdmin() {
       email: row.email,
       administrador: Number(row.administrador) === 1,
       criado_em: row.criado_em,
+      atualizado_em: row.atualizado_em,
+      itens_lista: Number(row.itens_lista || 0),
+      itens_historico: Number(row.itens_historico || 0),
+      itens_progresso: Number(row.itens_progresso || 0),
+      sessoes_ativas: Number(row.sessoes_ativas || 0),
+      ultima_atividade: row.ultima_atividade,
     }));
   });
 }

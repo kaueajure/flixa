@@ -8,6 +8,7 @@ import {
   type RealtimeChannel,
   type TokenRequest,
 } from "ably";
+import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 import { playerServerIdForSource } from "../lib/player-servers";
 
 type PartyProviderId = "cinesrc" | "moviesapi" | "vidzen";
@@ -24,6 +25,17 @@ type PartyMedia = {
   kind: "movie" | "tv";
   season?: number;
   episode?: number;
+};
+
+type WatchPartyControlsProps = {
+  media: PartyMedia;
+  sources: PartySource[];
+  activeSource?: PartySource;
+  playerRef: RefObject<HTMLIFrameElement | null>;
+  onSelectSource: (id: string) => void;
+  onOpenChange?: (open: boolean) => void;
+  onSessionProviderChange?: (providerId: string | null) => void;
+  providerFailure?: { sourceId: string; reason: string; sequence: number } | null;
 };
 
 type PartyPlayback = {
@@ -163,7 +175,7 @@ function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
   };
 }
 
-export default function WatchPartyControls({
+function ActiveWatchPartyControls({
   media,
   sources,
   activeSource,
@@ -172,16 +184,7 @@ export default function WatchPartyControls({
   onOpenChange,
   onSessionProviderChange,
   providerFailure,
-}: {
-  media: PartyMedia;
-  sources: PartySource[];
-  activeSource?: PartySource;
-  playerRef: RefObject<HTMLIFrameElement | null>;
-  onSelectSource: (id: string) => void;
-  onOpenChange?: (open: boolean) => void;
-  onSessionProviderChange?: (providerId: PartyProviderId | null) => void;
-  providerFailure?: { sourceId: string; reason: string; sequence: number } | null;
-}) {
+}: WatchPartyControlsProps) {
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [roomCode, setRoomCode] = useState("");
@@ -876,4 +879,39 @@ export default function WatchPartyControls({
       ) : null}
     </div>
   );
+}
+
+function UnavailableWatchPartyControls({
+  onOpenChange,
+  onSessionProviderChange,
+}: WatchPartyControlsProps) {
+  useEffect(() => {
+    onOpenChange?.(false);
+    onSessionProviderChange?.(null);
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("party")) return;
+    url.searchParams.delete("party");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [onOpenChange, onSessionProviderChange]);
+
+  return (
+    <div className="watch-party is-unavailable">
+      <button
+        type="button"
+        className="player-icon-btn watch-party-trigger is-disabled"
+        aria-label="Assistir junto temporariamente indisponível"
+        aria-disabled="true"
+        disabled
+      >
+        <span aria-hidden="true">◉</span>
+        <small>Inativo</small>
+      </button>
+    </div>
+  );
+}
+
+export default function WatchPartyControls(props: WatchPartyControlsProps) {
+  return WATCH_PARTY_ENABLED
+    ? <ActiveWatchPartyControls {...props} />
+    : <UnavailableWatchPartyControls {...props} />;
 }

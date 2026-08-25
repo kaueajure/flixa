@@ -293,18 +293,22 @@ const AD_HOST_PARTS = [
   "chaturbate",
 ];
 
-const AD_PATH = /\/(adserver|advert|popunder|popads|prebid|onclick|banner|pop)(\/|$)/i;
+const AD_PATH = /(?:^|[/_.-])(?:ads?|adserver|advert(?:ising|isement)?|vast|vmap|ima3?|prebid|preroll|midroll|postroll|popunder|popads|onclick|banner|sponsor(?:ed)?)(?:[/_.-]|$)/i;
+const AD_QUERY = /(?:^|[?&])(?:ads?|ad[_-]?(?:id|slot|tag|unit)|campaign(?:id)?|preroll|midroll|postroll|vast|vmap|zone(?:id)?)=/i;
+const TRACKING_PATH = /(?:^|[/_.-])(?:analytics?|beacon|collect|pixel|tracking)(?:[/_.-]|$)/i;
 const MEDIA = /\.(m3u8|mpd|mp4|webm|ts|m4s|vtt|srt)(\?|$)/i;
-const PLAYER_HOST = /cdn-embed|warezcdn|superflix|111movies|2embed|myembed|filmesyseries\.epizy|vidlink|vidsrc|vidfast|vidphantom|autoembed|moviesapi|yapgrid|videasy|vidcore|ezvidapi|cinesrc|cinextream|embed-api|vaplayer|1embed|iembed|mapple|mgeb|pipocacine|redeflixapi|pomfy|betterflix|megaembedapi|cloudflare|themoviedb|tmdb|googlevideo|gstatic|youtube/i;
+const PLAYER_HOST = /moviesapi|vidzen|autoembed|vidsrc|vidphantom|yapgrid|videasy|vidcore|cinesrc|embed-api|iembed|mapple|cdn-embed|2embed|myembed|filmesyseries|pipocacine|pomfy|betterflix|vidbolt|embos|unlimplay|screenscape|nsrplay|filesun|nontongo|primesrc|vidlux|cinezo|cloudflare|themoviedb|tmdb|googlevideo|gstatic|youtube/i;
 
 function isAdUrl(raw) {
   try {
     const url = new URL(raw);
     const host = url.hostname.toLowerCase();
-    if (PLAYER_HOST.test(host) || MEDIA.test(url.pathname)) return false;
     if (host.includes("aichouphaugn")) return true;
     if (AD_HOST_PARTS.some((part) => host.includes(part))) return true;
-    return AD_PATH.test(`${url.pathname}${url.search}`);
+    const pathAndQuery = `${url.pathname}${url.search}`;
+    if (AD_PATH.test(pathAndQuery) || AD_QUERY.test(url.search) || TRACKING_PATH.test(pathAndQuery)) return true;
+    if (PLAYER_HOST.test(host) || MEDIA.test(url.pathname)) return false;
+    return false;
   } catch {
     return false;
   }
@@ -320,6 +324,6 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (isAdUrl(event.request.url)) {
-    event.respondWith(new Response("", { status: 204, statusText: "Blocked by Flixa adblock" }));
+    event.respondWith(new Response(null, { status: 204, statusText: "Blocked by Flixa adblock" }));
   }
 });

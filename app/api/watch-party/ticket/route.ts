@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { requireUsuario } from "../../../../db/auth";
+import { WATCH_PARTY_ENABLED } from "../../../../lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +112,12 @@ function newSession(uid: number, name: string, role: PartyRole, requestedCode: u
 }
 
 export async function POST(request: Request) {
+  if (!WATCH_PARTY_ENABLED) {
+    return Response.json(
+      { erro: "O Assistir Junto está temporariamente desabilitado." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const usuario = await requireUsuario(request);
   if (!usuario) return Response.json({ erro: "Não autenticado." }, { status: 401 });
   if (!ablyKey() || !signingSecret()) {

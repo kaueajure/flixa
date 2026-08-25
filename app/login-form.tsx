@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 
 type Usuario = {
   id: number;
@@ -128,7 +129,7 @@ export default function LoginForm() {
       const destino = new URL("/", window.location.origin);
       destino.searchParams.set("welcome", "1");
       const sala = atual.searchParams.get("party");
-      if (sala) destino.searchParams.set("party", sala);
+      if (WATCH_PARTY_ENABLED && sala) destino.searchParams.set("party", sala);
       destino.hash = atual.hash;
       window.location.assign(`${destino.pathname}${destino.search}${destino.hash}`);
     } catch (error) {

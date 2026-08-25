@@ -75,7 +75,8 @@ function experienceScore(server: ServerState) {
       ? 3_500
       : 0;
   const watchPartyPoints = server.watchPartySupport === "full" ? 1_200 : 0;
-  return advertisingPoints + watchPartyPoints;
+  const portugueseAudioPoints = server.prioritizesPortugueseAudio ? 9_000 : 0;
+  return advertisingPoints + watchPartyPoints + portugueseAudioPoints;
 }
 
 function storedScore(server: ServerState, kind: "movie" | "tv") {
@@ -95,9 +96,8 @@ function storedScore(server: ServerState, kind: "movie" | "tv") {
   return statusPoints
     + manualPoints
     + experienceScore(server)
-    + (server.audioProfile === "pt-BR" ? 700 : 0)
-    + (server.protectedEmbedCompatible ? 600 : -1_200)
-    - (server.blockedReason ? 2_500 : 0)
+    + (server.protectedEmbedCompatible ? 600 : -12_000)
+    - (server.blockedReason ? 15_000 : 0)
     - server.priority * 10
     - latencyPenalty;
 }
@@ -115,6 +115,9 @@ function endpointScore(candidate: SourceCandidate, check: PlayerServerEndpointCh
     + confidencePoints
     + experienceScore(candidate.server)
     + (check.evidence.mediaProbe?.status === "passed" ? 2_500 : 0)
+    // O bônus só existe quando o HLS/DASH deste título declarou
+    // uma faixa de áudio em português. Nome ou origem do provedor não contam.
+    + (check.evidence.mediaProbe?.hasPortugueseAudio === true ? 10_000 : 0)
     + (check.evidence.playbackConfirmed ? 4_000 : 0)
     - (check.issues.some((item) => item.code === "PRIMARY_MEDIA_FAILED") ? 7_000 : 0)
     - Math.min(2_000, check.latencyMs / 5)
@@ -142,8 +145,8 @@ function validCandidate(input: unknown, serversById: Map<string, ServerState>, k
   }
 }
 
-function cacheKey(kind: "movie" | "tv", candidates: SourceCandidate[]) {
-  return `${kind}:${candidates.map((candidate) => `${candidate.id}=${candidate.url}`).join("|")}`;
+function cacheKey(kind: "movie" | "tv", candidates: SourceCandidate[], preferredServerId: string) {
+  return `${kind}:preferred=${preferredServerId}:${candidates.map((candidate) => `${candidate.id}=${candidate.url}`).join("|")}`;
 }
 
 export async function GET() {
@@ -157,7 +160,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let body: { kind?: unknown; sources?: unknown };
+  let body: { kind?: unknown; sources?: unknown; preferredServerId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -172,10 +175,15 @@ export async function POST(request: Request) {
   const serversById = new Map(servers.map((server) => [server.id, server]));
   const disabled = servers.filter((server) => !server.enabled).map((server) => server.id);
   const candidates = body.sources
-    .slice(0, 50)
+    .slice(0, 100)
     .map((source) => validCandidate(source, serversById, kind))
     .filter((source): source is SourceCandidate => Boolean(source));
-  const key = cacheKey(kind, candidates);
+  const requestedPreferredServerId = typeof body.preferredServerId === "string"
+    && /^[a-z0-9-]{1,64}$/i.test(body.preferredServerId)
+    ? body.preferredServerId
+    : "";
+  const preferredCandidate = candidates.find((candidate) => candidate.serverId === requestedPreferredServerId) ?? null;
+  const key = cacheKey(kind, candidates, preferredCandidate?.serverId ?? "");
   const cached = rankingCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return Response.json(cached.value, { headers: { "Cache-Control": "private, max-age=60" } });
@@ -185,13 +193,16 @@ export async function POST(request: Request) {
   const initiallyRanked = [...candidates].sort(
     (left, right) => storedScore(right.server, kind) - storedScore(left.server, kind),
   );
-  const targets = initiallyRanked.slice(0, MAX_CANDIDATES_TO_TEST);
+  const targets = [
+    ...(preferredCandidate ? [preferredCandidate] : []),
+    ...initiallyRanked.filter((candidate) => candidate.id !== preferredCandidate?.id),
+  ].slice(0, MAX_CANDIDATES_TO_TEST);
   const tested = await Promise.all(targets.map(async (candidate) => ({
     candidate,
     check: await testPlayerSource(candidate.server, kind, candidate.url),
   })));
   const testedById = new Map(tested.map((result) => [result.candidate.id, result]));
-  const order = [...candidates]
+  let order = [...candidates]
     .sort((left, right) => {
       const leftTest = testedById.get(left.id);
       const rightTest = testedById.get(right.id);
@@ -200,6 +211,12 @@ export async function POST(request: Request) {
       return rightScore - leftScore;
     })
     .map((candidate) => candidate.id);
+  const preferredTest = preferredCandidate ? testedById.get(preferredCandidate.id) : null;
+  if (preferredCandidate && preferredTest?.check.status !== "offline") {
+    // Um servidor já escolhido não deve ser trocado por pequenas variações
+    // de latência ou por um diagnóstico inconclusivo.
+    order = [preferredCandidate.id, ...order.filter((id) => id !== preferredCandidate.id)];
+  }
   const value = {
     disabled,
     order,

@@ -111,6 +111,19 @@ npm run db:migrate
 
 Use build and validation commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
 
+## Catálogo esportivo
+
+A seção de esportes usa a TheSportsDB para montar uma agenda multi-esporte
+com eventos futuros, resultados e links de vídeo informados pela fonte. A
+chave pública `123` funciona como fallback; defina `SPORTSDB_API_KEY` para usar
+uma assinatura com mais eventos por liga.
+
+Para acrescentar transmissões ao vivo e destaques oficiais de futebol, defina
+`SCOREBAT_API_TOKEN`. O player aceita somente embeds HTTPS pertencentes ao
+ScoreBat e links de vídeo do YouTube convertidos para `youtube-nocookie.com`.
+Eventos sem fonte incorporável continuam no catálogo como agenda ou resultado,
+mas nunca recebem um player fictício.
+
 The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
 
 ## Learn More
