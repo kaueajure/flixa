@@ -6262,32 +6262,132 @@ body.player-open > div[style*="z-index"] {
   cursor: wait;
 }
 
-.account-modal-backdrop {
-  position: fixed;
-  z-index: 1200;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  overflow-y: auto;
-  background: rgba(2, 3, 5, 0.78);
-  padding: 1.5rem;
-  backdrop-filter: blur(10px);
+.account-page {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 75% -10%, rgba(124, 105, 255, 0.16), transparent 34rem),
+    radial-gradient(circle at 8% 40%, rgba(229, 9, 20, 0.09), transparent 30rem),
+    #090b10;
+  color: #fff;
 }
 
-.account-modal {
-  width: min(43rem, 100%);
-  max-height: calc(100dvh - 3rem);
-  overflow-y: auto;
+.account-page-topbar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  min-height: 4.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 11, 16, 0.88);
+  padding: 0.8rem max(1rem, calc((100% - 78rem) / 2));
+  backdrop-filter: blur(18px);
+}
+
+.account-page-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #fff;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.account-page-brand > span {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border-radius: 0.7rem;
+  background: linear-gradient(135deg, var(--accent), #8f0710);
+  font-size: 1.15rem;
+  font-weight: 950;
+}
+
+.account-page-user {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.account-page-user-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  overflow: hidden;
+  border-radius: 0.72rem;
+  background: #282b35;
+}
+
+.account-page-user > span { display: grid; gap: 0.1rem; line-height: 1.1; }
+.account-page-user strong { font-size: 0.78rem; }
+.account-page-user small { color: rgba(255, 255, 255, 0.43); font-size: 0.67rem; }
+
+.account-page-layout {
+  display: grid;
+  width: min(78rem, 100%);
+  grid-template-columns: minmax(13rem, 0.58fr) minmax(0, 1.65fr);
+  align-items: start;
+  gap: clamp(2rem, 6vw, 6rem);
+  margin: 0 auto;
+  padding: clamp(3rem, 7vw, 6rem) clamp(1rem, 4vw, 3rem) 6rem;
+}
+
+.account-page.is-avatar-picker .account-page-layout {
+  grid-template-columns: minmax(0, 68rem);
+  justify-content: center;
+}
+
+.account-page.is-avatar-picker .account-page-intro { display: none; }
+
+.account-page-intro {
+  position: sticky;
+  top: 7.5rem;
+}
+
+.account-page-intro > small {
+  color: #e7c36a;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.account-page-intro h1 {
+  margin: 0.7rem 0 1rem;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.account-page-intro p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.account-page-intro a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.account-settings-panel {
+  width: 100%;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 1.35rem;
   background: #111319;
-  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.38);
 }
 
-.account-modal > header {
-  position: sticky;
-  z-index: 2;
-  top: 0;
+.account-settings-panel > header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6297,7 +6397,7 @@ body.player-open > div[style*="z-index"] {
   backdrop-filter: blur(16px);
 }
 
-.account-modal > header small {
+.account-settings-panel > header small {
   color: #e7c36a;
   font-size: 0.68rem;
   font-weight: 700;
@@ -6305,20 +6405,10 @@ body.player-open > div[style*="z-index"] {
   text-transform: uppercase;
 }
 
-.account-modal > header h2 {
+.account-settings-panel > header h2 {
   margin: 0.15rem 0 0;
   color: #fff;
   font-size: 1.35rem;
-}
-
-.account-modal-close {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-  font-size: 1.5rem;
 }
 
 .account-section {
@@ -6380,14 +6470,14 @@ body.player-open > div[style*="z-index"] {
   font-size: 0.72rem;
 }
 
-.account-modal.is-avatar-picker {
-  width: min(68rem, 100%);
+.account-settings-panel.is-avatar-picker {
   overflow: hidden;
 }
 
 .avatar-picker {
   display: grid;
-  max-height: calc(100dvh - 3rem);
+  min-height: min(46rem, calc(100dvh - 9rem));
+  max-height: calc(100dvh - 8rem);
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
@@ -6732,33 +6822,24 @@ body.player-open > div[style*="z-index"] {
 }
 
 @media (max-width: 600px) {
-  .account-modal-backdrop {
-    align-items: end;
-    padding: 0;
-  }
-
-  .account-modal {
-    max-height: 92dvh;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 1.25rem 1.25rem 0 0;
-  }
+  .account-page-topbar { min-height: 4.25rem; padding: 0.7rem 1rem; }
+  .account-page-user > span { display: none; }
+  .account-page-layout { grid-template-columns: 1fr; gap: 1.5rem; padding: 2rem 1rem 4rem; }
+  .account-page-intro { position: static; }
+  .account-page-intro h1 { font-size: 2.8rem; }
+  .account-page-intro p { max-width: 30rem; }
+  .account-settings-panel { border-radius: 1.1rem; }
 
   .account-password-grid {
     grid-template-columns: 1fr;
   }
 
-  .account-modal.is-avatar-picker {
-    height: 100dvh;
-    max-height: 100dvh;
-    border: 0;
-    border-radius: 0;
-  }
+  .account-page.is-avatar-picker .account-page-layout { padding: 0; }
+  .account-settings-panel.is-avatar-picker { border: 0; border-radius: 0; }
 
   .avatar-picker {
-    height: 100dvh;
-    max-height: 100dvh;
+    min-height: calc(100dvh - 4.25rem);
+    max-height: calc(100dvh - 4.25rem);
   }
 
   .avatar-picker-header {
@@ -6803,6 +6884,31 @@ body.player-open > div[style*="z-index"] {
     width: 100%;
   }
 }
+
+.account-page-state {
+  display: grid;
+  min-height: 100dvh;
+  place-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  background: #090b10;
+  color: #fff;
+  padding: 2rem;
+  text-align: center;
+}
+
+.account-page-state > span {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid rgba(255, 255, 255, 0.16);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: account-page-spin 700ms linear infinite;
+}
+
+.account-page-state p { margin: 0; color: rgba(255, 255, 255, 0.5); }
+.account-page-state a { margin-top: 0.5rem; color: #fff; text-decoration: underline; }
+@keyframes account-page-spin { to { transform: rotate(360deg); } }
 
 .header-user {
   display: inline-flex;

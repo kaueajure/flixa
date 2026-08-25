@@ -22,25 +22,13 @@ export default function ProfileAvatar({
   return (
     <span className={className} aria-label={avatar ? `${name}, avatar ${avatar.name}` : name}>
       {src && !failed ? (
-        avatar?.backgroundSize ? (
-          <span
-            className="profile-avatar-crop"
-            aria-hidden="true"
-            style={{
-              backgroundImage: `url(${src})`,
-              backgroundPosition: avatar.objectPosition || "center",
-              backgroundSize: avatar.backgroundSize,
-            }}
-          />
-        ) : (
-          <img
-            src={src}
-            alt=""
-            loading={loading}
-            style={{ objectPosition: avatar?.objectPosition || "center", objectFit: "cover" }}
-            onError={() => setFailedId(avatarId || null)}
-          />
-        )
+        <img
+          src={src}
+          alt=""
+          loading={loading}
+          style={{ objectFit: "cover" }}
+          onError={() => setFailedId(avatarId || null)}
+        />
       ) : <b aria-hidden="true">{name.trim().slice(0, 1).toUpperCase() || "?"}</b>}
     </span>
   );

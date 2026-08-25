@@ -1,7 +1,8 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
-import { PROFILE_AVATAR_COLLECTIONS, findProfileAvatar } from "../lib/profile-avatars";
+import { type FormEvent, useState } from "react";
+import Link from "next/link";
+import { PROFILE_AVATAR_COLLECTIONS, PROFILE_AVATARS, findProfileAvatar } from "../lib/profile-avatars";
 import ProfileAvatar from "./profile-avatar";
 
 export type AccountUser = {
@@ -15,7 +16,6 @@ export type AccountUser = {
 
 type Props = {
   user: AccountUser;
-  onClose: () => void;
   onUpdated: (user: AccountUser) => void;
 };
 
@@ -28,8 +28,7 @@ async function readResponse(response: Response) {
   }
 }
 
-export default function AccountSettingsModal({ user, onClose, onUpdated }: Props) {
-  const panelRef = useRef<HTMLDivElement>(null);
+export default function AccountSettingsPage({ user, onUpdated }: Props) {
   const [nome, setNome] = useState(user.nome);
   const [email, setEmail] = useState(user.email);
   const [senhaEmail, setSenhaEmail] = useState("");
@@ -47,37 +46,6 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
   const [savingAvatarId, setSavingAvatarId] = useState<string | null | undefined>(undefined);
   const [avatarStatus, setAvatarStatus] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const emailChanged = email.trim().toLowerCase() !== user.email.toLowerCase();
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const firstControl = panelRef.current?.querySelector<HTMLElement>(avatarPickerOpen ? "button:not(:disabled)" : "input:not(:disabled)");
-    firstControl?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        if (avatarPickerOpen) {
-          setAvatarPickerOpen(false);
-          setAvatarCollectionId(null);
-          setSelectedAvatarId(user.avatarId);
-        } else onClose();
-      }
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusables = Array.from(panelRef.current.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)"));
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      previous?.focus();
-    };
-  }, [avatarPickerOpen, onClose, user.avatarId]);
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,8 +149,22 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
   }
 
   return (
-    <div className="account-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className={`account-modal${avatarPickerOpen ? " is-avatar-picker" : ""}`} ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+    <main className={`account-page${avatarPickerOpen ? " is-avatar-picker" : ""}`}>
+      <header className="account-page-topbar">
+        <Link className="account-page-brand" href="/#home" aria-label="Voltar ao Flixa"><span>F</span><strong>Flixa</strong></Link>
+        <div className="account-page-user">
+          <ProfileAvatar avatarId={user.avatarId} name={user.nome} className="account-page-user-avatar" />
+          <span><strong>{user.nome}</strong><small>{user.username ? `@${user.username}` : "Sem username"}</small></span>
+        </div>
+      </header>
+      <div className="account-page-layout">
+        <aside className="account-page-intro">
+          <small>Sua conta</small>
+          <h1>Configurações</h1>
+          <p>Gerencie sua foto, seus dados de acesso e a segurança da conta.</p>
+          <Link href="/#home"><span aria-hidden="true">←</span> Voltar para o Flixa</Link>
+        </aside>
+        <section className={`account-settings-panel${avatarPickerOpen ? " is-avatar-picker" : ""}`} aria-labelledby="account-page-title">
         {avatarPickerOpen ? (
           <div className="avatar-picker">
             <header className="avatar-picker-header">
@@ -191,14 +173,13 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
               </button>
               <div>
                 <small>Foto do perfil</small>
-                <h2 id="account-modal-title">{avatarCollection ? avatarCollection.name : "Escolha seu desenho"}</h2>
+                <h2 id="account-page-title">{avatarCollection ? avatarCollection.name : "Escolha uma coleção"}</h2>
                 <p>{avatarCollection ? "Agora escolha um personagem." : "Escolha uma coleção para ver os personagens."}</p>
               </div>
-              <button type="button" className="account-modal-close" onClick={onClose} aria-label="Fechar configurações">×</button>
             </header>
 
             {!avatarCollection ? (
-              <div className="avatar-collection-grid" aria-label="Coleções de desenhos">
+              <div className="avatar-collection-grid" aria-label="Coleções de personagens">
                 {PROFILE_AVATAR_COLLECTIONS.map((collection) => {
                   const active = currentAvatar?.collectionId === collection.id;
                   return (
@@ -206,7 +187,7 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
                       <ProfileAvatar avatarId={collection.characters[0].id} name={collection.name} className="avatar-collection-cover" loading="lazy" />
                       <span>
                         <strong>{collection.name}</strong>
-                        <small>5 personagens</small>
+                        <small>{collection.characters.length} {collection.characters.length === 1 ? "personagem" : "personagens"}</small>
                       </span>
                       <i aria-hidden="true">›</i>
                     </button>
@@ -248,10 +229,9 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
           <>
         <header>
           <div>
-            <small>Sua conta</small>
-            <h2 id="account-modal-title">Configurações</h2>
+            <small>Visão geral</small>
+            <h2 id="account-page-title">Dados da conta</h2>
           </div>
-          <button type="button" className="account-modal-close" onClick={onClose} aria-label="Fechar configurações">×</button>
         </header>
 
         <section className="account-section account-avatar-section" aria-labelledby="account-avatar-title">
@@ -263,7 +243,7 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
             </div>
             <button type="button" className="account-avatar-change" onClick={openAvatarPicker}>Trocar foto</button>
           </div>
-          <small className="account-avatar-count">125 personagens organizados em 25 coleções.</small>
+          <small className="account-avatar-count">{PROFILE_AVATARS.length} personagens organizados em {PROFILE_AVATAR_COLLECTIONS.length} coleções.</small>
           {avatarStatus ? <p className={`account-status is-${avatarStatus.kind}`} role="status">{avatarStatus.text}</p> : null}
         </section>
 
@@ -321,7 +301,8 @@ export default function AccountSettingsModal({ user, onClose, onUpdated }: Props
         </form>
           </>
         )}
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

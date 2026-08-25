@@ -6,14 +6,20 @@ const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
 test("configurações permitem nome e e-mail, mas mantêm o username imutável", async () => {
-  const [modal, api, auth] = await Promise.all([
-    read("app/account-settings-modal.tsx"),
+  const [accountPage, route, home, api, auth] = await Promise.all([
+    read("app/account-settings-page.tsx"),
+    read("app/configuracoes/page.tsx"),
+    read("app/page.tsx"),
     read("app/api/auth/account/route.ts"),
     read("db/auth.ts"),
   ]);
 
-  assert.match(modal, /username é permanente/i);
-  assert.match(modal, /disabled readOnly/);
+  assert.match(accountPage, /username é permanente/i);
+  assert.match(accountPage, /disabled readOnly/);
+  assert.doesNotMatch(accountPage, /role="dialog"|aria-modal|account-modal-backdrop/);
+  assert.match(route, /api\/auth\/me/);
+  assert.match(home, /href="\/configuracoes"/);
+  assert.doesNotMatch(home, /AccountSettingsModal|accountSettingsOpen/);
   assert.doesNotMatch(api, /body\.username/);
   assert.match(auth, /senha atual para alterar o e-mail/i);
 });

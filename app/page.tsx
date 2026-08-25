@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import Link from "next/link";
 import {
   DEFAULT_DISABLED_PLAYER_SERVER_IDS,
   PLAYER_SERVERS,
@@ -12,7 +13,6 @@ import {
   PROTECTED_PLAYER_SANDBOX,
 } from "../lib/player-frame-policy";
 import BorderCollieForum from "./border-collie-forum";
-import AccountSettingsModal from "./account-settings-modal";
 import FriendsView, { type FriendActivity } from "./friends-view";
 import LoginForm from "./login-form";
 import ProfileAvatar from "./profile-avatar";
@@ -502,7 +502,6 @@ export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const toastTimer = useRef<number | null>(null);
   const lastCatalogHash = useRef("home");
   const playerMovieRef = useRef<Movie | null>(null);
@@ -1320,9 +1319,9 @@ export default function Home() {
                     Minha Lista {listMovies.length ? <em>{listMovies.length}</em> : null}
                   </button>
                   <button type="button" role="menuitem" onClick={() => goTo("amigos")}>Amigos</button>
-                  <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); setAccountSettingsOpen(true); }}>
+                  <Link role="menuitem" href="/configuracoes" onClick={() => setProfileMenuOpen(false)}>
                     Configurações da conta
-                  </button>
+                  </Link>
                   <button
                     type="button"
                     role="menuitem"
@@ -1774,14 +1773,6 @@ export default function Home() {
       ) : null}
 
       {!authUser.username ? <UsernameSetupModal user={authUser} onComplete={setAuthUser} /> : null}
-
-      {accountSettingsOpen ? (
-        <AccountSettingsModal
-          user={authUser}
-          onClose={() => setAccountSettingsOpen(false)}
-          onUpdated={setAuthUser}
-        />
-      ) : null}
 
       {toast ? <div className="toast" role="status">{toast}</div> : null}
 

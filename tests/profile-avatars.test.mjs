@@ -1,26 +1,35 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 import { PROFILE_AVATAR_COLLECTIONS, PROFILE_AVATARS } from "../lib/profile-avatars.ts";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
-test("oferece 25 desenhos e 125 personagens únicos", () => {
-  assert.equal(PROFILE_AVATAR_COLLECTIONS.length, 25);
-  assert.equal(PROFILE_AVATARS.length, 125);
-  assert.equal(new Set(PROFILE_AVATARS.map((avatar) => avatar.id)).size, 125);
-  assert.ok(PROFILE_AVATAR_COLLECTIONS.every((collection) => collection.characters.length === 5));
+test("oferece as 19 franquias e os 81 personagens solicitados", () => {
+  assert.equal(PROFILE_AVATAR_COLLECTIONS.length, 19);
+  assert.equal(PROFILE_AVATARS.length, 81);
+  assert.equal(new Set(PROFILE_AVATARS.map((avatar) => avatar.id)).size, 81);
+  assert.deepEqual(
+    PROFILE_AVATAR_COLLECTIONS.map((collection) => collection.characters.length),
+    [5, 4, 5, 3, 1, 5, 4, 5, 4, 5, 4, 4, 2, 5, 4, 5, 5, 5, 6],
+  );
   assert.deepEqual(
     PROFILE_AVATAR_COLLECTIONS[0].characters.map((avatar) => avatar.name),
-    ["Bart Simpson", "Lisa Simpson", "Homer Simpson", "Marge Simpson", "Maggie Simpson"],
+    ["Homer Simpson", "Marge Simpson", "Bart Simpson", "Lisa Simpson", "Maggie Simpson"],
+  );
+  assert.deepEqual(
+    PROFILE_AVATAR_COLLECTIONS.find((collection) => collection.id === "vingadores")?.characters.map(
+      (avatar) => avatar.name,
+    ),
+    ["Homem de Ferro", "Capitão América", "Thor", "Hulk", "Homem-Aranha"],
   );
 });
 
 test("salva somente avatares permitidos e os mostra no perfil e nos amigos", async () => {
   const [auth, account, avatarComponent, styles, page, friends, migration] = await Promise.all([
     read("db/auth.ts"),
-    read("app/account-settings-modal.tsx"),
+    read("app/account-settings-page.tsx"),
     read("app/profile-avatar.tsx"),
     read("app/globals.css"),
     read("app/page.tsx"),
@@ -29,7 +38,7 @@ test("salva somente avatares permitidos e os mostra no perfil e nos amigos", asy
   ]);
 
   assert.match(auth, /isValidProfileAvatar\(avatarId\)/);
-  assert.match(account, /125 personagens organizados em 25 coleções/);
+  assert.match(account, /PROFILE_AVATARS\.length\} personagens organizados em/);
   assert.match(account, /avatar-collection-grid/);
   assert.match(account, /Usar esta foto/);
   assert.doesNotMatch(account, /avatar-collection-tabs/);
@@ -40,11 +49,17 @@ test("salva somente avatares permitidos e os mostra no perfil e nos amigos", asy
   assert.match(migration, /ADD COLUMN `avatar_id` VARCHAR\(80\)/);
 });
 
-test("as fotos coletivas têm recortes distintos para cada personagem", () => {
-  for (const collectionId of ["turma-da-monica", "irmao-do-jorel"]) {
-    const collection = PROFILE_AVATAR_COLLECTIONS.find((item) => item.id === collectionId);
-    assert.ok(collection);
-    const signatures = collection.characters.map((avatar) => `${avatar.sourceUrl || avatar.page}|${avatar.backgroundSize || "cover"}|${avatar.objectPosition || "center"}`);
-    assert.equal(new Set(signatures).size, 5);
+test("cada personagem usa um PNG local e possui origem registrada", async () => {
+  assert.equal(new Set(PROFILE_AVATARS.map((avatar) => avatar.file)).size, 81);
+
+  for (const avatar of PROFILE_AVATARS) {
+    assert.match(avatar.file, /^\/assets\/avatars\/[a-z0-9-]+\/[a-z0-9-]+\.png$/);
+    const file = await stat(new URL(`public${avatar.file}`, root));
+    assert.ok(file.size > 1_000);
   }
+
+  const sources = JSON.parse(await read("public/assets/avatars/sources.json"));
+  assert.equal(sources.count, 81);
+  assert.equal(sources.avatars.length, 81);
+  assert.ok(sources.avatars.every((avatar) => avatar.validated && avatar.sourceUrl && avatar.license));
 });
