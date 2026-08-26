@@ -1,132 +1,172 @@
-# vinext-starter
+<div align="center">
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+# 🎬 Flixa
 
-## Prerequisites
+### Entretenimento, descoberta de conteúdo e experiências sociais em um só lugar
 
-- Node.js `>=22.13.0`
-- Linux with `flock`, `curl`, and GNU `timeout`
+Explore conteúdos, acompanhe esportes, organize sua biblioteca e interaja com outros usuários em uma plataforma moderna construída com React e Next.js.
 
-## Sites Lifecycle
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Drizzle](https://img.shields.io/badge/Drizzle-ORM-C5F74F?style=flat-square&logo=drizzle&logoColor=000)
+![Cloudflare](https://img.shields.io/badge/Cloudflare-Ready-F38020?style=flat-square&logo=cloudflare&logoColor=white)
 
-The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
+</div>
 
-This starter does not use `wrangler.jsonc`.
+---
 
-`install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout and then validates the Sites artifact. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
+## ✨ Sobre o projeto
 
-Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
+O **Flixa** é uma plataforma de entretenimento e descoberta de conteúdo que combina catálogo, recursos sociais, biblioteca pessoal e experiências ligadas a esportes.
 
-## Included Shape
+O projeto evoluiu além de um starter e hoje possui estrutura própria de aplicação, páginas autenticadas, configurações de usuário, administração, biblioteca, recursos sociais e integração com fontes externas.
 
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+## 🚀 Principais recursos
 
-## Workspace Auth Headers
+- 🎬 **Descoberta de conteúdo** em uma interface moderna
+- 📚 **Biblioteca pessoal** para organizar itens salvos
+- 👥 **Recursos sociais** e visualização de amigos
+- 💬 **Comunidades e fóruns** dentro da plataforma
+- ⚽ **Catálogo esportivo** com agenda, eventos e resultados
+- ▶️ **Reprodução por embeds externos seguros** quando disponíveis
+- 👤 **Conta e preferências do usuário**
+- 🔐 **Autenticação** e áreas protegidas
+- 🛠️ **Área administrativa**
+- ☁️ **Estrutura preparada para Cloudflare**
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
+## 🛠️ Stack
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+| Camada | Tecnologias |
+| --- | --- |
+| Aplicação | Next.js 16, React 19, TypeScript |
+| Runtime / Build | Vinext, Vite |
+| Banco de dados | Drizzle ORM, MySQL e suporte a ambientes Cloudflare |
+| Infraestrutura | Cloudflare, Wrangler |
+| Autenticação | bcrypt + integração opcional com autenticação do workspace |
+| Tempo real | Ably |
+| Estilos | Tailwind CSS |
 
-Treat the full name as optional and fall back to email when it is absent:
+## 🧩 Estrutura do projeto
 
-```tsx
-import { headers } from "next/headers";
+A aplicação utiliza a pasta `app/` como núcleo da interface e das rotas.
 
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
+Algumas áreas existentes no projeto incluem:
 
-  const displayName = fullName ?? email;
-  // ...
-}
+```text
+app/
+├── admin/            # área administrativa
+├── api/              # rotas e serviços da aplicação
+├── configuracoes/    # preferências do usuário
+├── esportes/         # catálogo e agenda esportiva
+├── login/            # autenticação
+├── friends-view.tsx  # recursos sociais
+└── library-view.tsx  # biblioteca pessoal
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+## 💻 Executando localmente
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+### Pré-requisitos
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+- Node.js `>= 22.13.0`
+- npm
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+### 1. Clone o projeto
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+```bash
+git clone https://github.com/kaueajure/flixa.git
+cd flixa
+```
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+### 2. Instale as dependências
 
-## Diagnostic Commands
+```bash
+npm install
+```
 
-- `npm run install:ci`: perform the one bounded lockfile install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build and validate the deployable Sites artifact
-- `npm run start`: start the built Vinext application
-- `npm test`: build, validate, and verify the rendered development-preview metadata
-- `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+### 3. Configure o ambiente
 
-## Reprodução de vídeo
+Use o arquivo de exemplo como base:
 
-O Flixa mantém embeds externos como contingência, sempre dentro de um iframe
-com sandbox. Provedores que exigem pop-ups, bloqueiam iframe externo ou estão
-estruturalmente indisponíveis ficam desativados. Depois de atualizar, aplique a
-revisão da lista com:
+```bash
+cp .env.example .env
+```
+
+Preencha apenas as integrações que deseja utilizar.
+
+### 4. Inicie o projeto
+
+```bash
+npm run dev
+```
+
+## 🗄️ Banco de dados
+
+O projeto utiliza Drizzle para modelagem e migrations.
+
+Gerar migrations:
+
+```bash
+npm run db:generate
+```
+
+Aplicar migrations:
 
 ```bash
 npm run db:migrate
 ```
 
-Use build and validation commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
+Popular dados de desenvolvimento quando necessário:
 
-## Catálogo esportivo
+```bash
+npm run db:seed
+```
 
-A seção de esportes usa a TheSportsDB para montar uma agenda multi-esporte
-com eventos futuros, resultados e links de vídeo informados pela fonte. A
-chave pública `123` funciona como fallback; defina `SPORTSDB_API_KEY` para usar
-uma assinatura com mais eventos por liga.
+## ⚽ Catálogo esportivo
 
-Para acrescentar transmissões ao vivo e destaques oficiais de futebol, defina
-`SCOREBAT_API_TOKEN`. O player aceita somente embeds HTTPS pertencentes ao
-ScoreBat e links de vídeo do YouTube convertidos para `youtube-nocookie.com`.
-Eventos sem fonte incorporável continuam no catálogo como agenda ou resultado,
-mas nunca recebem um player fictício.
+A seção de esportes pode utilizar a **TheSportsDB** para consultar eventos futuros, resultados e informações de múltiplas modalidades.
 
-The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
+Quando configurado, o projeto também pode utilizar o **ScoreBat** para conteúdos incorporáveis de futebol.
 
-## Learn More
+```env
+SPORTSDB_API_KEY=
+SCOREBAT_API_TOKEN=
+```
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Eventos sem uma fonte incorporável válida continuam disponíveis como agenda ou resultado, sem gerar players fictícios.
+
+## ▶️ Reprodução de vídeo
+
+Embeds externos são utilizados apenas como contingência e são carregados em `iframe` com restrições de segurança.
+
+Provedores incompatíveis com iframe, que exigem pop-ups ou que não estejam disponíveis são desativados.
+
+## 📦 Build e validação
+
+```bash
+npm run build
+npm run validate:artifact
+```
+
+Para iniciar uma versão construída:
+
+```bash
+npm start
+```
+
+O projeto também possui scripts específicos para o fluxo de build e validação em ambientes compatíveis com Cloudflare Sites.
+
+## 🧪 Qualidade
+
+```bash
+npm run lint
+npm test
+```
+
+---
+
+<div align="center">
+
+**Flixa** — uma experiência moderna para descobrir, acompanhar e compartilhar entretenimento.
+
+</div>
