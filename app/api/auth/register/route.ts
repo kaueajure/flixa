@@ -4,10 +4,16 @@ import {
   montarCookieSessao,
   paraUsuarioPublico,
 } from "../../../../db/auth";
+import { checkRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const limit = checkRateLimit(request, "auth-register", 5, 60 * 60 * 1000);
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.retryAfterSeconds, "Muitos cadastros a partir deste endereço. Tente novamente mais tarde.");
+  }
+
   try {
     const body = (await request.json()) as { nome?: string; username?: string; email?: string; senha?: string };
     const nome = String(body.nome || "");
@@ -32,7 +38,7 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha no cadastro";
-    return Response.json({ erro: message }, { status: 500 });
+    console.error("[auth-register] Falha no cadastro:", error);
+    return Response.json({ erro: "Não foi possível cadastrar agora." }, { status: 500 });
   }
 }
