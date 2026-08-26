@@ -6,6 +6,7 @@ import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 
 type Usuario = { id: number; nome: string; username: string | null; avatarId: string | null; email: string; administrador: boolean };
 type ModoAuth = "login" | "cadastro" | "recuperar" | "redefinir";
+const PASSWORD_MIN_LENGTH = 12;
 
 export default function LoginForm() {
   const router = useRouter();
@@ -85,11 +86,11 @@ export default function LoginForm() {
       if (!/^[a-z0-9](?:[a-z0-9._]{1,18}[a-z0-9])$/.test(normalizedUsername)) {
         return setErro("Escolha um username de 3 a 20 caracteres usando letras, números, ponto ou underline.");
       }
-      if (senha.length < 6) return setErro("A senha deve ter pelo menos 6 caracteres.");
+      if (senha.length < PASSWORD_MIN_LENGTH) return setErro(`A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`);
       if (senha !== confirmarSenha) return setErro("As senhas não coincidem.");
     }
     if (modo === "redefinir") {
-      if (senha.length < 6) return setErro("A nova senha deve ter pelo menos 6 caracteres.");
+      if (senha.length < PASSWORD_MIN_LENGTH) return setErro(`A nova senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`);
       if (senha !== confirmarSenha) return setErro("As senhas não coincidem.");
     }
 
@@ -180,8 +181,8 @@ export default function LoginForm() {
           ) : null}
 
           {modo !== "redefinir" ? <label><span>E-mail</span><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" required /></label> : null}
-          {modo !== "recuperar" ? <label><span>{modo === "redefinir" ? "Nova senha" : "Senha"}</span><input type="password" autoComplete={modo === "login" ? "current-password" : "new-password"} value={senha} onChange={(event) => setSenha(event.target.value)} placeholder="••••••••" required minLength={modo === "login" ? undefined : 6} /></label> : null}
-          {modo === "cadastro" || modo === "redefinir" ? <label><span>{modo === "redefinir" ? "Confirmar nova senha" : "Confirmar senha"}</span><input type="password" autoComplete="new-password" value={confirmarSenha} onChange={(event) => setConfirmarSenha(event.target.value)} placeholder="••••••••" required minLength={6} /></label> : null}
+          {modo !== "recuperar" ? <label><span>{modo === "redefinir" ? "Nova senha" : "Senha"}</span><input type="password" autoComplete={modo === "login" ? "current-password" : "new-password"} value={senha} onChange={(event) => setSenha(event.target.value)} placeholder="••••••••••••" required minLength={modo === "login" ? undefined : PASSWORD_MIN_LENGTH} /></label> : null}
+          {modo === "cadastro" || modo === "redefinir" ? <label><span>{modo === "redefinir" ? "Confirmar nova senha" : "Confirmar senha"}</span><input type="password" autoComplete="new-password" value={confirmarSenha} onChange={(event) => setConfirmarSenha(event.target.value)} placeholder="••••••••••••" required minLength={PASSWORD_MIN_LENGTH} /></label> : null}
 
           {modo === "login" ? <button className="login-forgot" type="button" onClick={() => trocarModo("recuperar")}>Esqueci minha senha</button> : null}
           {erro ? <p className="login-error" role="alert">{erro}</p> : null}
