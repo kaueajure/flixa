@@ -17,6 +17,7 @@ import {
 export const SESSAO_COOKIE = "flixa_sessao";
 export const SESSAO_DIAS = 14;
 export const PRESENCA_JANELA_SEGUNDOS = 75;
+export const SENHA_MINIMA_CARACTERES = 12;
 
 export type UsuarioPublico = {
   id: number;
@@ -56,7 +57,11 @@ export function verificarSenha(senha: string, armazenada: string) {
 }
 
 export function gerarTokenSessao() {
-  return createHash("sha256").update(randomBytes(48)).digest("hex");
+  return randomBytes(48).toString("base64url");
+}
+
+function hashTokenSessao(token: string) {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 export function paraUsuarioPublico(usuario: Usuario): UsuarioPublico {
@@ -82,6 +87,9 @@ export function lerTokenCookie(cookieHeader: string | null) {
 }
 
 export function cookieDeveSerSecure(request?: Request) {
+  // Em produção, cookies de autenticação nunca podem ser enviados sem Secure.
+  if (process.env.NODE_ENV === "production") return true;
+
   if (process.env.FLIXA_COOKIE_SECURE === "1") return true;
   if (process.env.FLIXA_COOKIE_SECURE === "0") return false;
 
@@ -95,7 +103,6 @@ export function cookieDeveSerSecure(request?: Request) {
     // ignore
   }
 
-  // Em produção atrás de proxy, Secure sem HTTPS real faz o browser descartar o cookie.
   return false;
 }
 
@@ -157,8 +164,8 @@ export async function cadastrarUsuario(input: { nome: string; username: string; 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { erro: "Informe um e-mail válido.", usuario: null as Usuario | null };
   }
-  if (senha.length < 6) {
-    return { erro: "A senha precisa ter pelo menos 6 caracteres.", usuario: null as Usuario | null };
+  if (senha.length < SENHA_MINIMA_CARACTERES) {
+    return { erro: `A senha precisa ter pelo menos ${SENHA_MINIMA_CARACTERES} caracteres.`, usuario: null as Usuario | null };
   }
 
   return withDb(async (db) => {
@@ -194,10 +201,11 @@ export async function cadastrarUsuario(input: { nome: string; username: string; 
 
 export async function criarSessao(usuarioId: number) {
   const token = gerarTokenSessao();
+  const tokenHash = hashTokenSessao(token);
   await withDb(async (db) => {
     await db.insert(sessoes).values({
       usuario_id: usuarioId,
-      token,
+      token: tokenHash,
       expira_em: expiraEmSql(),
       criado_em: agoraSql(),
       ultima_atividade_em: agoraSql(),
@@ -208,6 +216,7 @@ export async function criarSessao(usuarioId: number) {
 
 export async function obterUsuarioPorToken(token: string | null) {
   if (!token) return null;
+  const tokenHash = hashTokenSessao(token);
   const selectSession = () => withDb((db) => db
     .select({
       id: usuarios.id,
@@ -222,7 +231,7 @@ export async function obterUsuarioPorToken(token: string | null) {
     })
     .from(sessoes)
     .innerJoin(usuarios, eq(sessoes.usuario_id, usuarios.id))
-    .where(and(eq(sessoes.token, token), gt(sessoes.expira_em, agoraSql())))
+    .where(and(eq(sessoes.token, tokenHash), gt(sessoes.expira_em, agoraSql())))
     .limit(1));
 
   let rows;
@@ -258,8 +267,9 @@ export async function requireAdmin(request: Request) {
 
 export async function encerrarSessao(token: string | null) {
   if (!token) return;
+  const tokenHash = hashTokenSessao(token);
   await withDb(async (db) => {
-    await db.delete(sessoes).where(eq(sessoes.token, token));
+    await db.delete(sessoes).where(eq(sessoes.token, tokenHash));
   });
 }
 
@@ -315,7 +325,7 @@ export async function alterarSenha(
   novaSenha: string,
   tokenSessaoAtual: string | null,
 ) {
-  if (novaSenha.length < 6) return { erro: "A nova senha precisa ter pelo menos 6 caracteres." };
+  if (novaSenha.length < SENHA_MINIMA_CARACTERES) return { erro: `A nova senha precisa ter pelo menos ${SENHA_MINIMA_CARACTERES} caracteres.` };
   if (senhaAtual === novaSenha) return { erro: "Escolha uma senha diferente da atual." };
 
   return withDb(async (db) => {
@@ -326,7 +336,8 @@ export async function alterarSenha(
     }
     await db.update(usuarios).set({ senha: hashSenha(novaSenha), atualizado_em: agoraSql() }).where(eq(usuarios.id, usuarioId));
     if (tokenSessaoAtual) {
-      await db.delete(sessoes).where(and(eq(sessoes.usuario_id, usuarioId), ne(sessoes.token, tokenSessaoAtual)));
+      const tokenAtualHash = hashTokenSessao(tokenSessaoAtual);
+      await db.delete(sessoes).where(and(eq(sessoes.usuario_id, usuarioId), ne(sessoes.token, tokenAtualHash)));
     } else {
       await db.delete(sessoes).where(eq(sessoes.usuario_id, usuarioId));
     }
@@ -363,7 +374,7 @@ export async function criarRecuperacaoSenha(emailInformado: string) {
 
 export async function redefinirSenhaComToken(token: string, novaSenha: string) {
   if (token.length < 32 || token.length > 128) return { erro: "Link inválido ou expirado." };
-  if (novaSenha.length < 6) return { erro: "A nova senha precisa ter pelo menos 6 caracteres." };
+  if (novaSenha.length < SENHA_MINIMA_CARACTERES) return { erro: `A nova senha precisa ter pelo menos ${SENHA_MINIMA_CARACTERES} caracteres.` };
   const tokenHash = createHash("sha256").update(token).digest("hex");
 
   return withDb(async (db) => db.transaction(async (tx) => {
@@ -394,12 +405,13 @@ export async function redefinirSenhaComToken(token: string, novaSenha: string) {
 
 export async function registrarPresenca(usuarioId: number, token: string | null, clienteId: string, area: string) {
   if (!token) return;
+  const tokenHash = hashTokenSessao(token);
   const agora = agoraSql();
   await withDb(async (db) => {
     await db
       .update(sessoes)
       .set({ ultima_atividade_em: agora })
-      .where(and(eq(sessoes.token, token), gt(sessoes.expira_em, agoraSql())));
+      .where(and(eq(sessoes.token, tokenHash), gt(sessoes.expira_em, agoraSql())));
     await db.insert(presencas_usuarios).values({
       usuario_id: usuarioId,
       cliente_id: clienteId,
