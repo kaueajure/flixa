@@ -25,7 +25,8 @@ function ablyKey() {
 }
 
 function signingSecret() {
-  return (process.env.WATCH_PARTY_SECRET || process.env.MYSQL_PASSWORD || ablyKey()).trim();
+  const secret = (process.env.WATCH_PARTY_SECRET || "").trim();
+  return secret.length >= 32 ? secret : "";
 }
 
 function createAblyTokenRequest(
@@ -71,9 +72,10 @@ function signSession(claims: SessionClaims) {
 }
 
 function verifySession(value: unknown): SessionClaims | null {
+  const secret = signingSecret();
   const [payload, signature, extra] = String(value || "").split(".");
-  if (!payload || !signature || extra || !signingSecret()) return null;
-  const expected = createHmac("sha256", signingSecret()).update(payload).digest();
+  if (!payload || !signature || extra || !secret) return null;
+  const expected = createHmac("sha256", secret).update(payload).digest();
   let received: Buffer;
   try {
     received = Buffer.from(signature, "base64url");
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
   const usuario = await requireUsuario(request);
   if (!usuario) return Response.json({ erro: "Não autenticado." }, { status: 401 });
   if (!ablyKey() || !signingSecret()) {
-    return Response.json({ erro: "Ably não está configurado no servidor." }, { status: 503 });
+    return Response.json({ erro: "Assistir Junto não está configurado com credenciais independentes no servidor." }, { status: 503 });
   }
 
   let body: { action?: string; roomCode?: string; session?: string } = {};
@@ -144,9 +146,7 @@ export async function POST(request: Request) {
   }
 
   const resource = `watch-party:${claims.roomCode}`;
-  const operations: AblyCapabilityOperation[] = claims.role === "host"
-    ? ["publish", "subscribe", "presence", "history"]
-    : ["publish", "subscribe", "presence", "history"];
+  const operations: AblyCapabilityOperation[] = ["publish", "subscribe", "presence", "history"];
 
   try {
     const tokenRequest = createAblyTokenRequest(claims.clientId, resource, operations);
