@@ -1,5 +1,6 @@
 import { criarRecuperacaoSenha, redefinirSenhaComToken } from "../../../../db/auth";
 import { criarUrlRecuperacao, enviarEmailRecuperacao } from "../../../../lib/password-reset-email";
+import { checkRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 const GENERIC_MESSAGE = "Se esse e-mail estiver cadastrado, você receberá um link para criar uma nova senha.";
@@ -10,6 +11,11 @@ function waitUntil(startedAt: number, minimumMs = 400) {
 }
 
 export async function POST(request: Request) {
+  const limit = checkRateLimit(request, "auth-password-recovery", 3, 60 * 60 * 1000);
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.retryAfterSeconds, "Muitas solicitações de recuperação. Tente novamente mais tarde.");
+  }
+
   const startedAt = Date.now();
   let devResetUrl: string | undefined;
   try {
@@ -38,6 +44,11 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const limit = checkRateLimit(request, "auth-password-reset", 10, 15 * 60 * 1000);
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.retryAfterSeconds);
+  }
+
   try {
     const body = await request.json() as { token?: string; novaSenha?: string; confirmarSenha?: string };
     const novaSenha = String(body.novaSenha || "");
