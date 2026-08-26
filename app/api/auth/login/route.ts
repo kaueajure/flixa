@@ -4,10 +4,16 @@ import {
   montarCookieSessao,
   paraUsuarioPublico,
 } from "../../../../db/auth";
+import { checkRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const limit = checkRateLimit(request, "auth-login", 10, 15 * 60 * 1000);
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.retryAfterSeconds);
+  }
+
   try {
     const body = (await request.json()) as { email?: string; senha?: string };
     const email = String(body.email || "").trim().toLowerCase();
@@ -34,7 +40,7 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha no login";
-    return Response.json({ erro: message }, { status: 500 });
+    console.error("[auth-login] Falha no login:", error);
+    return Response.json({ erro: "Não foi possível entrar agora." }, { status: 500 });
   }
 }
