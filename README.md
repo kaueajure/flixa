@@ -1,172 +1,87 @@
-<div align="center">
+# Flixa
 
-# 🎬 Flixa
+Plataforma de entretenimento com catálogo de conteúdo, biblioteca pessoal, recursos sociais e uma área de esportes com agenda, resultados e vídeos quando a fonte permite incorporação.
 
-### Entretenimento, descoberta de conteúdo e experiências sociais em um só lugar
+## Funcionalidades
 
-Explore conteúdos, acompanhe esportes, organize sua biblioteca e interaja com outros usuários em uma plataforma moderna construída com React e Next.js.
+- catálogo e descoberta de conteúdo
+- biblioteca pessoal
+- perfis e configurações de usuário
+- amigos e recursos sociais
+- comunidades e fóruns
+- área administrativa
+- agenda esportiva e resultados
+- reprodução por embeds externos quando compatível
 
-![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
-![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Drizzle](https://img.shields.io/badge/Drizzle-ORM-C5F74F?style=flat-square&logo=drizzle&logoColor=000)
-![Cloudflare](https://img.shields.io/badge/Cloudflare-Ready-F38020?style=flat-square&logo=cloudflare&logoColor=white)
+## Stack
 
-</div>
+- Next.js 16
+- React 19
+- TypeScript
+- Drizzle ORM
+- MySQL
+- Ably
+- Tailwind CSS
+- Cloudflare / Wrangler
 
----
+## Rodando localmente
 
-## ✨ Sobre o projeto
+Requisitos:
 
-O **Flixa** é uma plataforma de entretenimento e descoberta de conteúdo que combina catálogo, recursos sociais, biblioteca pessoal e experiências ligadas a esportes.
-
-O projeto evoluiu além de um starter e hoje possui estrutura própria de aplicação, páginas autenticadas, configurações de usuário, administração, biblioteca, recursos sociais e integração com fontes externas.
-
-## 🚀 Principais recursos
-
-- 🎬 **Descoberta de conteúdo** em uma interface moderna
-- 📚 **Biblioteca pessoal** para organizar itens salvos
-- 👥 **Recursos sociais** e visualização de amigos
-- 💬 **Comunidades e fóruns** dentro da plataforma
-- ⚽ **Catálogo esportivo** com agenda, eventos e resultados
-- ▶️ **Reprodução por embeds externos seguros** quando disponíveis
-- 👤 **Conta e preferências do usuário**
-- 🔐 **Autenticação** e áreas protegidas
-- 🛠️ **Área administrativa**
-- ☁️ **Estrutura preparada para Cloudflare**
-
-## 🛠️ Stack
-
-| Camada | Tecnologias |
-| --- | --- |
-| Aplicação | Next.js 16, React 19, TypeScript |
-| Runtime / Build | Vinext, Vite |
-| Banco de dados | Drizzle ORM, MySQL e suporte a ambientes Cloudflare |
-| Infraestrutura | Cloudflare, Wrangler |
-| Autenticação | bcrypt + integração opcional com autenticação do workspace |
-| Tempo real | Ably |
-| Estilos | Tailwind CSS |
-
-## 🧩 Estrutura do projeto
-
-A aplicação utiliza a pasta `app/` como núcleo da interface e das rotas.
-
-Algumas áreas existentes no projeto incluem:
-
-```text
-app/
-├── admin/            # área administrativa
-├── api/              # rotas e serviços da aplicação
-├── configuracoes/    # preferências do usuário
-├── esportes/         # catálogo e agenda esportiva
-├── login/            # autenticação
-├── friends-view.tsx  # recursos sociais
-└── library-view.tsx  # biblioteca pessoal
-```
-
-## 💻 Executando localmente
-
-### Pré-requisitos
-
-- Node.js `>= 22.13.0`
+- Node.js 22.13 ou superior
 - npm
-
-### 1. Clone o projeto
 
 ```bash
 git clone https://github.com/kaueajure/flixa.git
 cd flixa
-```
-
-### 2. Instale as dependências
-
-```bash
 npm install
-```
-
-### 3. Configure o ambiente
-
-Use o arquivo de exemplo como base:
-
-```bash
 cp .env.example .env
-```
-
-Preencha apenas as integrações que deseja utilizar.
-
-### 4. Inicie o projeto
-
-```bash
 npm run dev
 ```
 
-## 🗄️ Banco de dados
+As integrações externas são opcionais e devem ser configuradas no `.env` conforme necessário.
 
-O projeto utiliza Drizzle para modelagem e migrations.
+## Banco de dados
 
-Gerar migrations:
+O projeto usa Drizzle para schema e migrations.
 
 ```bash
 npm run db:generate
-```
-
-Aplicar migrations:
-
-```bash
 npm run db:migrate
 ```
 
-Popular dados de desenvolvimento quando necessário:
+Para popular dados de desenvolvimento:
 
 ```bash
 npm run db:seed
 ```
 
-## ⚽ Catálogo esportivo
+## Esportes
 
-A seção de esportes pode utilizar a **TheSportsDB** para consultar eventos futuros, resultados e informações de múltiplas modalidades.
-
-Quando configurado, o projeto também pode utilizar o **ScoreBat** para conteúdos incorporáveis de futebol.
+A área de esportes usa a TheSportsDB para agenda, eventos e resultados. O ScoreBat pode ser usado para vídeos e destaques de futebol.
 
 ```env
 SPORTSDB_API_KEY=
 SCOREBAT_API_TOKEN=
 ```
 
-Eventos sem uma fonte incorporável válida continuam disponíveis como agenda ou resultado, sem gerar players fictícios.
+Quando não há uma fonte incorporável válida, o evento continua aparecendo como agenda ou resultado, sem player.
 
-## ▶️ Reprodução de vídeo
+## Vídeo
 
-Embeds externos são utilizados apenas como contingência e são carregados em `iframe` com restrições de segurança.
+Embeds externos são carregados em `iframe` com restrições de segurança. Provedores que exigem pop-up, bloqueiam incorporação ou não são compatíveis ficam desativados.
 
-Provedores incompatíveis com iframe, que exigem pop-ups ou que não estejam disponíveis são desativados.
-
-## 📦 Build e validação
+## Build e testes
 
 ```bash
 npm run build
 npm run validate:artifact
-```
-
-Para iniciar uma versão construída:
-
-```bash
-npm start
-```
-
-O projeto também possui scripts específicos para o fluxo de build e validação em ambientes compatíveis com Cloudflare Sites.
-
-## 🧪 Qualidade
-
-```bash
 npm run lint
 npm test
 ```
 
----
+Para iniciar o build gerado:
 
-<div align="center">
-
-**Flixa** — uma experiência moderna para descobrir, acompanhar e compartilhar entretenimento.
-
-</div>
+```bash
+npm start
+```
