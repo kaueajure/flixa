@@ -22,11 +22,16 @@ import RetrospectiveView from "./retrospective-view";
 import SeriesRecapModal from "./series-recap-modal";
 import SiteIntro from "./site-intro";
 import SportsView from "./sports-view";
+import PageLoadingBoundary, { usePageReady } from "./page-loading-boundary";
+import PlayerServerMenu from "./player-server-menu";
+import { PlayerSandboxToggle, PlayerSandboxWarning, PlayerSandboxNotice } from "./player-sandbox-controls";
 import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
+import GroupExtensionGuide from "./group-extension-guide";
 import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 import { parsePlayerPlaybackEvent } from "../lib/player-events";
 import { useLivePresence } from "../lib/use-live-presence";
+import { createClientId } from "../lib/client-id";
 
 type MediaKind = "movie" | "tv";
 
@@ -521,9 +526,11 @@ export default function Home() {
   const [catalogGenres, setCatalogGenres] = useState<Genre[]>([]);
   const [catalogPage, setCatalogPage] = useState(1);
   const [browseItems, setBrowseItems] = useState<Movie[]>([]);
-  const [browseTotal, setBrowseTotal] = useState(0);
   const [browsePages, setBrowsePages] = useState(1);
   const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseReadyKey, setBrowseReadyKey] = useState("");
+  const [genresReadyView, setGenresReadyView] = useState("");
+  const navigationKeyRef = useRef("");
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -747,6 +754,17 @@ export default function Home() {
   useEffect(() => {
     const syncView = (event?: Event) => {
       const route = parseRoute(window.location.hash);
+      if (!route.selected && !route.player) {
+        const nextKey = `${route.view}:${route.catalogPage || 1}:${route.genreId || "all"}`;
+        if (navigationKeyRef.current !== nextKey) {
+          const previousView = navigationKeyRef.current.split(":")[0];
+          navigationKeyRef.current = nextKey;
+          if (route.view === "filmes" || route.view === "series") {
+            setBrowseReadyKey("");
+            if (previousView !== route.view) setGenresReadyView("");
+          }
+        }
+      }
       setView(route.view);
       setGenreId(route.genreId ?? null);
       setCatalogPage(route.catalogPage ?? 1);
@@ -887,11 +905,12 @@ export default function Home() {
     fetch(`/api/movies?genres=1&kind=${kind}`, { cache: "no-store", signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { genres?: Genre[] } | null) => {
-        setCatalogGenres(Array.isArray(data?.genres) ? data.genres : []);
+        if (!controller.signal.aborted) setCatalogGenres(Array.isArray(data?.genres) ? data.genres : []);
       })
       .catch(() => {
         if (!controller.signal.aborted) setCatalogGenres([]);
-      });
+      })
+      .finally(() => { if (!controller.signal.aborted) setGenresReadyView(view); });
 
     return () => controller.abort();
   }, [view]);
@@ -902,6 +921,7 @@ export default function Home() {
     const kind = view === "series" ? "tv" : "movie";
     const controller = new AbortController();
     const timer = window.setTimeout(() => setBrowseLoading(true), 0);
+    const requestKey = `${view}:${catalogPage}:${genreId || "all"}`;
     const genreParam = genreId ? `&genre=${encodeURIComponent(genreId)}` : "";
     fetch(`/api/movies?browse=1&kind=${kind}&page=${catalogPage}${genreParam}`, {
       cache: "no-store",
@@ -909,19 +929,22 @@ export default function Home() {
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { movies?: Movie[]; totalPages?: number; totalResults?: number } | null) => {
+        if (controller.signal.aborted) return;
         setBrowseItems(Array.isArray(data?.movies) ? data.movies : []);
         setBrowsePages(Math.max(1, Number(data?.totalPages) || 1));
-        setBrowseTotal(Math.max(0, Number(data?.totalResults) || 0));
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setBrowseItems([]);
           setBrowsePages(1);
-          setBrowseTotal(0);
         }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setBrowseLoading(false);
+        if (!controller.signal.aborted) {
+          window.clearTimeout(timer);
+          setBrowseLoading(false);
+          setBrowseReadyKey(requestKey);
+        }
       });
 
     return () => {
@@ -1264,15 +1287,15 @@ export default function Home() {
           <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
             Séries
           </a>
+          <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
+            Esportes
+          </a>
           <a
             href="#surpreenda-me"
             className={view === "surpreenda-me" ? "is-active" : ""}
             onClick={() => goTo("surpreenda-me")}
           >
             Surpreenda-me
-          </a>
-          <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
-            Esportes
           </a>
           <a
             href="#assistir-em-grupo"
@@ -1392,131 +1415,53 @@ export default function Home() {
         </div>
       ) : null}
 
-      {view === "esportes" ? (
-        <SportsView />
-      ) : view === "retrospectiva" ? (
-        <RetrospectiveView name={authUser.nome} />
-      ) : view === "amigos" ? (
-        <FriendsView username={authUser.username || ""} onOpenActivity={(activity) => void openFriendActivity(activity)} />
-      ) : view === "grupo" ? (
-        <GroupWatchView
-          movies={groupCandidates}
-          onCreate={createGroupSession}
-          onExplore={() => goTo("filmes")}
-        />
-      ) : view === "lista" ? (
-        <LibraryView
-          items={listMovies}
-          onItemsChange={(items) => setListMovies(items as Movie[])}
-          onOpen={(movie: LibraryMovie) => openDetails(movie as Movie)}
-          onExplore={() => goTo("filmes")}
-        />
-      ) : view === "surpreenda-me" ? (
-        <RouletteView
-          genres={genres}
-          listed={listMovies}
-          onWatch={openPlayer}
-          onOpen={openDetails}
-          onToggleList={toggleList}
-          onToast={showToast}
-        />
-      ) : view === "filmes" || view === "series" ? (
-        <section className="list-view" id={view === "series" ? "series" : "filmes"}>
-          <div className="list-view-head">
-            <div>
-              <p className="eyebrow">{activeGenre ? "Categoria" : "Mais famosos"}</p>
-              <h1>
-                {view === "series" ? "Séries" : "Filmes"}
-                {activeGenre ? ` · ${activeGenre.name}` : ""}
-              </h1>
-              <p className="hero-description">
-                {browseTotal
-                  ? `${browseTotal.toLocaleString("pt-BR")} ${view === "series" ? "séries" : "filmes"} disponíveis nesta página${
-                      activeGenre ? ` em ${activeGenre.name}` : ""
-                    } · Catálogo ampliado.`
-                  : browseLoading
-                    ? "Carregando o catálogo…"
-                    : "Nenhum título disponível nesta página."}
-              </p>
-            </div>
-            {browsePages > 1 ? (
-              <div className="pager">
-                <button
-                  className="secondary-action"
-                  type="button"
-                  disabled={catalogPage <= 1 || browseLoading}
-                  onClick={() => goTo(catalogPath(view, catalogPage - 1, genreId))}
-                >
-                  Anterior
-                </button>
-                <span>
-                  Página {catalogPage} de {browsePages}
-                </span>
-                <button
-                  className="secondary-action"
-                  type="button"
-                  disabled={catalogPage >= browsePages || browseLoading}
-                  onClick={() => goTo(catalogPath(view, catalogPage + 1, genreId))}
-                >
-                  Próxima
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          {catalogGenres.length ? (
-            <>
-            <div className="catalog-kind-switch" aria-label="Tipo de catálogo">
-              <a href="#filmes" className={view === "filmes" ? "is-active" : ""} onClick={() => goTo("filmes")}>Filmes</a>
-              <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>Séries</a>
-            </div>
-            <div className="catalog-filters" role="listbox" aria-label="Filtrar por categoria">
-              <button
-                type="button"
-                role="option"
-                aria-selected={!genreId}
-                className={`catalog-filter ${!genreId ? "is-active" : ""}`}
-                onClick={() => goTo(catalogPath(view, 1, null))}
-              >
-                Todas
-              </button>
-              {catalogGenres.map((genre) => (
-                <button
-                  key={genre.id}
-                  type="button"
-                  role="option"
-                  aria-selected={String(genre.id) === genreId}
-                  className={`catalog-filter ${String(genre.id) === genreId ? "is-active" : ""}`}
-                  onClick={() => goTo(catalogPath(view, 1, String(genre.id)))}
-                >
-                  {genre.name}
-                </button>
-              ))}
-            </div>
-            </>
-          ) : null}
-
-          {browseLoading && browseItems.length === 0 ? (
-            <div className="skeleton-row">
-              {Array.from({ length: 10 }).map((_, index) => (
-                <span key={index} className="skeleton-poster" />
-              ))}
-            </div>
-          ) : browseItems.length ? (
-            <>
-              <div className="poster-grid">
-                {browseItems.map((movie) => (
-                  <MovieCard
-                    key={movieKey(movie)}
-                    movie={movie}
-                    inList={isListed(listMovies, movie)}
-                    onOpen={openDetails}
-                    onToggleList={toggleList}
-                  />
-                ))}
+      <PageLoadingBoundary
+        key={`${view}:${catalogPage}:${genreId || "all"}`}
+        pageKey={`${view}:${catalogPage}:${genreId || "all"}`}
+        label={`Carregando ${{ home: "Início", filmes: "Filmes", series: "Séries", esportes: "Esportes", lista: "Minha Lista", "surpreenda-me": "Surpreenda-me", grupo: "Grupo", amigos: "Amigos", retrospectiva: "Retrospectiva" }[view]}…`}
+        loading={(view === "filmes" || view === "series") && (browseReadyKey !== `${view}:${catalogPage}:${genreId || "all"}` || genresReadyView !== view || browseLoading)}
+        waitForReady={["esportes", "lista", "amigos", "retrospectiva", "surpreenda-me"].includes(view)}
+      >
+        {view === "esportes" ? (
+          <SportsView />
+        ) : view === "retrospectiva" ? (
+          <RetrospectiveView name={authUser.nome} />
+        ) : view === "amigos" ? (
+          <FriendsView username={authUser.username || ""} onOpenActivity={(activity) => void openFriendActivity(activity)} />
+        ) : view === "grupo" ? (
+          <GroupWatchView
+            movies={groupCandidates}
+            onCreate={createGroupSession}
+            onExplore={() => goTo("filmes")}
+          />
+        ) : view === "lista" ? (
+          <LibraryView
+            items={listMovies}
+            onItemsChange={(items) => setListMovies(items as Movie[])}
+            onOpen={(movie: LibraryMovie) => openDetails(movie as Movie)}
+            onExplore={() => goTo("filmes")}
+          />
+        ) : view === "surpreenda-me" ? (
+          <RouletteView
+            genres={genres}
+            listed={listMovies}
+            onWatch={openPlayer}
+            onOpen={openDetails}
+            onToggleList={toggleList}
+            onToast={showToast}
+          />
+        ) : view === "filmes" || view === "series" ? (
+          <section className="list-view" id={view === "series" ? "series" : "filmes"}>
+            <div className="list-view-head">
+              <div>
+                <p className="eyebrow">{activeGenre ? "Categoria" : "Mais famosos"}</p>
+                <h1>
+                  {view === "series" ? "Séries" : "Filmes"}
+                  {activeGenre ? ` · ${activeGenre.name}` : ""}
+                </h1>
               </div>
               {browsePages > 1 ? (
-                <div className="pager pager-bottom">
+                <div className="pager">
                   <button
                     className="secondary-action"
                     type="button"
@@ -1538,170 +1483,241 @@ export default function Home() {
                   </button>
                 </div>
               ) : null}
-            </>
-          ) : (
-            <div className="empty-state">
-              <p>
-                {activeGenre
-                  ? `Nenhum título em “${activeGenre.name}”`
-                  : view === "series"
-                    ? "Nenhuma série no catálogo"
-                    : "Nenhum filme no catálogo"}
-              </p>
-              {activeGenre ? (
-                <button className="primary-action" type="button" onClick={() => goTo(catalogPath(view, 1, null))}>
-                  Ver todas
-                </button>
-              ) : (
-                <a className="primary-action" href="#home" onClick={() => goTo("home")}>
-                  Voltar ao início
-                </a>
-              )}
             </div>
-          )}
-        </section>
-      ) : (
-        <>
-          {featuredMovie ? (
-            <section
-              className="hero"
-              id="home"
-              onMouseEnter={() => setHeroPaused(true)}
-              onMouseLeave={() => setHeroPaused(false)}
-            >
-              {imageSrc(featuredMovie.backdrop || featuredMovie.poster, "w1280") ? (
-                <img
-                  className="hero-media"
-                  src={imageSrc(featuredMovie.backdrop || featuredMovie.poster, "w1280")}
-                  alt=""
-                />
-              ) : null}
-              <div className="hero-content">
-                <p className="eyebrow">Em destaque</p>
-                <h1>{featuredMovie.title}</h1>
-                {featuredMovie.description ? (
-                  <p className="hero-description">{featuredMovie.description}</p>
-                ) : null}
-                <div className="meta-line">
-                  {movieMeta(featuredMovie).map((item) => (
-                    <span key={String(item)}>{item}</span>
+
+            {catalogGenres.length ? (
+              <div className="catalog-filters" role="listbox" aria-label="Filtrar por categoria">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={!genreId}
+                  className={`catalog-filter ${!genreId ? "is-active" : ""}`}
+                  onClick={() => goTo(catalogPath(view, 1, null))}
+                >
+                  Todas
+                </button>
+                {catalogGenres.map((genre) => (
+                  <button
+                    key={genre.id}
+                    type="button"
+                    role="option"
+                    aria-selected={String(genre.id) === genreId}
+                    className={`catalog-filter ${String(genre.id) === genreId ? "is-active" : ""}`}
+                    onClick={() => goTo(catalogPath(view, 1, String(genre.id)))}
+                  >
+                    {genre.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {browseLoading && browseItems.length === 0 ? (
+              <div className="skeleton-row">
+                {Array.from({ length: 10 }).map((_, index) => (
+                  <span key={index} className="skeleton-poster" />
+                ))}
+              </div>
+            ) : browseItems.length ? (
+              <>
+                <div className="poster-grid">
+                  {browseItems.map((movie) => (
+                    <MovieCard
+                      key={movieKey(movie)}
+                      movie={movie}
+                      inList={isListed(listMovies, movie)}
+                      onOpen={openDetails}
+                      onToggleList={toggleList}
+                    />
                   ))}
                 </div>
-                <div className="hero-actions">
-                  {canWatch(featuredMovie) ? (
-                    <button className="primary-action" type="button" onClick={() => openPlayer(featuredMovie)}>
-                      Assistir
+                {browsePages > 1 ? (
+                  <div className="pager pager-bottom">
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={catalogPage <= 1 || browseLoading}
+                      onClick={() => goTo(catalogPath(view, catalogPage - 1, genreId))}
+                    >
+                      Anterior
                     </button>
-                  ) : null}
-                  <button
-                    className={`secondary-action ${isListed(listMovies, featuredMovie) ? "is-on" : ""}`}
-                    type="button"
-                    onClick={() => toggleList(featuredMovie)}
-                  >
-                    {isListed(listMovies, featuredMovie) ? "Na Minha Lista" : "Minha Lista"}
-                  </button>
-                  <button className="ghost-action" type="button" onClick={() => openDetails(featuredMovie)}>
-                    Detalhes
-                  </button>
-                </div>
-                {heroPool.length > 1 ? (
-                  <div className="hero-dots" role="tablist" aria-label="Destaques">
-                    {heroPool.map((movie, index) => (
-                      <button
-                        key={movieKey(movie)}
-                        type="button"
-                        className={index === heroIndex ? "is-active" : ""}
-                        aria-label={`Ver ${movie.title}`}
-                        onClick={() => setHeroIndex(index)}
-                      />
-                    ))}
+                    <span>
+                      Página {catalogPage} de {browsePages}
+                    </span>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={catalogPage >= browsePages || browseLoading}
+                      onClick={() => goTo(catalogPath(view, catalogPage + 1, genreId))}
+                    >
+                      Próxima
+                    </button>
                   </div>
                 ) : null}
-              </div>
-            </section>
-          ) : (
-            <section className="hero" id="home">
-              <div className="hero-content">
-                <p className="eyebrow">Catálogo Flixa</p>
-                <h1>Catálogo indisponível</h1>
-                <p className="hero-description">{loadError ?? "As APIs não devolveram títulos neste momento."}</p>
-                <div className="hero-actions">
-                  <button className="primary-action" type="button" onClick={() => fetchCatalog(true)}>
-                    Tentar de novo
+              </>
+            ) : (
+              <div className="empty-state">
+                <p>
+                  {activeGenre
+                    ? `Nenhum título em “${activeGenre.name}”`
+                    : view === "series"
+                      ? "Nenhuma série no catálogo"
+                      : "Nenhum filme no catálogo"}
+                </p>
+                {activeGenre ? (
+                  <button className="primary-action" type="button" onClick={() => goTo(catalogPath(view, 1, null))}>
+                    Ver todas
                   </button>
-                </div>
+                ) : (
+                  <a className="primary-action" href="#home" onClick={() => goTo("home")}>
+                    Voltar ao início
+                  </a>
+                )}
               </div>
-            </section>
-          )}
-
-          <section className="content-rows" aria-label="Catálogo">
-            {genres.length ? (
-              <section className="genre-board" aria-label="Gêneros">
-                <div className="genre-board-head">
-                  <h2>Gêneros</h2>
-                </div>
-                <div className="genre-row">
-                  {genres.map((genre) => (
-                    <a
-                      key={genre.id}
-                      className="genre-chip"
-                      href={`#filmes/genero/${genre.id}`}
-                      onClick={() => goTo(`filmes/genero/${genre.id}`)}
+            )}
+          </section>
+        ) : (
+          <>
+            {featuredMovie ? (
+              <section
+                className="hero"
+                id="home"
+                onMouseEnter={() => setHeroPaused(true)}
+                onMouseLeave={() => setHeroPaused(false)}
+              >
+                {imageSrc(featuredMovie.backdrop || featuredMovie.poster, "w1280") ? (
+                  <img
+                    className="hero-media"
+                    src={imageSrc(featuredMovie.backdrop || featuredMovie.poster, "w1280")}
+                    alt=""
+                  />
+                ) : null}
+                <div className="hero-content">
+                  <p className="eyebrow">Em destaque</p>
+                  <h1>{featuredMovie.title}</h1>
+                  {featuredMovie.description ? (
+                    <p className="hero-description">{featuredMovie.description}</p>
+                  ) : null}
+                  <div className="meta-line">
+                    {movieMeta(featuredMovie).map((item) => (
+                      <span key={String(item)}>{item}</span>
+                    ))}
+                  </div>
+                  <div className="hero-actions">
+                    {canWatch(featuredMovie) ? (
+                      <button className="primary-action" type="button" onClick={() => openPlayer(featuredMovie)}>
+                        Assistir
+                      </button>
+                    ) : null}
+                    <button
+                      className={`secondary-action ${isListed(listMovies, featuredMovie) ? "is-on" : ""}`}
+                      type="button"
+                      onClick={() => toggleList(featuredMovie)}
                     >
-                      <span>{genre.name}</span>
-                    </a>
-                  ))}
+                      {isListed(listMovies, featuredMovie) ? "Na Minha Lista" : "Minha Lista"}
+                    </button>
+                    <button className="ghost-action" type="button" onClick={() => openDetails(featuredMovie)}>
+                      Detalhes
+                    </button>
+                  </div>
+                  {heroPool.length > 1 ? (
+                    <div className="hero-dots" role="tablist" aria-label="Destaques">
+                      {heroPool.map((movie, index) => (
+                        <button
+                          key={movieKey(movie)}
+                          type="button"
+                          className={index === heroIndex ? "is-active" : ""}
+                          aria-label={`Ver ${movie.title}`}
+                          onClick={() => setHeroIndex(index)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </section>
-            ) : null}
+            ) : (
+              <section className="hero" id="home">
+                <div className="hero-content">
+                  <p className="eyebrow">Catálogo Flixa</p>
+                  <h1>Catálogo indisponível</h1>
+                  <p className="hero-description">{loadError ?? "As APIs não devolveram títulos neste momento."}</p>
+                  <div className="hero-actions">
+                    <button className="primary-action" type="button" onClick={() => fetchCatalog(true)}>
+                      Tentar de novo
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
 
-            {continueMovies.length ? (
-              <MovieRow
-                title="Continuar assistindo"
-                items={continueMovies}
-                listed={listMovies}
-                onOpen={(movie) => openPlayer(movie)}
-                onToggleList={toggleList}
-                onRemoveProgress={removeFromContinue}
-              />
-            ) : recentMovies.length ? (
-              <MovieRow
-                title="Assistidos recentemente"
-                items={recentMovies}
-                listed={listMovies}
-                onOpen={openDetails}
-                onToggleList={toggleList}
-              />
-            ) : null}
+            <section className="content-rows" aria-label="Catálogo">
+              {genres.length ? (
+                <section className="genre-board" aria-label="Gêneros">
+                  <div className="genre-board-head">
+                    <h2>Gêneros</h2>
+                  </div>
+                  <div className="genre-row">
+                    {genres.map((genre) => (
+                      <a
+                        key={genre.id}
+                        className="genre-chip"
+                        href={`#filmes/genero/${genre.id}`}
+                        onClick={() => goTo(`filmes/genero/${genre.id}`)}
+                      >
+                        <span>{genre.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
-            {listMovies.length ? (
-              <MovieRow
-                title="Minha Lista"
-                items={listMovies}
-                listed={listMovies}
-                onOpen={openDetails}
-                onToggleList={toggleList}
-                onSeeAll={() => goTo("minha-lista")}
-              />
-            ) : null}
+              {continueMovies.length ? (
+                <MovieRow
+                  title="Continuar assistindo"
+                  items={continueMovies}
+                  listed={listMovies}
+                  onOpen={(movie) => openPlayer(movie)}
+                  onToggleList={toggleList}
+                  onRemoveProgress={removeFromContinue}
+                />
+              ) : recentMovies.length ? (
+                <MovieRow
+                  title="Assistidos recentemente"
+                  items={recentMovies}
+                  listed={listMovies}
+                  onOpen={openDetails}
+                  onToggleList={toggleList}
+                />
+              ) : null}
 
-            {catalogRows.map((row) => (
-              <MovieRow
-                key={row.title}
-                title={row.title}
-                items={row.items}
-                listed={listMovies}
-                onOpen={openDetails}
-                onToggleList={toggleList}
-              />
-            ))}
+              {listMovies.length ? (
+                <MovieRow
+                  title="Minha Lista"
+                  items={listMovies}
+                  listed={listMovies}
+                  onOpen={openDetails}
+                  onToggleList={toggleList}
+                  onSeeAll={() => goTo("minha-lista")}
+                />
+              ) : null}
 
-            <p className="tmdb-credit">
-              Este produto usa a API do TMDB, mas não é endossado ou certificado pelo TMDB.
-            </p>
-          </section>
-        </>
-      )}
+              {catalogRows.map((row) => (
+                <MovieRow
+                  key={row.title}
+                  title={row.title}
+                  items={row.items}
+                  listed={listMovies}
+                  onOpen={openDetails}
+                  onToggleList={toggleList}
+                />
+              ))}
+
+              <p className="tmdb-credit">
+                Este produto usa a API do TMDB, mas não é endossado ou certificado pelo TMDB.
+              </p>
+            </section>
+          </>
+        )}
+      </PageLoadingBoundary>
 
       {selectedMovie ? (
         <MovieDetails
@@ -1861,6 +1877,8 @@ function RouletteView({
   onToast: (message: string) => void;
 }) {
   const [genres, setGenres] = useState<Genre[]>(catalogGenres);
+  const [initialGenresReady, setInitialGenresReady] = useState(false);
+  usePageReady(initialGenresReady);
   const [rouletteKind, setRouletteKind] = useState<MediaKind>("movie");
   const [maxMinutes, setMaxMinutes] = useState(0);
   const [mood, setMood] = useState<RouletteMood>("any");
@@ -1940,12 +1958,14 @@ function RouletteView({
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { genres?: Genre[] } | null) => {
         const list = Array.isArray(data?.genres) ? data.genres : [];
+        if (controller.signal.aborted) return;
         if (list.length) setGenres(list);
         else if (rouletteKind === "movie" && catalogGenres.length) setGenres(catalogGenres);
       })
       .catch(() => {
         if (!controller.signal.aborted && rouletteKind === "movie" && catalogGenres.length) setGenres(catalogGenres);
-      });
+      })
+      .finally(() => { if (!controller.signal.aborted) setInitialGenresReady(true); });
     return () => controller.abort();
   }, [catalogGenres, rouletteKind]);
 
@@ -2584,11 +2604,13 @@ function GroupWatchView({
         <button className="secondary-action" type="button" onClick={onExplore}>Explorar catálogo</button>
       </div>
 
+      <GroupExtensionGuide />
+
       <div className="group-watch-guide" aria-label="Como criar uma sessão">
         <div className="group-watch-status"><span /> Salas em tempo real · até 12 pessoas</div>
         <ol>
           <li><b>1</b><span><strong>Escolha um título</strong><small>Filme ou episódio.</small></span></li>
-          <li><b>2</b><span><strong>Copie o convite</strong><small>A sala abre automaticamente.</small></span></li>
+          <li><b>2</b><span><strong>Copie o convite</strong><small>Escolha o servidor no player e crie a sala.</small></span></li>
           <li><b>3</b><span><strong>Assista junto</strong><small>O anfitrião controla para todos.</small></span></li>
         </ol>
       </div>
@@ -3313,136 +3335,6 @@ function buildPlayerSources(
     .filter((source) => Boolean(source.src));
 }
 
-function PlayerServerMenu({
-  sources,
-  activeId,
-  onSelect,
-  onOpenChange,
-  compact = false,
-}: {
-  sources: PlayerSource[];
-  activeId: string;
-  onSelect: (id: string) => void;
-  onOpenChange?: (open: boolean) => void;
-  compact?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const active = sources.find((source) => source.id === activeId) ?? sources[0];
-  const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
-  const visibleSources = normalizedQuery
-    ? sources.filter((source) => source.name.toLocaleLowerCase("pt-BR").includes(normalizedQuery))
-    : sources;
-
-  function updateOpen(next: boolean) {
-    setOpen(next);
-    if (!next) setQuery("");
-    onOpenChange?.(next);
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) updateOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") updateOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  useEffect(() => () => onOpenChange?.(false), [onOpenChange]);
-
-  if (!active || sources.length === 0) return null;
-
-  return (
-    <div
-      className={`player-server-menu theme-${active.theme} ${open ? "is-open" : ""} ${compact ? "is-compact" : ""}`}
-      ref={menuRef}
-    >
-      <button
-        type="button"
-        className="player-server-trigger"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={`Servidor: ${active.name}`}
-        onClick={() => updateOpen(!open)}
-      >
-        <span className="player-server-icon" aria-hidden="true">
-          <i /><i /><i />
-        </span>
-        <span className="player-server-copy">
-          <small>Servidor ativo</small>
-          <strong>{active.name}</strong>
-        </span>
-        <span className="player-server-count" aria-label={`${sources.length} servidores`}>
-          {sources.length}
-        </span>
-        <span className="player-server-chevron" aria-hidden="true" />
-      </button>
-
-      {open ? (
-        <div className="player-server-dropdown" role="dialog" aria-label="Alterar servidor">
-          <div className="player-server-heading">
-            <span>
-              <strong>Alterar servidor</strong>
-              <small>Escolha outra fonte de reprodução</small>
-            </span>
-            <em>{sources.length}</em>
-          </div>
-          <label className="player-server-filter">
-            <span aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar servidor"
-              aria-label="Buscar servidor"
-              autoFocus
-            />
-          </label>
-          <div className="player-server-list" role="listbox" aria-label="Servidores disponíveis">
-            {visibleSources.map((source, index) => {
-              const selected = source.id === active.id;
-              return (
-                <button
-                  key={source.id}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  className={`player-server-option theme-${source.theme} ${selected ? "is-active" : ""}`}
-                  onClick={() => {
-                    onSelect(source.id);
-                    updateOpen(false);
-                  }}
-                >
-                  <span className="player-server-rank" aria-hidden="true">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="player-server-dot" aria-hidden="true" />
-                  <span className="player-server-copy">
-                    <strong>{source.name}</strong>
-                    <small>{selected ? "Reproduzindo agora" : "Disponível"}</small>
-                  </span>
-                  {selected
-                    ? <span className="player-server-active-label">Em uso</span>
-                    : <span className="player-server-arrow" aria-hidden="true">›</span>}
-                </button>
-              );
-            })}
-            {!visibleSources.length ? <p className="player-server-empty">Nenhum servidor encontrado.</p> : null}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function MoviePlayer({
   movie,
@@ -3529,7 +3421,7 @@ function MoviePlayer({
   }, [onProgress]);
 
   useEffect(() => {
-    sessionKeyRef.current = `watch-${crypto.randomUUID()}`;
+    sessionKeyRef.current = `watch-${createClientId()}`;
   }, []);
 
   useEffect(() => {
@@ -3627,7 +3519,7 @@ function MoviePlayer({
   const switchToNextSource = useCallback((failedId: string, reason: string) => {
     if (partyProviderId) {
       setPartyFailure((current) => ({ sourceId: failedId, reason, sequence: (current?.sequence ?? 0) + 1 }));
-      setServerNotice(`O player da sessão falhou (${reason}). Tentando trocar o servidor para o grupo…`);
+      setServerNotice(`O player da sessão falhou (${reason}). Mantenha o mesmo servidor da sala e tente recarregar o player.`);
       return;
     }
     const failed = new Set(failedSourceIds);
@@ -3934,7 +3826,7 @@ function MoviePlayer({
   const canGoPrev = Boolean(prevEpisode || prevSeason);
   const canGoNext = Boolean(nextEpisode || nextSeason);
   const playerMenuSources = partyProviderId
-    ? sources.filter((source) => playerServerIdForSource(source.id) === partyProviderId)
+    ? sources.filter((source) => source.id === partyProviderId || playerServerIdForSource(source.id) === partyProviderId)
     : sources;
 
   const playerChrome = (
@@ -3994,19 +3886,10 @@ function MoviePlayer({
           onSelect={selectPlayerSource}
           onOpenChange={setMenuPinned}
         />
-        <button
-          type="button"
-          className={`player-sandbox-toggle ${sandboxEnabled ? "is-protected" : "is-unprotected"}`}
-          aria-label={sandboxEnabled ? "Sandbox ativo. Desativar proteção" : "Sandbox desativado. Ativar proteção"}
-          aria-pressed={sandboxEnabled}
-          onClick={() => {
-            if (sandboxEnabled) setSandboxWarningOpen(true);
-            else setSandboxEnabled(true);
-          }}
-        >
-          <span className="player-sandbox-shield" aria-hidden="true"><i /></span>
-          <span className="player-sandbox-copy"><small>Sandbox</small><strong>{sandboxEnabled ? "Protegido" : "Desativado"}</strong></span>
-        </button>
+        <PlayerSandboxToggle enabled={sandboxEnabled} onToggle={() => {
+          if (sandboxEnabled) setSandboxWarningOpen(true);
+          else setSandboxEnabled(true);
+        }} />
         <button
           type="button"
           className={`player-icon-btn player-fs-btn ${isFullscreen ? "is-active" : ""}`}
@@ -4097,63 +3980,14 @@ function MoviePlayer({
       ) : null}
 
       <div className="player-stage-wrap" ref={stageRef}>
-        {sandboxWarningOpen ? (
-          <div className="player-sandbox-warning-backdrop" role="presentation">
-            <section
-              className="player-sandbox-warning"
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="sandbox-warning-title"
-              aria-describedby="sandbox-warning-description"
-            >
-              <span className="player-sandbox-warning-badge">IMPORTANTE</span>
-              <span className="player-sandbox-warning-icon" aria-hidden="true">!</span>
-              <h2 id="sandbox-warning-title">Desativar a proteção do player?</h2>
-              <p id="sandbox-warning-description">
-                Sem o sandbox, o servidor externo poderá abrir novas abas, popups, sobrepor a tela e exibir anúncios sem o controle do Flixa.
-              </p>
-              <div className="player-sandbox-risk-list" aria-label="Riscos ao desativar o sandbox">
-                <span>Conteúdo adulto</span>
-                <span>Nudez e pornografia</span>
-                <span>Propagandas e golpes</span>
-              </div>
-              <strong className="player-sandbox-disclaimer">
-                O Flixa não controla nem se responsabiliza pelo conteúdo exibido por esses provedores quando a proteção estiver desativada.
-              </strong>
-              <div className="player-sandbox-warning-actions">
-                <button
-                  type="button"
-                  className="player-sandbox-cancel"
-                  autoFocus
-                  onClick={() => setSandboxWarningOpen(false)}
-                >
-                  Manter proteção
-                </button>
-                <button
-                  type="button"
-                  className="player-sandbox-confirm"
-                  onClick={() => {
-                    setSandboxEnabled(false);
-                    setSandboxWarningOpen(false);
-                  }}
-                >
-                  Entendo os riscos, desativar
-                </button>
-              </div>
-            </section>
-          </div>
-        ) : null}
-
-        {!sandboxEnabled ? (
-          <aside className="player-sandbox-live-warning" role="alert">
-            <span aria-hidden="true">!</span>
-            <p>
-              <strong>IMPORTANTE · SANDBOX DESATIVADO</strong>
-              <small>Este provedor pode exibir anúncios, nudez, pornografia, golpes e abrir novas guias.</small>
-            </p>
-            <button type="button" onClick={() => setSandboxEnabled(true)}>Ativar proteção</button>
-          </aside>
-        ) : null}
+        {sandboxWarningOpen ? <PlayerSandboxWarning
+          onCancel={() => setSandboxWarningOpen(false)}
+          onConfirm={() => {
+            setSandboxEnabled(false);
+            setSandboxWarningOpen(false);
+          }}
+        /> : null}
+        {!sandboxEnabled ? <PlayerSandboxNotice onEnable={() => setSandboxEnabled(true)} /> : null}
         <div className="watch-party-layer">
           <WatchPartyControls
             media={{
@@ -4233,6 +4067,7 @@ function MoviePlayer({
           <iframe
             key={`${activeSource.src}:${sandboxEnabled ? "protected" : "unprotected"}`}
             ref={playerIframeRef}
+                data-flixa-group-player="true"
             className="video-stage"
             src={activeSource.src}
             onLoad={() => {

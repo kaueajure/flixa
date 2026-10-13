@@ -6,24 +6,23 @@ import {
   SPORTS_VIDEO_PROVIDERS,
   addSportsVideoSource,
   dedupeSportsEvents,
-  mapScoreBatEvent,
   mapSportsDbEvent,
   mapSportsVideoSource,
 } from "../lib/sports-catalog.ts";
 
 test("uses a multi-sport league catalog instead of static stream providers", () => {
-  assert.ok(SPORTS_LEAGUES.length > 5);
+  assert.equal(SPORTS_LEAGUES.length, 4);
+  assert.ok(!SPORTS_LEAGUES.some((league) => ["4351", "4328", "4480", "4387", "4391"].includes(league.id)));
   assert.equal(new Set(SPORTS_LEAGUES.map((league) => league.id)).size, SPORTS_LEAGUES.length);
 });
 
-test("supports exactly five validated official iframe providers", () => {
+test("supports the preserved validated official iframe providers", () => {
   assert.deepEqual(SPORTS_VIDEO_PROVIDERS.map((provider) => provider.id), [
-    "youtube", "scorebat", "twitch", "dailymotion", "vimeo",
+    "youtube", "twitch", "dailymotion", "vimeo",
   ]);
 
   const examples = [
     ["https://www.youtube.com/watch?v=abcDEF_1234", "youtube", "youtube-nocookie.com"],
-    ['<iframe src="https://www.scorebat.com/embed/v/123/"></iframe>', "scorebat", "scorebat.com"],
     ["https://www.twitch.tv/nba", "twitch", "player.twitch.tv"],
     ["https://www.dailymotion.com/video/x84sh87", "dailymotion", "dailymotion.com"],
     ["https://vimeo.com/123456789", "vimeo", "player.vimeo.com"],
@@ -38,7 +37,7 @@ test("supports exactly five validated official iframe providers", () => {
 test("rejects unsupported, insecure and lookalike sports embeds", () => {
   assert.equal(mapSportsVideoSource("http://www.youtube.com/watch?v=abcDEF_1234"), null);
   assert.equal(mapSportsVideoSource("https://youtube.example.com/watch?v=abcDEF_1234"), null);
-  assert.equal(mapSportsVideoSource('<iframe src="https://scorebat.com.attacker.example/embed/1"></iframe>'), null);
+  assert.equal(mapSportsVideoSource('<iframe src="https://vimeo.com.attacker.example/embed/1"></iframe>'), null);
 });
 
 test("maps past TheSportsDB events to safe YouTube embeds without overstating their origin", () => {
@@ -72,26 +71,6 @@ test("maps upcoming events without pretending a stream is available", () => {
   assert.equal(event?.status, "upcoming");
   assert.equal(event?.embedUrl, undefined);
   assert.match(event?.sourceUrl || "", /^https:\/\/www\.thesportsdb\.com\/event\//);
-});
-
-test("accepts only ScoreBat-owned iframe URLs", () => {
-  const base = {
-    title: "Clube A - Clube B",
-    competition: "Liga",
-    date: "2026-08-24T12:00:00+0000",
-  };
-  const valid = mapScoreBatEvent({
-    ...base,
-    videos: [{ id: "video-1", title: "Live", embed: '<iframe src="https://www.scorebat.com/embed/v/123/?token=x"></iframe>' }],
-  }, "live", new Date("2026-08-24T13:00:00Z"));
-  const invalid = mapScoreBatEvent({
-    ...base,
-    videos: [{ embed: '<iframe src="https://example.com/player"></iframe>' }],
-  }, "live", new Date("2026-08-24T13:00:00Z"));
-
-  assert.equal(valid?.status, "live");
-  assert.match(valid?.embedUrl || "", /^https:\/\/www\.scorebat\.com\//);
-  assert.equal(invalid, null);
 });
 
 test("deduplicates the same event and date across feeds", () => {

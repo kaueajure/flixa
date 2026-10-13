@@ -17,15 +17,10 @@ const curatedServerIds = [
   "iembed", "mapple",
 ];
 
-test("keeps Assistir Junto present but disabled for use", () => {
-  assert.equal(WATCH_PARTY_ENABLED, false);
-  const pageSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const controlsSource = readFileSync(new URL("../app/watch-party-controls.tsx", import.meta.url), "utf8");
+test("enables Assistir Junto with CineSrc while retaining unavailable configuration handling", () => {
+  assert.equal(WATCH_PARTY_ENABLED, true);
   const ticketSource = readFileSync(new URL("../app/api/watch-party/ticket/route.ts", import.meta.url), "utf8");
-  assert.match(pageSource, /Assistir em grupo está temporariamente indisponível/);
-  assert.match(pageSource, /if \(!WATCH_PARTY_ENABLED\)/);
-  assert.match(controlsSource, /watch-party-trigger is-disabled[\s\S]*disabled/);
-  assert.match(ticketSource, /status: 503/);
+  assert.match(ticketSource, /not_configured/);
 });
 
 test("keeps the curated 45-provider inventory", () => {
@@ -49,7 +44,7 @@ test("registers usable endpoints for every declared media kind", () => {
 
 test("advertises only watch-party bridges with end-to-end command proof", () => {
   const partyServers = PLAYER_SERVERS.filter((server) => server.watchPartySupport === "full");
-  assert.deepEqual(partyServers.map((server) => server.id), []);
+  assert.deepEqual(partyServers.map((server) => server.id), ["cinesrc"]);
   for (const server of partyServers) assert.match(server.compatibilityMessage, /Bridge|bridge/);
 });
 

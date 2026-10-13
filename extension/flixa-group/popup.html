@@ -1,0 +1,7 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Flixa Grupo</title><link rel="stylesheet" href="popup.css"></head><body>
+<header><img src="logo.png" alt="Flixa"><span>GRUPO</span></header>
+<main><p class="eyebrow">TODO MUNDO NO MESMO PLAY</p><h1>Uma sala.<br>O mesmo momento.</h1><p class="muted">Abra um filme ou episódio no Flixa e conecte esta aba para assistir junto.</p>
+<div class="connection"><span id="indicator"></span><div><strong id="status">Verificando a aba…</strong><small id="origin"></small></div></div>
+<button id="activate" class="primary" disabled>Conectar ao Flixa</button>
+<section id="room" hidden><div class="room-head"><span>SALA <b id="code"></b></span><small id="role"></small></div><p id="source" class="muted"></p><div class="controls"><button id="back" aria-label="Voltar 10 segundos">−10s</button><button id="play">Play</button><button id="pause">Pausar</button><button id="forward" aria-label="Avançar 10 segundos">+10s</button></div><small id="position"></small></section>
+<p id="error" role="status"></p><p class="hint">A sala e o convite ficam no botão Grupo do player. Cada pessoa precisa conectar a extensão e iniciar o vídeo uma vez.</p><button id="disconnect" class="secondary" hidden>Desconectar esta aba</button></main><footer>FLIXA GRUPO <span>v1.0.0 · Chrome para computador</span></footer><script type="module" src="popup.js"></script></body></html>

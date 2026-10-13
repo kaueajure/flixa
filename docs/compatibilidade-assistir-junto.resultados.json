@@ -1,0 +1,311 @@
+{
+  "testedAt": "2026-10-13T16:39:27.800632+00:00",
+  "sample": "TMDB 550; Chrome headless; same protected sandbox as Flixa",
+  "notTested": [
+    "installed extension",
+    "multi-participant synchronization",
+    "PT-BR audio"
+  ],
+  "providers": [
+    {
+      "id": "cinesrc",
+      "url": "https://cinesrc.st/embed/movie/550",
+      "mode": "localhost secure context; protected iframe; isolated-world DOM control",
+      "before": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 7984,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "initialInteraction": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "result": "playing"
+        }
+      ],
+      "afterInteraction": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 1.893425,
+              "duration": 7984,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgePause": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "videos": [
+            {
+              "paused": true,
+              "time": 1.897799,
+              "duration": 7984,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgeSeek": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "videos": [
+            {
+              "paused": true,
+              "time": 15,
+              "duration": 7984,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgePlay": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 16.937025,
+              "duration": 7984,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "isolatedControls": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "commands": {
+            "paused": true,
+            "seekError": null,
+            "playError": null
+          },
+          "after": [
+            {
+              "paused": false,
+              "time": 15.93125,
+              "duration": 7984,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vidzen",
+      "url": "https://vidzen.fun/movie/550",
+      "mode": "localhost secure context; protected iframe; isolated-world DOM control",
+      "before": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.3,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "initialInteraction": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "result": "playing"
+        }
+      ],
+      "afterInteraction": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 1.963147,
+              "duration": 8348.3,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgePause": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 2.392917,
+              "duration": 8348.3,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgeSeek": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 2.896938,
+              "duration": 8348.3,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgePlay": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 4.908374,
+              "duration": 8348.3,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "isolatedControls": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "commands": {
+            "paused": true,
+            "seekError": null,
+            "playError": null
+          },
+          "after": [
+            {
+              "paused": false,
+              "time": 15.944072,
+              "duration": 8348.3,
+              "ready": 4,
+              "error": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moviesapi",
+      "url": "https://moviesapi.to/movie/550",
+      "mode": "localhost secure context; protected iframe; isolated-world DOM control",
+      "before": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "initialInteraction": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "result": "Error: timeout"
+        }
+      ],
+      "afterInteraction": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgePause": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgeSeek": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "bridgePlay": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "error": null
+            }
+          ]
+        }
+      ],
+      "isolatedControls": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "commands": {
+            "paused": true,
+            "seekError": null,
+            "playError": "Error: timeout"
+          },
+          "after": [
+            {
+              "paused": false,
+              "time": 15,
+              "duration": null,
+              "ready": 0,
+              "error": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

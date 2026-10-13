@@ -18,7 +18,7 @@ test("determina online por páginas visíveis, não por cookies ainda válidos",
 });
 
 test("mantém uma presença independente por página e encerra ao ocultar ou sair", () => {
-  assert.match(hookSource, /crypto\.randomUUID/);
+  assert.match(hookSource, /documentClientId = createClientId\(\)/);
   assert.match(hookSource, /document\.visibilityState !== "visible"/);
   assert.match(hookSource, /navigator\.sendBeacon/);
   assert.match(hookSource, /state: "offline"/);

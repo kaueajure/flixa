@@ -12,6 +12,7 @@ Plataforma de entretenimento com catálogo de conteúdo, biblioteca pessoal, rec
 - área administrativa
 - agenda esportiva e resultados
 - reprodução por embeds externos quando compatível
+- assistir em grupo com CineSrc, convites, chat e controles do anfitrião (requer Ably)
 
 ## Stack
 
@@ -41,6 +42,16 @@ npm run dev
 
 As integrações externas são opcionais e devem ser configuradas no `.env` conforme necessário.
 
+## Assistir em grupo
+
+As salas sincronizam play, pause e posição pela extensão **Flixa Grupo**, usando o servidor selecionado no player. A opção **CineSrc sem extensão** permanece disponível. A página **Grupo** oferece o ZIP e o tutorial de instalação no Chrome. Configure `ABLY_API_KEY` e, preferencialmente, `WATCH_PARTY_SECRET` no servidor. A chave Ably deve permitir os recursos `watch-party:*`; os convidados recebem permissão de publicar apenas no canal de chat. Sem configuração, a interface informa a indisponibilidade e não cria salas.
+
+A [auditoria de todas as fontes](docs/auditoria-todas-fontes.md) registra os testes reais de controle interno e por extensão, incluindo filmes, séries e limitações de áudio dublado. A extensão controla os vídeos nos frames conhecidos quando a mídia está disponível; fontes sem vídeo pronto não podem criar uma sala.
+
+O criador compartilha o convite completo pelo player. Cada convidado precisa liberar a reprodução no vídeo uma vez quando o navegador bloquear autoplay. Consulte [configuração e validação](docs/assistir-junto-cinesrc.md) para os detalhes e testes pendentes.
+
+Consulte [extensão Flixa Grupo](docs/extensao-flixa-grupo.md) para instalação, arquitetura, geração do ZIP e limites dos testes.
+
 ## Banco de dados
 
 O projeto usa Drizzle para schema e migrations.
@@ -58,14 +69,20 @@ npm run db:seed
 
 ## Esportes
 
-A área de esportes usa a TheSportsDB para agenda, eventos e resultados. O ScoreBat pode ser usado para vídeos e destaques de futebol.
+Futebol, basquete e futebol americano usam diretamente a Streamed API: `/api/matches/all`, `/api/matches/live`, `/api/matches/football`, `/api/matches/basketball` e `/api/sports`. As fontes de cada partida são resolvidas por `/api/stream/{source}/{id}`; o player utiliza exclusivamente o `embedUrl` recebido.
 
-```env
-SPORTSDB_API_KEY=
-SCOREBAT_API_TOKEN=
-```
+A TheSportsDB permanece para NHL, MLB, Fórmula 1 e tênis (`SPORTSDB_API_KEY`, padrão público `123`), com os embeds adicionais existentes. ScoreBat foi removido. Não são necessárias credenciais para a Streamed.
 
-Quando não há uma fonte incorporável válida, o evento continua aparecendo como agenda ou resultado, sem player.
+O catálogo atualiza a cada 60 segundos enquanto a página está visível. O servidor compartilha requisições concorrentes e guarda catálogo/streams por 60 segundos, modalidades por uma hora e demais esportes por cinco minutos. Streams são consultados somente para a partida selecionada. Respostas vazias válidas são aceitas; falhas parciais aparecem na tela e dados anteriores são mantidos quando possível.
+
+A Streamed não forneceu placares nem confirmação de encerramento nos JSONs inspecionados. O estado ao vivo depende de `/matches/live`; partidas sem confirmação ficam com estado não informado. `date: 0` aparece como data a confirmar. Não são presumidos resultados ou replays.
+
+A listagem é separada por esporte e liga, com filtros de status independentes. TheSportsDB fornece os nomes das ligas dos esportes preservados. Na Streamed, nomes explícitos em títulos e IDs das fontes permitem identificar UEFA Champions League, NBA e NFL; eventos sem essa indicação ficam em “Liga não informada”. Não são deduzidas ligas pelos nomes dos times.
+
+Os players esportivos compartilham com filmes e séries o menu pesquisável de servidores e os controles de sandbox. A proteção começa ativa, só é removida após confirmação e pode ser reativada no aviso persistente. Ao selecionar outro evento, a proteção volta a ficar ativa. Há recarregamento, troca de stream e tela cheia.
+
+A interface esportiva segue uma composição de transmissão: faixas de esportes e ligas, player principal, agenda lateral e cards compactos de partidas. A busca por jogos, times ou ligas filtra agenda e cards em conjunto. Em telas pequenas, a agenda fica abaixo do player. Placar, local e demais detalhes aparecem apenas quando fornecidos; os escudos da Streamed são exibidos pela rota de imagens verificada, com monogramas quando ausentes ou quando o carregamento falha.
+
 
 ## Vídeo
 

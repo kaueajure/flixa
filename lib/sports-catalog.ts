@@ -1,14 +1,13 @@
-export type SportsEventStatus = "live" | "upcoming" | "replay" | "finished";
+export type SportsEventStatus = "live" | "upcoming" | "replay" | "finished" | "unknown";
 
 export const SPORTS_VIDEO_PROVIDERS = [
   { id: "youtube", name: "YouTube" },
-  { id: "scorebat", name: "ScoreBat" },
   { id: "twitch", name: "Twitch" },
   { id: "dailymotion", name: "Dailymotion" },
   { id: "vimeo", name: "Vimeo" },
 ] as const;
 
-export type SportsVideoProviderId = typeof SPORTS_VIDEO_PROVIDERS[number]["id"];
+export type SportsVideoProviderId = typeof SPORTS_VIDEO_PROVIDERS[number]["id"] | "streamed";
 
 export type SportsVideoSource = {
   id: string;
@@ -23,6 +22,7 @@ export type SportsEvent = {
   id: string;
   title: string;
   competition: string;
+  league?: string;
   sport: string;
   startAt: string;
   status: SportsEventStatus;
@@ -30,11 +30,15 @@ export type SportsEvent = {
   venue?: string;
   homeTeam?: string;
   awayTeam?: string;
+  homeBadge?: string;
+  awayBadge?: string;
   homeScore?: number;
   awayScore?: number;
   sourceName: string;
   sourceUrl: string;
   sources: SportsVideoSource[];
+  streamRefs?: { source: string; id: string }[];
+  category?: string;
   /** @deprecated Use sources; kept for compatibility with older clients. */
   embedUrl?: string;
   /** @deprecated Use sources; kept for compatibility with older clients. */
@@ -49,11 +53,6 @@ export type SportsCatalogResponse = {
 };
 
 export const SPORTS_LEAGUES = [
-  { id: "4351", name: "Brasileirão Série A" },
-  { id: "4328", name: "Premier League" },
-  { id: "4480", name: "Champions League" },
-  { id: "4387", name: "NBA" },
-  { id: "4391", name: "NFL" },
   { id: "4380", name: "NHL" },
   { id: "4424", name: "MLB" },
   { id: "4370", name: "Fórmula 1" },
@@ -169,11 +168,6 @@ export function mapSportsVideoSource(value: unknown, label?: string): SportsVide
       );
     }
 
-    if (/(^|\.)scorebat\.com$/i.test(url.hostname)) {
-      url.searchParams.set("autoplay", "1");
-      return videoSource("scorebat", url.toString(), url.toString(), label || "Vídeo oficial");
-    }
-
     if (/(^|\.)twitch\.tv$/i.test(url.hostname)) {
       const videoId = url.hostname === "player.twitch.tv"
         ? (url.searchParams.get("video") || "").replace(/^v/, "")
@@ -237,11 +231,6 @@ export function mapSportsVideoSource(value: unknown, label?: string): SportsVide
   return null;
 }
 
-function scoreBatEmbed(value: unknown) {
-  const source = mapSportsVideoSource(value);
-  return source?.providerId === "scorebat" ? source : undefined;
-}
-
 export function mapSportsDbEvent(value: unknown, period: "upcoming" | "past"): SportsEvent | null {
   const event = record(value);
   const id = text(event?.idEvent);
@@ -263,6 +252,7 @@ export function mapSportsDbEvent(value: unknown, period: "upcoming" | "past"): S
     id: `sportsdb-${id}`,
     title,
     competition: text(event.strLeague) || "Competição",
+    league: text(event.strLeague),
     sport: SPORT_NAMES[text(event.strSport) || ""] || text(event.strSport) || "Esporte",
     startAt: eventTimestamp(event),
     status,
@@ -277,47 +267,6 @@ export function mapSportsDbEvent(value: unknown, period: "upcoming" | "past"): S
     sources: video ? [video] : [],
     embedUrl: video?.embedUrl,
     videoLabel: video?.label,
-  };
-}
-
-export function mapScoreBatEvent(value: unknown, feed: "live" | "highlights", now = new Date()): SportsEvent | null {
-  const match = record(value);
-  const title = text(match?.title);
-  const date = text(match?.date);
-  if (!match || !title || !date) return null;
-
-  const startAt = new Date(date.replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
-  if (Number.isNaN(startAt.valueOf())) return null;
-  const videos = Array.isArray(match.videos) ? match.videos.map(record).filter(Boolean) as UnknownRecord[] : [];
-  const selectedVideo = videos.find((video) => scoreBatEmbed(video.embed));
-  const rawSource = scoreBatEmbed(selectedVideo?.embed);
-  if (!rawSource) return null;
-
-  const sourceUrl = httpsUrl(match.matchviewUrl) || rawSource.sourceUrl;
-  const recentLiveWindow = startAt.valueOf() <= now.valueOf() && startAt.valueOf() > now.valueOf() - 6 * 60 * 60 * 1000;
-  const status: SportsEventStatus = feed === "live" && recentLiveWindow ? "live" : "replay";
-  const home = record(match.homeTeam);
-  const away = record(match.awayTeam);
-  const stableId = text(selectedVideo?.id) || `${startAt.toISOString()}-${title}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-  const videoLabel = status === "live" ? "Transmissão oficial ao vivo" : text(selectedVideo?.title) || "Vídeo oficial";
-  const source = { ...rawSource, sourceUrl, label: videoLabel };
-
-  return {
-    id: `scorebat-${stableId}`,
-    title,
-    competition: text(match.competition) || "Futebol",
-    sport: "Futebol",
-    startAt: startAt.toISOString(),
-    status,
-    thumbnail: httpsUrl(match.thumbnail),
-    homeTeam: text(home?.name),
-    awayTeam: text(away?.name),
-    sourceName: "ScoreBat · fonte oficial",
-    sourceUrl,
-    sources: [source],
-    embedUrl: source.embedUrl,
-    videoLabel,
   };
 }
 
@@ -360,4 +309,85 @@ export function dedupeSportsEvents(events: SportsEvent[]) {
     });
   }
   return [...unique.values()];
+}
+
+
+export const STREAMED_ORIGIN = "https://streamed.pk";
+export const STREAMED_SPORT_NAMES: Record<string, string> = {
+  football: "Futebol", basketball: "Basquete", "american-football": "Futebol americano",
+};
+
+/** League labels are extracted only from explicit returned text, never team affiliations. */
+export function streamedLeague(category: string, title: string, refs: { id: string }[]) {
+  const labels: Record<string, [RegExp, string][]> = {
+    football: [[/\buefa(?:-| )champions(?:-| )league\b/i, "UEFA Champions League"]],
+    basketball: [[/\bnba\b/i, "NBA"]],
+    "american-football": [[/\bnfl\b/i, "NFL"]],
+  };
+  const evidence = [title, ...refs.map((ref) => ref.id)].join(" ");
+  return labels[category]?.find(([pattern]) => pattern.test(evidence))?.[1];
+}
+
+/** The proxy route and .webp format were verified with actual team badge identifiers. */
+export function streamedTeamBadge(value: unknown) {
+  const badge = text(value);
+  if (!badge || badge.length > 4096 || !/^[a-zA-Z0-9_+-]+={0,2}$/.test(badge)) return undefined;
+  return `${STREAMED_ORIGIN}/api/images/proxy/${badge}.webp`;
+}
+
+export function mapStreamedMatch(value: unknown, liveIds: Set<string>, now = Date.now()): SportsEvent | null {
+  const match = record(value);
+  const id = text(match?.id);
+  const title = text(match?.title);
+  const category = text(match?.category);
+  if (!match || !id || !title || !category || !STREAMED_SPORT_NAMES[category]) return null;
+  const date = typeof match.date === "number" && Number.isFinite(match.date) && match.date > 0
+    && !Number.isNaN(new Date(match.date).valueOf()) ? match.date : undefined;
+  const teams = record(match.teams);
+  const refs = Array.isArray(match.sources) ? match.sources.flatMap((value) => {
+    const ref = record(value);
+    const source = text(ref?.source);
+    const id = text(ref?.id);
+    return source && id ? [{ source, id }] : [];
+  }) : [];
+  const league = streamedLeague(category, title, refs);
+  const poster = text(match.poster);
+  let thumbnail: string | undefined;
+  if (poster) {
+    try {
+      const url = new URL(poster, STREAMED_ORIGIN);
+      if (url.protocol === "https:" && !url.username && !url.password) thumbnail = url.href;
+    } catch { /* Invalid optional artwork. */ }
+  }
+  return {
+    id: `streamed-${id}`, title, category,
+    league, competition: league || "Liga não informada", sport: STREAMED_SPORT_NAMES[category],
+    startAt: date ? new Date(date).toISOString() : "",
+    // Only the live endpoint confirms live status. Past start times do not prove a match ended.
+    status: liveIds.has(id) ? "live" : date && date > now ? "upcoming" : "unknown",
+    thumbnail, homeTeam: text(record(teams?.home)?.name), awayTeam: text(record(teams?.away)?.name),
+    homeBadge: streamedTeamBadge(record(teams?.home)?.badge), awayBadge: streamedTeamBadge(record(teams?.away)?.badge),
+    sourceName: "Streamed", sourceUrl: "", sources: [],
+    streamRefs: refs.filter((ref, index) => refs.findIndex((item) => item.source === ref.source && item.id === ref.id) === index),
+  };
+}
+
+export function mapStreamedStreams(value: unknown): SportsVideoSource[] {
+  if (!Array.isArray(value)) throw new Error("Resposta de streams inválida");
+  const sources = value.flatMap((value) => {
+    const stream = record(value);
+    const id = text(stream?.id);
+    const source = text(stream?.source);
+    const embedUrl = httpsUrl(stream?.embedUrl);
+    const streamNo = stream?.streamNo;
+    if (!stream || !id || !source || !embedUrl || typeof streamNo !== "number") return [];
+    const url = new URL(embedUrl);
+    if (url.username || url.password) return [];
+    return [{
+      id: `${source}:${id}:${streamNo}`, providerId: "streamed" as const,
+      name: `Streamed · ${source}`, embedUrl, sourceUrl: embedUrl,
+      label: `${source} ${streamNo} · ${text(stream.language) || "Idioma não informado"}${stream.hd === true ? " · HD" : ""}`,
+    }];
+  });
+  return sources.filter((source, index) => sources.findIndex((item) => item.embedUrl === source.embedUrl) === index);
 }

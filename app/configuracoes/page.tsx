@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PageLoader from "../page-loader";
 import { useRouter } from "next/navigation";
 import AccountSettingsPage, { type AccountUser } from "../account-settings-page";
 import { useLivePresence } from "../../lib/use-live-presence";
@@ -45,7 +46,7 @@ export default function AccountSettingsRoute() {
   }, []);
 
   if (loading) {
-    return <main className="account-page-state" aria-live="polite"><span /><strong>Carregando sua conta…</strong></main>;
+    return <main><PageLoader label="Carregando sua conta…" /></main>;
   }
   if (error || !user) {
     return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { usePageReady } from "./page-loading-boundary";
+
 import { useEffect, useState } from "react";
 
 type Retrospective = {
@@ -25,12 +27,14 @@ export default function RetrospectiveView({ name }: { name: string }) {
   const [mode, setMode] = useState<"month" | "year">("month");
   const [data, setData] = useState<Retrospective | null>(null);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
   const [shared, setShared] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/retrospectiva?mode=${mode}`, { cache: "no-store", credentials: "include", signal: controller.signal })
       .then((response) => response.ok ? response.json() : null)
-      .then((payload) => setData(payload?.retrospectiva || null))
+      .then((payload) => { if (!controller.signal.aborted) setData(payload?.retrospectiva || null); })
+      .catch(() => { if (!controller.signal.aborted) setData(null); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [mode]);

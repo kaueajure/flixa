@@ -1,5 +1,7 @@
 "use client";
 
+import { usePageReady } from "./page-loading-boundary";
+
 import { useEffect, useMemo, useState } from "react";
 
 export type LibraryMovie = {
@@ -17,10 +19,29 @@ function key(movie: LibraryMovie) { return movie.kind === "tv" ? `tv:${movie.tmd
 function minutes(movie: LibraryMovie) { if (movie.durationSeconds) return movie.durationSeconds / 60; const match = movie.duration?.match(/(?:(\d+)h)?\s*(\d+)?/); return match ? Number(match[1] || 0) * 60 + Number(match[2] || 0) : 0; }
 
 export default function LibraryView({ items, onItemsChange, onOpen, onExplore }: { items: LibraryMovie[]; onItemsChange: (items: LibraryMovie[]) => void; onOpen: (movie: LibraryMovie) => void; onExplore: () => void }) {
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  usePageReady(!initialLoading);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [state, setState] = useState("all"); const [kind, setKind] = useState("all"); const [genre, setGenre] = useState("all"); const [year, setYear] = useState("all"); const [duration, setDuration] = useState("all"); const [sort, setSort] = useState("recent"); const [collection, setCollection] = useState("all");
   const [editing, setEditing] = useState<LibraryMovie | null>(null); const [newCollection, setNewCollection] = useState(""); const [busy, setBusy] = useState(false);
-  useEffect(() => { fetch("/api/lista", { cache: "no-store", credentials: "include" }).then((r) => r.ok ? r.json() : null).then((data) => { if (data?.itens) onItemsChange(data.itens); if (data?.colecoes) setCollections(data.colecoes); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/lista", { cache: "no-store", credentials: "include", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Não foi possível atualizar sua lista.");
+        return response.json();
+      })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        if (Array.isArray(data?.itens)) onItemsChange(data.itens);
+        if (Array.isArray(data?.colecoes)) setCollections(data.colecoes);
+      })
+      .catch(() => { if (!controller.signal.aborted) setLoadError("Não foi possível atualizar sua lista. Exibindo os dados disponíveis."); })
+      .finally(() => { if (!controller.signal.aborted) setInitialLoading(false); });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the initial library request gates entry
+  }, []);
   const genres = useMemo(() => [...new Set(items.flatMap((item) => item.genres || []))].sort((a, b) => a.localeCompare(b, "pt-BR")), [items]);
   const years = useMemo(() => [...new Set(items.map((item) => item.year).filter(Boolean) as number[])].sort((a, b) => b - a), [items]);
   const visible = useMemo(() => items.filter((item) => {
@@ -48,6 +69,7 @@ export default function LibraryView({ items, onItemsChange, onOpen, onExplore }:
   return <section className="library-view" id="minha-lista">
     <header className="library-hero"><div><p className="eyebrow">Sua biblioteca</p><h1>Minha Lista</h1><p>{items.length} {items.length === 1 ? "história organizada" : "histórias organizadas"} do seu jeito.</p></div><button className="secondary-action" onClick={onExplore}>Explorar catálogo</button></header>
     <div className="library-state-tabs">{STATES.map(([id,label]) => <button key={id} className={state === id ? "is-active" : ""} onClick={() => setState(id)}>{label}<span>{id === "all" ? items.length : id === "favorite" ? items.filter(i=>i.favorite).length : id === "not_for_me" ? items.filter(i=>i.notForMe).length : items.filter(i=>(i.libraryState||"quero_assistir")===id).length}</span></button>)}</div>
+    {loadError ? <p role="alert">{loadError}</p> : null}
     <div className="library-toolbar"><select value={kind} onChange={(e)=>setKind(e.target.value)} aria-label="Tipo"><option value="all">Filmes e séries</option><option value="movie">Filmes</option><option value="tv">Séries</option></select><select value={genre} onChange={(e)=>setGenre(e.target.value)} aria-label="Gênero"><option value="all">Todos os gêneros</option>{genres.map(g=><option key={g}>{g}</option>)}</select><select value={year} onChange={(e)=>setYear(e.target.value)} aria-label="Ano"><option value="all">Todos os anos</option>{years.map(y=><option key={y}>{y}</option>)}</select><select value={duration} onChange={(e)=>setDuration(e.target.value)} aria-label="Duração"><option value="all">Qualquer duração</option><option value="short">Até 90 min</option><option value="medium">91 a 120 min</option><option value="long">Mais de 2 horas</option></select><select value={collection} onChange={(e)=>setCollection(e.target.value)} aria-label="Coleção"><option value="all">Todas as coleções</option>{collections.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select value={sort} onChange={(e)=>setSort(e.target.value)} aria-label="Ordenar"><option value="recent">Adicionados recentemente</option><option value="rating">Melhor nota</option><option value="year">Mais novos</option><option value="duration-asc">Menor duração</option></select></div>
     {visible.length ? <div className="library-grid">{visible.map((movie)=><article key={key(movie)} className={movie.notForMe ? "is-muted" : ""}><button className="library-poster" onClick={()=>onOpen(movie)}>{movie.poster ? <img src={movie.poster} alt={`Pôster de ${movie.title}`} loading="lazy" /> : <span>{movie.title[0]}</span>}<i>{STATE_LABEL[movie.libraryState || "quero_assistir"]}</i>{movie.favorite ? <b aria-label="Favorito">♥</b> : null}</button><div><strong>{movie.title}</strong><small>{[movie.kind === "tv" ? "Série" : "Filme", movie.year, movie.genres?.[0]].filter(Boolean).join(" · ")}</small><button onClick={()=>setEditing(movie)}>Organizar</button></div></article>)}</div> : <div className="library-empty"><strong>Nenhum título neste filtro</strong><span>Ajuste os filtros ou descubra algo novo.</span><button className="primary-action" onClick={onExplore}>Explorar</button></div>}
     {editing ? <div className="library-editor-backdrop" onMouseDown={(e)=>{if(e.target===e.currentTarget)setEditing(null)}}><section className="library-editor" role="dialog" aria-modal="true"><header><div><small>Organizar na biblioteca</small><h2>{editing.title}</h2></div><button onClick={()=>setEditing(null)} aria-label="Fechar">×</button></header><label>Estado<select value={editing.libraryState || "quero_assistir"} disabled={busy} onChange={(e)=>{const value=e.target.value as LibraryMovie['libraryState']; setEditing({...editing,libraryState:value}); void patch(editing,{estado:value});}}>{Object.entries(STATE_LABEL).map(([id,label])=><option value={id} key={id}>{label}</option>)}</select></label><div className="library-editor-toggles"><button className={editing.favorite ? "is-on" : ""} disabled={busy} onClick={()=>{const value=!editing.favorite;setEditing({...editing,favorite:value,notForMe:value?false:editing.notForMe});void patch(editing,{favorito:value})}}>♥ Favorito</button><button className={editing.notForMe ? "is-on is-negative" : ""} disabled={busy} onClick={()=>{const value=!editing.notForMe;setEditing({...editing,notForMe:value,favorite:value?false:editing.favorite});void patch(editing,{naoEParaMim:value})}}>Não é para mim</button></div><fieldset><legend>Listas personalizadas</legend>{collections.map(c=>{const checked=editing.collections?.some(x=>x.id===c.id)||false;return <label key={c.id}><input type="checkbox" checked={checked} onChange={()=>{const ids=checked ? (editing.collections||[]).filter(x=>x.id!==c.id).map(x=>x.id) : [...(editing.collections||[]).map(x=>x.id),c.id];const next={...editing,collections:collections.filter(x=>ids.includes(x.id))};setEditing(next);void saveCollections(editing,ids)}} />{c.name}</label>})}<div className="library-new-collection"><input value={newCollection} onChange={(e)=>setNewCollection(e.target.value.slice(0,60))} placeholder="Nova lista, ex: Terror de sexta"/><button onClick={()=>void createCollection()}>Criar</button></div></fieldset><button className="library-remove" onClick={()=>void remove(editing)}>Remover da biblioteca</button></section></div> : null}

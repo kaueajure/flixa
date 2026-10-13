@@ -9,22 +9,16 @@ import {
   type TokenRequest,
 } from "ably";
 import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
-import { playerServerIdForSource } from "../lib/player-servers";
+import GroupExtensionGuide from "./group-extension-guide";
+import { usePartyExtension } from "../lib/use-party-extension";
+import { getPlayerServer, playerServerIdForSource } from "../lib/player-servers";
 
-type PartyProviderId = "cinesrc" | "moviesapi" | "vidzen";
+import { PARTY_PLAYER_ORIGIN, cineSrcCommand, parseCineSrcEvent, parsePartyRoomState, partyTargetTime, samePartyMedia, samePartyDuration, type PartyProviderId, type PartyMedia, type PartyPlayback, type PartyRoomState } from "../lib/watch-party";
 
 type PartySource = {
   id: string;
   name: string;
   src: string;
-};
-
-type PartyMedia = {
-  id: string;
-  title: string;
-  kind: "movie" | "tv";
-  season?: number;
-  episode?: number;
 };
 
 type WatchPartyControlsProps = {
@@ -38,13 +32,6 @@ type WatchPartyControlsProps = {
   providerFailure?: { sourceId: string; reason: string; sequence: number } | null;
 };
 
-type PartyPlayback = {
-  paused: boolean;
-  currentTime: number;
-  updatedAt: number;
-  sequence: number;
-};
-
 type PartyParticipant = {
   id: string;
   name: string;
@@ -52,12 +39,6 @@ type PartyParticipant = {
 };
 
 type PartyRole = "host" | "guest" | "";
-
-type PartyRoomState = {
-  media: PartyMedia;
-  providerId: PartyProviderId;
-  playback: PartyPlayback;
-};
 
 type PartyPresenceData = {
   name?: string;
@@ -87,18 +68,13 @@ type AblyAuthResponse = {
   erro?: string;
 };
 
-const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc", "moviesapi", "vidzen"]);
-const PARTY_PROVIDER_PRIORITY: PartyProviderId[] = ["cinesrc", "moviesapi", "vidzen"];
-const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = {
-  cinesrc: "Poucos anúncios · sincronização completa",
-  moviesapi: "Sincronização completa · servidor reserva",
-  vidzen: "Sincronização completa · servidor reserva",
-};
+const PARTY_PROVIDERS = new Set<PartyProviderId>(["cinesrc"]);
+const PARTY_PROVIDER_LABELS: Record<PartyProviderId, string> = { cinesrc: "Play, pausa e posição sincronizados" };
 
 function providerFor(source?: PartySource): PartyProviderId | null {
   if (!source) return null;
   const id = playerServerIdForSource(source.id) as PartyProviderId;
-  return PARTY_PROVIDERS.has(id) ? id : null;
+  try { return PARTY_PROVIDERS.has(id) && new URL(source.src).origin === PARTY_PLAYER_ORIGIN ? id : null; } catch { return null; }
 }
 
 function normalizeRoomCode(value: string) {
@@ -109,7 +85,7 @@ function currentTimestamp() {
   return Date.now();
 }
 
-function sendPlayerCommand(
+function sendNativePlayerCommand(
   iframe: HTMLIFrameElement | null,
   providerId: PartyProviderId,
   command: "play" | "pause" | "seek" | "getStatus",
@@ -117,62 +93,13 @@ function sendPlayerCommand(
 ) {
   const target = iframe?.contentWindow;
   if (!target) return;
-  if (providerId === "cinesrc") {
-    target.postMessage({
-      type: "cinesrc:command",
-      command: command === "getStatus" ? "getCurrentTime" : command,
-      args: command === "seek" ? [Math.max(0, Number(time) || 0)] : [],
-    }, "https://cinesrc.st");
-    if (command === "getStatus") {
-      target.postMessage({ type: "cinesrc:command", command: "getPaused", args: [] }, "https://cinesrc.st");
-    }
-    return;
-  }
-  if (providerId === "moviesapi") {
-    target.postMessage({ action: command, ...(command === "seek" ? { time: Math.max(0, Number(time) || 0) } : {}) }, "https://moviesapi.to");
-    return;
-  }
-  target.postMessage(JSON.stringify({
-    command,
-    ...(command === "seek" ? { time: Math.max(0, Number(time) || 0) } : {}),
-  }), "https://vidzen.fun");
+  if (providerId !== "cinesrc") return;
+  target.postMessage(cineSrcCommand(command, time), PARTY_PLAYER_ORIGIN);
+  if (command === "getStatus") target.postMessage({ type: "cinesrc:command", command: "getPaused", args: [] }, PARTY_PLAYER_ORIGIN);
 }
 
 function parsePlayerEvent(event: MessageEvent, providerId: PartyProviderId) {
-  let payload: unknown = event.data;
-  if (providerId === "vidzen" && typeof payload === "string") {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      return null;
-    }
-  }
-  if (!payload || typeof payload !== "object") return null;
-  const data = payload as Record<string, unknown>;
-  let eventName = "";
-  let details: Record<string, unknown> = data;
-
-  if (providerId === "cinesrc") {
-    if (typeof data.type !== "string" || !data.type.startsWith("cinesrc:")) return null;
-    eventName = data.type.slice("cinesrc:".length);
-  } else if (providerId === "moviesapi") {
-    if (data.source !== "moviesapi-player" || typeof data.event !== "string") return null;
-    eventName = data.event;
-  } else {
-    if (data.type !== "PLAYER_EVENT") return null;
-    details = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : data;
-    eventName = typeof details.event === "string" ? details.event : "";
-  }
-
-  const currentTime = Number(details.currentTime ?? data.currentTime);
-  const pausedValue = details.paused ?? data.paused;
-  return {
-    name: eventName.toLowerCase(),
-    currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : null,
-    paused: typeof pausedValue === "boolean" ? pausedValue : null,
-    command: typeof data.command === "string" ? data.command : "",
-    result: data.result,
-  };
+  return providerId === "cinesrc" ? parseCineSrcEvent(event.data) : null;
 }
 
 function ActiveWatchPartyControls({
@@ -198,9 +125,33 @@ function ActiveWatchPartyControls({
   const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [participantName, setParticipantName] = useState("");
+  const [preferredMode, setPreferredMode] = useState<"extension" | "native">("extension");
+  const [controlMode, setControlMode] = useState<"extension" | "native">("extension");
+  const [sessionSourceId, setSessionSourceId] = useState("");
+  const modeRef = useRef<"extension" | "native">("extension");
+  const sourceIdRef = useRef("");
+  const extension = usePartyExtension({ sourceUrl: activeSource?.src, providerId: activeSource ? playerServerIdForSource(activeSource.id) : "", role: controlMode === "extension" ? role || "preview" : "preview", roomCode: controlMode === "extension" ? roomCode : "" });
+  const extensionRef = useRef(extension);
+  useEffect(() => { extensionRef.current = extension; }, [extension]);
+  const sourceProvider = useCallback((source: PartySource | undefined, mode: "extension" | "native") => {
+    if (mode === "native") return providerFor(source);
+    if (!source) return null;
+    const id = playerServerIdForSource(source.id); const server = getPlayerServer(id);
+    try { return server && new URL(source.src).hostname.replace(/^www\./, "") === server.domain.replace(/^www\./, "") ? id : null; } catch { return null; }
+  }, []);
+  const sendPlayerCommand = useCallback((iframe: HTMLIFrameElement | null, provider: PartyProviderId, command: "play" | "pause" | "seek" | "getStatus", time?: number) => {
+    if (modeRef.current === "extension") extensionRef.current.command(command, time);
+    else sendNativePlayerCommand(iframe, provider, command, time);
+  }, []);
 
   const realtimeRef = useRef<Realtime | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const chatChannelRef = useRef<RealtimeChannel | null>(null);
+  const connectPendingRef = useRef(false);
+  const connectGenerationRef = useRef(0);
+  const disconnectedHostTimerRef = useRef<number | null>(null);
+  const retryPlaybackTimerRef = useRef<number | null>(null);
+  const initialPlaybackTimerRef = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const clientIdRef = useRef("");
   const hostClientIdRef = useRef("");
@@ -211,6 +162,7 @@ function ActiveWatchPartyControls({
   const providerRef = useRef<PartyProviderId | null>(null);
   const currentTimeRef = useRef(0);
   const pausedRef = useRef(true);
+  const durationRef = useRef(0);
   const unlockedRef = useRef(true);
   const pendingPlaybackRef = useRef<PartyPlayback | null>(null);
   const applyingRemoteUntilRef = useRef(0);
@@ -219,18 +171,18 @@ function ActiveWatchPartyControls({
   const autoJoinAttemptedRef = useRef(false);
   const handledFailureSequenceRef = useRef(0);
   const lastChatSentAtRef = useRef(0);
+  const lastHostStateAtRef = useRef(0);
+  const hostStateStaleRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const sourcesRef = useRef(sources);
   const mediaRef = useRef(media);
   const activeSourceRef = useRef(activeSource);
 
-  const compatibleSources = useMemo(() => [...sources]
-    .filter((source) => providerFor(source))
-    .sort((left, right) => {
-      const leftProvider = providerFor(left);
-      const rightProvider = providerFor(right);
-      return PARTY_PROVIDER_PRIORITY.indexOf(leftProvider!) - PARTY_PROVIDER_PRIORITY.indexOf(rightProvider!);
-    }), [sources]);
+  const compatibleSources = useMemo(() => sources.filter(source => sourceProvider(source, preferredMode)), [sources, preferredMode, sourceProvider]);
+
+  useEffect(() => {
+    if (new URL(window.location.href).searchParams.get("partyMode") === "native") queueMicrotask(() => setPreferredMode("native"));
+  }, []);
 
   useEffect(() => { sourcesRef.current = sources; }, [sources]);
   useEffect(() => { mediaRef.current = media; }, [media]);
@@ -246,9 +198,15 @@ function ActiveWatchPartyControls({
     roomCodeRef.current = "";
     roleRef.current = "";
     providerRef.current = null;
+    sourceIdRef.current = "";
+    hostStateStaleRef.current = false;
+    setSessionSourceId("");
     hostClientIdRef.current = "";
     sessionRef.current = "";
     pendingPlaybackRef.current = null;
+    if (disconnectedHostTimerRef.current) window.clearTimeout(disconnectedHostTimerRef.current);
+    if (retryPlaybackTimerRef.current) window.clearTimeout(retryPlaybackTimerRef.current);
+    if (initialPlaybackTimerRef.current) window.clearTimeout(initialPlaybackTimerRef.current);
     setRoomCode("");
     setRole("");
     setParticipants([]);
@@ -263,6 +221,7 @@ function ActiveWatchPartyControls({
       const url = new URL(window.location.href);
       if (url.searchParams.has("party")) {
         url.searchParams.delete("party");
+        url.searchParams.delete("partyMode");
         window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
       }
     }
@@ -272,6 +231,7 @@ function ActiveWatchPartyControls({
     const channel = channelRef.current;
     const realtime = realtimeRef.current;
     channelRef.current = null;
+    chatChannelRef.current = null;
     realtimeRef.current = null;
     if (leavePresence && channel) void channel.presence.leave().catch(() => undefined);
     realtime?.close();
@@ -280,34 +240,47 @@ function ActiveWatchPartyControls({
   const applyPlayback = useCallback((playback: PartyPlayback, force = false) => {
     pendingPlaybackRef.current = playback;
     if (!providerRef.current || (!unlockedRef.current && roleRef.current === "guest")) return;
+    if (roleRef.current === "guest" && !samePartyDuration(playback.durationSeconds, durationRef.current)) {
+      applyingRemoteUntilRef.current = Date.now() + 800;
+      sendPlayerCommand(playerRef.current, providerRef.current, "pause");
+      setError("O player carregou uma versão diferente da do anfitrião. Escolha a mesma versão no player antes de sincronizar.");
+      return;
+    }
     const serverTimeNow = Date.now() + serverClockOffsetRef.current;
-    const elapsed = playback.paused ? 0 : Math.max(0, (serverTimeNow - playback.updatedAt) / 1000);
-    const targetTime = Math.max(0, playback.currentTime + elapsed);
-    applyingRemoteUntilRef.current = Date.now() + 1800;
+    const targetTime = partyTargetTime(playback, serverTimeNow);
+    if (roleRef.current === "guest") applyingRemoteUntilRef.current = Date.now() + 800;
     if (force || Math.abs(currentTimeRef.current - targetTime) > 1.25) {
       sendPlayerCommand(playerRef.current, providerRef.current, "seek", targetTime);
       currentTimeRef.current = targetTime;
     }
     sendPlayerCommand(playerRef.current, providerRef.current, playback.paused ? "pause" : "play");
     pausedRef.current = playback.paused;
-  }, [playerRef]);
+  }, [playerRef, sendPlayerCommand]);
 
-  const selectProvider = useCallback((nextProvider: PartyProviderId, playback?: PartyPlayback) => {
-    const source = sourcesRef.current.find((item) => providerFor(item) === nextProvider);
+  const selectProvider = useCallback((nextProvider: PartyProviderId, playback?: PartyPlayback, sourceId?: string, mode: "native" | "extension" = modeRef.current) => {
+    if (mode === "extension" && !extensionRef.current.installed) { setError("Instale e conecte a extensão nesta aba para entrar nesta sala."); return false; }
+    const source = sourcesRef.current.find((item) => sourceProvider(item, mode) === nextProvider && (!sourceId || item.id === sourceId));
     if (!source) {
       setError(`O servidor ${nextProvider} não está disponível para este título.`);
       return false;
     }
+    modeRef.current = mode;
+    setControlMode(mode);
+    setSessionSourceId(source.id);
+    sourceIdRef.current = source.id;
     providerRef.current = nextProvider;
     setProviderId(nextProvider);
-    onSessionProviderChange?.(nextProvider);
+    onSessionProviderChange?.(source.id);
     if (activeSourceRef.current?.id !== source.id) onSelectSource(source.id);
     if (playback) {
       pendingPlaybackRef.current = playback;
-      window.setTimeout(() => applyPlayback(playback, true), 900);
+      if (initialPlaybackTimerRef.current) window.clearTimeout(initialPlaybackTimerRef.current);
+      initialPlaybackTimerRef.current = window.setTimeout(() => {
+        if (roomCodeRef.current && pendingPlaybackRef.current) applyPlayback(pendingPlaybackRef.current, true);
+      }, 900);
     }
     return true;
-  }, [applyPlayback, onSelectSource, onSessionProviderChange]);
+  }, [applyPlayback, onSelectSource, onSessionProviderChange, sourceProvider]);
 
   const refreshParticipants = useCallback(async () => {
     const channel = channelRef.current;
@@ -339,9 +312,11 @@ function ActiveWatchPartyControls({
     const state: PartyRoomState = {
       media: mediaRef.current,
       providerId: selectedProvider,
-      playback,
+      controlMode: modeRef.current,
+      sourceId: sourceIdRef.current,
+      playback: { ...playback, ...(durationRef.current > 0 ? { durationSeconds: durationRef.current } : {}) },
     };
-    pendingPlaybackRef.current = playback;
+    pendingPlaybackRef.current = state.playback;
     void Promise.all([
       channel.publish("party", { type, action, ...state } satisfies PartyRealtimeMessage),
       channel.presence.update({ name: participantNameRef.current, role: "host", state } satisfies PartyPresenceData),
@@ -352,34 +327,44 @@ function ActiveWatchPartyControls({
     if (!hostClientIdRef.current || message.clientId !== hostClientIdRef.current || message.clientId === clientIdRef.current) return;
     const data = message.data as Partial<PartyRealtimeMessage> | null;
     if (!data || typeof data !== "object") return;
-    if (Number.isFinite(message.timestamp)) serverClockOffsetRef.current = message.timestamp - Date.now();
     if (data.type === "roomClosed") {
       closeRealtime();
       resetSession();
       setError("O anfitrião encerrou a sessão.");
       return;
     }
-    if (!data.playback || !data.providerId || !PARTY_PROVIDERS.has(data.providerId)) return;
+    const state = parsePartyRoomState(data);
+    if (!state || !samePartyMedia(state.media, mediaRef.current)) return;
+    if (state.playback.sequence <= (pendingPlaybackRef.current?.sequence ?? -1)) return;
+    lastHostStateAtRef.current = Date.now();
+    if (hostStateStaleRef.current) { hostStateStaleRef.current = false; setError(""); }
     if (data.type === "sync") {
-      applyPlayback(data.playback, data.action === "seek");
+      if (state.providerId !== providerRef.current || (state.sourceId && state.sourceId !== sourceIdRef.current) || (state.controlMode || "native") !== modeRef.current) return;
+      applyPlayback(state.playback, data.action === "seek");
     } else if (data.type === "provider") {
-      selectProvider(data.providerId, data.playback);
+      selectProvider(state.providerId, state.playback, state.sourceId, state.controlMode || "native");
       setError("O anfitrião trocou o servidor para todos.");
     }
   }, [applyPlayback, closeRealtime, resetSession, selectProvider]);
 
   const handlePresenceChange = useCallback((member: PresenceMessage) => {
     void refreshParticipants().catch(() => undefined);
-    if (
-      roleRef.current === "guest" &&
-      member.clientId === hostClientIdRef.current &&
-      (member.action === "leave" || member.action === "absent")
-    ) {
-      closeRealtime(false);
-      resetSession(false);
-      setError("O anfitrião se desconectou e a sala foi encerrada.");
+    if (roleRef.current !== "guest" || member.clientId !== hostClientIdRef.current) return;
+    if (member.action === "leave" || member.action === "absent") {
+      setError("O anfitrião se desconectou. Aguardando reconexão…");
+      if (disconnectedHostTimerRef.current) window.clearTimeout(disconnectedHostTimerRef.current);
+      disconnectedHostTimerRef.current = window.setTimeout(() => {
+        closeRealtime(false);
+        resetSession(false);
+        setError("O anfitrião não retornou. Entre novamente pelo convite.");
+      }, 30_000);
+    } else {
+      if (disconnectedHostTimerRef.current) window.clearTimeout(disconnectedHostTimerRef.current);
+      const state = parsePartyRoomState((member.data as PartyPresenceData | undefined)?.state);
+      if (state && samePartyMedia(state.media, mediaRef.current) && state.playback.sequence > (pendingPlaybackRef.current?.sequence ?? -1)) applyPlayback(state.playback);
+      setError("");
     }
-  }, [closeRealtime, refreshParticipants, resetSession]);
+  }, [applyPlayback, closeRealtime, refreshParticipants, resetSession]);
 
   const handleChatMessage = useCallback((message: InboundMessage) => {
     const data = message.data as Partial<PartyChatMessage> | null;
@@ -398,10 +383,14 @@ function ActiveWatchPartyControls({
   }, []);
 
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
-    if (connecting) return;
+    if (connectPendingRef.current) return;
+    const generation = ++connectGenerationRef.current;
+    modeRef.current = preferredMode;
+    if (preferredMode === "extension" && !extensionRef.current.installed) { setError("Instale e conecte a extensão ao Flixa antes de abrir a sala."); updateOpen(true); return; }
     const candidate = mode === "create"
-      ? sourcesRef.current.find((source) => providerFor(source))
+      ? preferredMode === "extension" ? activeSourceRef.current : sourcesRef.current.find(source => sourceProvider(source, "native"))
       : null;
+    if (mode === "create" && preferredMode === "extension" && (!candidate || !sourceProvider(candidate, "extension") || !extensionRef.current.ready)) { setError("Escolha um servidor e inicie o vídeo antes de criar a sala."); updateOpen(true); return; }
     if (mode === "create" && !candidate) {
       setError("Nenhum player compatível com sessão compartilhada está disponível para este título.");
       updateOpen(true);
@@ -414,10 +403,12 @@ function ActiveWatchPartyControls({
       return;
     }
 
+    connectPendingRef.current = true;
     setConnecting(true);
     setError("");
     updateOpen(true);
     closeRealtime();
+    if (candidate) onSelectSource(candidate.id);
 
     try {
       const response = await fetch("/api/watch-party/ticket", {
@@ -428,6 +419,7 @@ function ActiveWatchPartyControls({
         body: JSON.stringify({ action: mode, roomCode: requestedRoomCode }),
       });
       const data = await response.json() as AblyAuthResponse;
+      if (generation !== connectGenerationRef.current) return;
       if (!response.ok || !data.tokenRequest || !data.session || !data.roomCode || !data.clientId || !data.role) {
         throw new Error(data.erro || "Não foi possível autenticar a sessão.");
       }
@@ -468,6 +460,17 @@ function ActiveWatchPartyControls({
         setConnecting(false);
         setError(change.reason?.message || "A conexão em tempo real com o Ably falhou.");
       });
+      realtime.connection.on("connected", () => {
+        const existingChannel = channelRef.current;
+        if (!roomCodeRef.current || !existingChannel) return;
+        void existingChannel.presence.get().then((members) => {
+          if (existingChannel !== channelRef.current) return;
+          const host = members.find((member) => member.clientId === hostClientIdRef.current);
+          const state = parsePartyRoomState((host?.data as PartyPresenceData | undefined)?.state);
+          if (roleRef.current === "guest" && state && samePartyMedia(state.media, mediaRef.current)) applyPlayback(state.playback, true);
+          setError("");
+        }).catch(() => setError("Reconectado. Aguardando o estado do anfitrião…"));
+      });
       realtime.connect();
 
       let timeoutId = 0;
@@ -491,12 +494,14 @@ function ActiveWatchPartyControls({
       const channel = realtime.channels.get(`watch-party:${code}`);
       channelRef.current = channel;
       await channel.subscribe("party", handleRealtimeMessage);
-      await channel.subscribe("chat", handleChatMessage);
+      const chatChannel = realtime.channels.get(`watch-party:${code}:chat`);
+      chatChannelRef.current = chatChannel;
+      await chatChannel.subscribe("chat", handleChatMessage);
       await channel.presence.subscribe(handlePresenceChange);
       await channel.attach();
 
       try {
-        const history = await channel.history({ limit: 50, direction: "forwards" });
+        const history = await chatChannel.history({ limit: 50, direction: "forwards" });
         for (const message of history.items) {
           if (message.name === "chat") handleChatMessage(message);
         }
@@ -506,16 +511,17 @@ function ActiveWatchPartyControls({
 
       let roomState: PartyRoomState;
       if (mode === "create" && candidate) {
-        const nextProvider = providerFor(candidate);
+        const nextProvider = sourceProvider(candidate, preferredMode);
         if (!nextProvider) throw new Error("O player escolhido não permite sincronização.");
         onSelectSource(candidate.id);
         const playback: PartyPlayback = {
           paused: true,
-          currentTime: 0,
+          currentTime: preferredMode === "extension" ? extensionRef.current.playback?.currentTime || 0 : 0,
+          ...(preferredMode === "extension" && extensionRef.current.playback?.duration ? { durationSeconds: extensionRef.current.playback.duration } : {}),
           updatedAt: Date.now() + serverClockOffsetRef.current,
           sequence: 0,
         };
-        roomState = { media: mediaRef.current, providerId: nextProvider, playback };
+        roomState = { media: mediaRef.current, providerId: nextProvider, playback, controlMode: preferredMode, sourceId: candidate.id };
         hostClientIdRef.current = data.clientId;
         await channel.presence.enter({ name: participantNameRef.current, role: "host", state: roomState } satisfies PartyPresenceData);
         await channel.publish("party", { type: "sync", action: "state", ...roomState } satisfies PartyRealtimeMessage);
@@ -528,7 +534,9 @@ function ActiveWatchPartyControls({
         if (!host) throw new Error("Sala não encontrada ou o anfitrião está desconectado.");
         if (members.length >= 12) throw new Error("Esta sala atingiu o limite de 12 participantes.");
         hostClientIdRef.current = host.clientId;
-        roomState = (host.data as PartyPresenceData).state as PartyRoomState;
+        const validState = parsePartyRoomState((host.data as PartyPresenceData).state);
+        if (!validState) throw new Error("A sala não tem um estado válido de reprodução.");
+        roomState = validState;
         const joinedMedia = roomState.media;
         const currentMedia = mediaRef.current;
         const sameEpisode = currentMedia.kind !== "tv" || (
@@ -541,6 +549,7 @@ function ActiveWatchPartyControls({
         await channel.presence.enter({ name: participantNameRef.current, role: "guest" } satisfies PartyPresenceData);
       }
 
+      if (generation !== connectGenerationRef.current || realtimeRef.current !== realtime) return;
       const joinedMedia = roomState.media;
       const currentMedia = mediaRef.current;
       const sameEpisode = currentMedia.kind !== "tv" || (
@@ -552,28 +561,33 @@ function ActiveWatchPartyControls({
       }
 
       roomCodeRef.current = code;
+      lastHostStateAtRef.current = Date.now();
       roleRef.current = data.role;
       setRoomCode(code);
       setRole(data.role);
       const canControl = data.role === "host";
       setUnlocked(canControl);
       unlockedRef.current = canControl;
-      if (!selectProvider(roomState.providerId, roomState.playback)) throw new Error("O player da sala não está disponível neste título.");
+      if (!selectProvider(roomState.providerId, roomState.playback, roomState.sourceId, roomState.controlMode || "native")) throw new Error("O player da sala não está disponível neste título.");
       await refreshParticipants();
       setConnecting(false);
       setError("");
       const url = new URL(window.location.href);
       url.searchParams.set("party", code);
+      url.searchParams.set("partyMode", roomState.controlMode || "native");
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     } catch (cause) {
+      if (generation !== connectGenerationRef.current) return;
       closeRealtime();
       resetSession(false);
       setConnecting(false);
       setError(cause instanceof Error ? cause.message : "Não foi possível abrir a sessão.");
+    } finally {
+      if (generation === connectGenerationRef.current) connectPendingRef.current = false;
     }
   }, [
+    applyPlayback,
     closeRealtime,
-    connecting,
     handlePresenceChange,
     handleChatMessage,
     handleRealtimeMessage,
@@ -582,12 +596,15 @@ function ActiveWatchPartyControls({
     resetSession,
     selectProvider,
     updateOpen,
+    preferredMode,
+    sourceProvider,
   ]);
 
   useEffect(() => {
-    if (autoJoinAttemptedRef.current || compatibleSources.length === 0) return;
+    if (autoJoinAttemptedRef.current || compatibleSources.length === 0 || (preferredMode === "extension" && !extension.installed)) return;
     const partyValue = new URL(window.location.href).searchParams.get("party") || "";
     if (partyValue.toLowerCase() === "create") {
+      if (preferredMode === "extension" && !extension.ready) { queueMicrotask(() => updateOpen(true)); return; }
       autoJoinAttemptedRef.current = true;
       queueMicrotask(() => void connect("create"));
       return;
@@ -596,7 +613,7 @@ function ActiveWatchPartyControls({
     if (inviteCode.length !== 6) return;
     autoJoinAttemptedRef.current = true;
     queueMicrotask(() => void connect("join", inviteCode));
-  }, [compatibleSources.length, connect]);
+  }, [compatibleSources.length, connect, preferredMode, extension.installed, extension.ready, updateOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -615,27 +632,27 @@ function ActiveWatchPartyControls({
   }, [open, updateOpen]);
 
   useEffect(() => {
-    const nextProvider = providerFor(activeSource);
+    const nextProvider = sourceProvider(activeSource, modeRef.current);
     if (!nextProvider || nextProvider !== providerRef.current || !roomCodeRef.current) return;
     const timer = window.setTimeout(() => {
       sendPlayerCommand(playerRef.current, nextProvider, "getStatus");
       if (pendingPlaybackRef.current) applyPlayback(pendingPlaybackRef.current, true);
     }, 850);
     return () => window.clearTimeout(timer);
-  }, [activeSource, applyPlayback, playerRef]);
+  }, [activeSource, applyPlayback, playerRef, sendPlayerCommand, sourceProvider]);
 
   useEffect(() => {
     const onPlayerMessage = (event: MessageEvent) => {
       const currentProvider = providerRef.current;
       const iframe = playerRef.current;
-      if (!currentProvider || !iframe?.contentWindow || event.source !== iframe.contentWindow) return;
-      const expectedOrigin = currentProvider === "cinesrc"
-        ? "https://cinesrc.st"
-        : currentProvider === "moviesapi"
-          ? "https://moviesapi.to"
-          : "https://vidzen.fun";
-      if (event.origin !== expectedOrigin) return;
-      const playerEvent = parsePlayerEvent(event, currentProvider);
+      if (!currentProvider || !iframe?.contentWindow) return;
+      if (modeRef.current === "native" && (event.source !== iframe.contentWindow || event.origin !== PARTY_PLAYER_ORIGIN)) return;
+      const parsed = modeRef.current === "extension" ? extensionRef.current.parseEvent(event) : parsePlayerEvent(event, currentProvider);
+      if (parsed && "hostCommand" in parsed) {
+        if (roleRef.current === "host" && typeof parsed.hostCommand === "string" && ["play", "pause", "seek"].includes(parsed.hostCommand)) sendPlayerCommand(iframe, currentProvider, parsed.hostCommand as "play" | "pause" | "seek", parsed.time);
+        return;
+      }
+      const playerEvent = parsed;
       if (!playerEvent) return;
 
       if (playerEvent.name === "response") {
@@ -644,15 +661,33 @@ function ActiveWatchPartyControls({
         }
         if (playerEvent.command === "getPaused" && typeof playerEvent.result === "boolean") {
           pausedRef.current = playerEvent.result;
+          if (roleRef.current === "host" && roomCodeRef.current && Date.now() - lastStateSentAtRef.current >= 2500) {
+            lastStateSentAtRef.current = Date.now();
+            publishRoomState("sync", { paused: pausedRef.current, currentTime: currentTimeRef.current, updatedAt: Date.now() + serverClockOffsetRef.current, sequence: (pendingPlaybackRef.current?.sequence || 0) + 1 }, "state");
+          }
         }
         return;
       }
       if (playerEvent.currentTime != null) currentTimeRef.current = playerEvent.currentTime;
+      if (playerEvent.duration != null) durationRef.current = playerEvent.duration;
       if (playerEvent.paused != null) pausedRef.current = playerEvent.paused;
       if (playerEvent.name === "play") pausedRef.current = false;
       if (playerEvent.name === "pause" || playerEvent.name === "ended") pausedRef.current = true;
-      if (playerEvent.name === "ready" && pendingPlaybackRef.current) {
+      if (playerEvent.name === "error") setError("O player informou uma falha de reprodução. Tente recarregar o player.");
+      if ((playerEvent.name === "ready" || playerEvent.name === "loadedmetadata") && pendingPlaybackRef.current) {
         applyPlayback(pendingPlaybackRef.current, true);
+      }
+      if (roleRef.current === "guest" && pendingPlaybackRef.current) {
+        if ((playerEvent.name === "play" || (modeRef.current === "extension" && playerEvent.paused === false)) && !unlockedRef.current) {
+          unlockedRef.current = true;
+          setUnlocked(true);
+          applyPlayback(pendingPlaybackRef.current, true);
+        } else if (["play", "pause", "seeked"].includes(playerEvent.name) && Date.now() >= applyingRemoteUntilRef.current) {
+          if (retryPlaybackTimerRef.current) window.clearTimeout(retryPlaybackTimerRef.current);
+          retryPlaybackTimerRef.current = window.setTimeout(() => {
+            if (pendingPlaybackRef.current) applyPlayback(pendingPlaybackRef.current);
+          }, 150);
+        }
       }
 
       if (roleRef.current !== "host" || !roomCodeRef.current || Date.now() < applyingRemoteUntilRef.current) return;
@@ -675,21 +710,45 @@ function ActiveWatchPartyControls({
     };
     window.addEventListener("message", onPlayerMessage);
     return () => window.removeEventListener("message", onPlayerMessage);
-  }, [applyPlayback, playerRef, publishRoomState]);
+  }, [applyPlayback, playerRef, publishRoomState, sendPlayerCommand]);
+
+  useEffect(() => {
+    if (!roomCode) return;
+    const timer = window.setInterval(() => {
+      if (roleRef.current === "host" && providerRef.current) sendPlayerCommand(playerRef.current, providerRef.current, "getStatus");
+      if (roleRef.current === "guest" && providerRef.current && !hostStateStaleRef.current && Date.now() - lastHostStateAtRef.current > 12_000) {
+        hostStateStaleRef.current = true;
+        sendPlayerCommand(playerRef.current, providerRef.current, "pause");
+        setError("Sem atualização do anfitrião. Reprodução pausada até a sincronização retornar.");
+      }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [playerRef, roomCode, sendPlayerCommand]);
 
   useEffect(() => () => {
+    ++connectGenerationRef.current;
+    if (disconnectedHostTimerRef.current) window.clearTimeout(disconnectedHostTimerRef.current);
+    if (retryPlaybackTimerRef.current) window.clearTimeout(retryPlaybackTimerRef.current);
+    if (initialPlaybackTimerRef.current) window.clearTimeout(initialPlaybackTimerRef.current);
     onOpenChange?.(false);
     closeRealtime();
     onSessionProviderChange?.(null);
   }, [closeRealtime, onOpenChange, onSessionProviderChange]);
 
   function unlockAndSync() {
-    setUnlocked(true);
-    unlockedRef.current = true;
-    if (pendingPlaybackRef.current) applyPlayback(pendingPlaybackRef.current, true);
+    setError("Clique no play dentro do vídeo uma vez para permitir a reprodução. Depois os controles seguem o anfitrião.");
+    if (pendingPlaybackRef.current && unlockedRef.current) applyPlayback(pendingPlaybackRef.current, true);
+  }
+
+  function hostCommand(command: "play" | "pause") {
+    if (roleRef.current !== "host" || !providerRef.current) return;
+    sendPlayerCommand(playerRef.current, providerRef.current, command);
+    if (command === "play") setError("Se o vídeo não iniciar, clique no play dentro do player uma vez.");
   }
 
   async function leave() {
+    ++connectGenerationRef.current;
+    connectPendingRef.current = false;
     const channel = channelRef.current;
     if (roleRef.current === "host" && channel && providerRef.current) {
       const playback: PartyPlayback = {
@@ -716,6 +775,7 @@ function ActiveWatchPartyControls({
   async function copyInvite() {
     const url = new URL(window.location.href);
     url.searchParams.set("party", roomCodeRef.current);
+    url.searchParams.set("partyMode", modeRef.current);
     try {
       await navigator.clipboard.writeText(url.toString());
       setCopied(true);
@@ -725,51 +785,19 @@ function ActiveWatchPartyControls({
     }
   }
 
-  const changeProviderForEveryone = useCallback((automaticReason?: string) => {
-    if (roleRef.current !== "host") return false;
-    if (compatibleSources.length < 2) {
-      if (automaticReason) setError("O player da sessão falhou e não há outro servidor sincronizado disponível.");
-      return false;
-    }
-    const currentIndex = compatibleSources.findIndex((source) => providerFor(source) === providerRef.current);
-    const next = compatibleSources[(currentIndex + 1) % compatibleSources.length];
-    const nextProvider = providerFor(next);
-    if (!nextProvider) return false;
-    providerRef.current = nextProvider;
-    setProviderId(nextProvider);
-    onSessionProviderChange?.(nextProvider);
-    onSelectSource(next.id);
-    const playback: PartyPlayback = {
-      paused: true,
-      currentTime: currentTimeRef.current,
-      updatedAt: Date.now() + serverClockOffsetRef.current,
-      sequence: (pendingPlaybackRef.current?.sequence || 0) + 1,
-    };
-    pendingPlaybackRef.current = playback;
-    pausedRef.current = true;
-    window.setTimeout(() => applyPlayback(playback, true), 900);
-    publishRoomState("provider", playback, undefined, nextProvider);
-    setError(automaticReason ? `${automaticReason} Trocando todos para ${next.name}.` : "");
-    return true;
-  }, [applyPlayback, compatibleSources, onSelectSource, onSessionProviderChange, publishRoomState]);
-
   useEffect(() => {
     if (!providerFailure || providerFailure.sequence <= handledFailureSequenceRef.current || !roomCodeRef.current) return;
     handledFailureSequenceRef.current = providerFailure.sequence;
     if (playerServerIdForSource(providerFailure.sourceId) !== providerRef.current) return;
-    if (roleRef.current === "host") {
-      changeProviderForEveryone(`O servidor anterior falhou (${providerFailure.reason}).`);
-      return;
-    }
-    setError("Seu player apresentou uma falha. Aguardando o anfitrião trocar o servidor para toda a sala.");
-  }, [changeProviderForEveryone, providerFailure]);
+    queueMicrotask(() => setError(`O player apresentou uma falha (${providerFailure.reason}). Recarregue o player ou encerre a sala e tente novamente.`));
+  }, [providerFailure]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [chatMessages.length]);
 
   function sendChat(textValue = chatInput) {
-    const channel = channelRef.current;
+    const channel = chatChannelRef.current;
     const text = textValue.trim().slice(0, 240);
     const now = currentTimestamp();
     if (!channel || !roomCodeRef.current || !text || now - lastChatSentAtRef.current < 600) return;
@@ -784,7 +812,7 @@ function ActiveWatchPartyControls({
     void channel.publish("chat", message).catch(() => setError("Não foi possível enviar a mensagem."));
   }
 
-  const providerName = compatibleSources.find((source) => providerFor(source) === providerId)?.name || providerId;
+  const providerName = sources.find((source) => source.id === sessionSourceId)?.name || providerId;
 
   return (
     <div className={`watch-party ${open ? "is-open" : ""} ${roomCode ? "is-connected" : ""}`} ref={menuRef}>
@@ -797,7 +825,7 @@ function ActiveWatchPartyControls({
         aria-label={roomCode ? `Sessão com ${participants.length} participantes` : "Assistir junto"}
       >
         <span aria-hidden="true">◉</span>
-        <small>{roomCode ? participants.length : "Junto"}</small>
+        <small>{roomCode ? participants.length : "Grupo"}</small>
       </button>
 
       {open ? (
@@ -810,7 +838,9 @@ function ActiveWatchPartyControls({
           {!roomCode ? (
             <div className="watch-party-join">
               <p>Play, pausa e avanço ficam sincronizados. O anfitrião controla o filme para todos.</p>
-              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
+              <div className="watch-party-mode" aria-label="Como sincronizar"><button type="button" aria-pressed={preferredMode === "extension"} disabled={connecting} onClick={() => setPreferredMode("extension")}>Extensão · servidor atual</button><button type="button" aria-pressed={preferredMode === "native"} disabled={connecting} onClick={() => setPreferredMode("native")}>CineSrc · sem extensão</button></div>
+              {preferredMode === "extension" ? <><p role="status">{extension.installed ? extension.status : "Conecte a extensão Flixa Grupo nesta aba."}</p>{!extension.installed ? <GroupExtensionGuide compact /> : null}</> : null}
+              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0 || (preferredMode === "extension" && (!extension.installed || !extension.ready))} onClick={() => void connect("create")}>
                 {connecting ? "Conectando…" : "Criar uma sala"}
               </button>
               <div className="watch-party-code-row">
@@ -821,9 +851,9 @@ function ActiveWatchPartyControls({
                   aria-label="Código da sala"
                   maxLength={6}
                 />
-                <button type="button" disabled={connecting || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
+                <button type="button" disabled={connecting || codeInput.length !== 6 || (preferredMode === "extension" && !extension.installed)} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
-              <small>{compatibleSources.length ? `${compatibleSources.length} servidor(es) sincronizados. CineSrc será priorizado por ter menos anúncios.` : "Aguardando um servidor compatível…"}</small>
+              <small>{preferredMode === "extension" ? "A sala mantém o servidor atual. Todos devem escolher a mesma versão e áudio dentro do player." : "CineSrc sincronizado pelo site, sem precisar da extensão."}</small>
             </div>
           ) : (
             <div className="watch-party-room">
@@ -838,12 +868,16 @@ function ActiveWatchPartyControls({
               <div className="watch-party-provider">
                 <span>Player sincronizado</span>
                 <strong>{providerName}</strong>
-                {providerId ? <small>{PARTY_PROVIDER_LABELS[providerId]}</small> : null}
-                {role === "host" && compatibleSources.length > 1 ? <button type="button" onClick={() => changeProviderForEveryone()}>Trocar para todos</button> : null}
+                {providerId ? <small>{controlMode === "extension" ? "Controles pela extensão Flixa Grupo" : PARTY_PROVIDER_LABELS[providerId]}</small> : null}
               </div>
+              {controlMode === "extension" ? <p className="watch-party-extension-status" role="status">{extension.installed ? extension.status : "Extensão desconectada. Reconecte para sincronizar."}</p> : null}
               {role === "guest" && !unlocked ? (
-                <button type="button" className="watch-party-primary" onClick={unlockAndSync}>Sincronizar meu player</button>
+                <button type="button" className="watch-party-primary" onClick={unlockAndSync}>Liberar reprodução e sincronizar</button>
               ) : null}
+              {role === "host" ? <div className="watch-party-code-row" aria-label="Controles do anfitrião">
+                <button type="button" onClick={() => hostCommand("play")}>Reproduzir para todos</button>
+                <button type="button" onClick={() => hostCommand("pause")}>Pausar para todos</button>
+              </div> : <small>O anfitrião controla a reprodução. Clique no play do vídeo uma vez para liberar o áudio.</small>}
               <div className="watch-party-people">
                 <small>{participants.length} participante{participants.length === 1 ? "" : "s"}</small>
                 <ul>

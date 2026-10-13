@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { createClientId } from "./client-id";
 
 const PRESENCE_HEARTBEAT_MS = 25_000;
 let documentClientId: string | null = null;
 
 function getDocumentClientId() {
   if (documentClientId) return documentClientId;
-  documentClientId = typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  documentClientId = createClientId();
   return documentClientId;
 }
 

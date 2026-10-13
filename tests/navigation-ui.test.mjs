@@ -12,8 +12,8 @@ test("keeps the desktop navigation in a coherent centered order", () => {
     "#home",
     "#filmes",
     "#series",
-    "#surpreenda-me",
     "#esportes",
+    "#surpreenda-me",
     "#assistir-em-grupo",
   ];
   let cursor = -1;
@@ -42,7 +42,11 @@ test("keeps the mobile navigation focused on five primary destinations", () => {
 });
 
 test("makes the server picker searchable and exposes the selected server", () => {
-  assert.match(pageSource, /placeholder="Buscar servidor"/);
-  assert.match(pageSource, /Reproduzindo agora/);
-  assert.match(pageSource, /player-server-active-label">Em uso/);
+  const menuSource = readFileSync(new URL("../app/player-server-menu.tsx", import.meta.url), "utf8");
+  assert.match(menuSource, /placeholder="Buscar servidor"/);
+  assert.match(menuSource, /Reproduzindo agora/);
+  assert.match(menuSource, /player-server-active-label">Em uso/);
+  for (const path of ["../app/page.tsx", "../app/sports-view.tsx"]) {
+    assert.match(readFileSync(new URL(path, import.meta.url), "utf8"), /import PlayerServerMenu from "\.\/player-server-menu"/);
+  }
 });

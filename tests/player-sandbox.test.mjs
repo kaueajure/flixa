@@ -46,7 +46,7 @@ test("grants playback APIs while denying advertising and privacy-sensitive APIs"
 });
 
 test("uses the protected policy on trailer, sports and admin frames", () => {
-  for (const path of ["../app/sports-view.tsx", "../app/admin/page.tsx"]) {
+  for (const path of ["../app/admin/page.tsx"]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.match(source, /sandbox=\{PROTECTED_PLAYER_SANDBOX\}/, path);
     assert.match(source, /allow=\{PROTECTED_PLAYER_ALLOW\}/, path);
@@ -59,9 +59,17 @@ test("starts protected and removes sandbox only after an explicit risk confirmat
   const pageSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(pageSource, /\[sandboxEnabled, setSandboxEnabled\] = useState\(true\)/);
   assert.match(pageSource, /sandbox=\{sandboxEnabled \? PROTECTED_PLAYER_SANDBOX : undefined\}/);
-  assert.match(pageSource, /Entendo os riscos, desativar/);
-  assert.match(pageSource, /Nudez e pornografia/);
-  assert.match(pageSource, /O Flixa não controla nem se responsabiliza/);
+  const controlsSource = readFileSync(new URL("../app/player-sandbox-controls.tsx", import.meta.url), "utf8");
+  assert.match(controlsSource, /Entendo os riscos, desativar/);
+  assert.match(controlsSource, /Nudez e pornografia/);
+  assert.match(controlsSource, /O Flixa não controla nem se responsabiliza/);
+  for (const path of ["../app/page.tsx", "../app/sports-view.tsx"]) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /sandbox=\{sandboxEnabled \? PROTECTED_PLAYER_SANDBOX : undefined\}/);
+    assert.match(source, /PlayerSandboxWarning/);
+    assert.match(source, /PlayerSandboxToggle/);
+    assert.match(source, /PlayerSandboxNotice/);
+  }
   assert.doesNotMatch(pageSource, /sandbox=\{partyProviderId \? undefined/);
 });
 

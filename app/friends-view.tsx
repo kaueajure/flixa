@@ -1,5 +1,7 @@
 "use client";
 
+import { usePageReady } from "./page-loading-boundary";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import ProfileAvatar from "./profile-avatar";
 
@@ -64,6 +66,7 @@ export default function FriendsView({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [activityClock, setActivityClock] = useState(() => Date.now());

@@ -1,0 +1,7033 @@
+{
+  "testedAt": "2026-10-13T17:43:06.146Z",
+  "browser": "Chrome/155.0.8059.39",
+  "extension": "Manifest V3 instalada em perfil temporário, all_frames",
+  "providerCount": 45,
+  "mainAttempts": 88,
+  "totalAttempts": 113,
+  "scope": "Filmes e séries do inventário lib/player-servers.ts; não inclui players esportivos.",
+  "unitTests": {
+    "command": "npm test",
+    "buildPassed": true,
+    "passed": 68,
+    "failed": 0
+  },
+  "audio": "Nenhuma confirmação de áudio PT-BR. Vídeos usados nos testes de controle ficaram silenciados; rótulos de dublagem/legendas não comprovam áudio.",
+  "providers": [
+    {
+      "id": "pipocacine",
+      "name": "PipocaCine",
+      "domain": "pipocacine.lat",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "myembed",
+      "name": "MyEmbed",
+      "domain": "myembed.biz",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 7,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player",
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "cdn-embed",
+      "name": "CDN Brasil",
+      "domain": "cdn-embed.com",
+      "supportsMovie": true,
+      "supportsTv": false,
+      "attempts": 4,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto",
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "pomfy",
+      "name": "Pomfy",
+      "domain": "api.pomfy.stream",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 5,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "betterflix",
+      "name": "BetterFlix",
+      "domain": "betterflix.lat",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "filmesyseries",
+      "name": "Filmes & Séries",
+      "domain": "filmesyseries.epizy.com",
+      "supportsMovie": true,
+      "supportsTv": false,
+      "attempts": 1,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "vidsrc-wiki",
+      "name": "VidSrc Wiki",
+      "domain": "vidsrc.wiki",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox",
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "cinesrc",
+      "name": "CineSrc",
+      "domain": "cinesrc.st",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1"
+        }
+      ],
+      "native": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1"
+        }
+      ],
+      "audioConfirmed": false,
+      "observations": []
+    },
+    {
+      "id": "moviesapi",
+      "name": "MoviesAPI",
+      "domain": "moviesapi.to",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1"
+        }
+      ],
+      "native": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        },
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550",
+          "protocol": "action-object"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1",
+          "protocol": "action-object"
+        }
+      ],
+      "audioConfirmed": false,
+      "observations": [
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "vidzen",
+      "name": "VidZen",
+      "domain": "vidzen.fun",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1"
+        },
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1"
+        }
+      ],
+      "native": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550",
+          "protocol": "command-object"
+        },
+        {
+          "kind": "tv",
+          "mode": "protected",
+          "sample": "1399/1/1",
+          "protocol": "command-object"
+        }
+      ],
+      "audioConfirmed": false,
+      "observations": []
+    },
+    {
+      "id": "videasy",
+      "name": "Videasy",
+      "domain": "player.videasy.net",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox",
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "yapgrid",
+      "name": "YapGrid",
+      "domain": "yapgrid.com",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "unprotected",
+          "sample": "550"
+        }
+      ],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox",
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "vidbolt",
+      "name": "VidBolt",
+      "domain": "vidbolt.pro",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [
+        {
+          "kind": "tv",
+          "mode": "unprotected",
+          "sample": "1399/1/1"
+        }
+      ],
+      "native": [
+        {
+          "kind": "tv",
+          "mode": "unprotected",
+          "sample": "1399/1/1"
+        }
+      ],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox",
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "embos",
+      "name": "Embos",
+      "domain": "embos.top",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 4,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox",
+        "Página/menu sem vídeo pronto",
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "unlimplay",
+      "name": "UnlimPlay",
+      "domain": "unlimplay.com",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Carregamento sem vídeo acessível à extensão",
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "screenscape",
+      "name": "ScreenScape",
+      "domain": "screenscape.me",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "nsrplay",
+      "name": "NasriPlay",
+      "domain": "nsrplay.space",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "filesun",
+      "name": "FileSuN",
+      "domain": "filesun.sbs",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "vidphantom-live",
+      "name": "VidPhantom Live",
+      "domain": "vidphantom.live",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        }
+      ],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox"
+      ]
+    },
+    {
+      "id": "vidphantom-online",
+      "name": "VidPhantom Online",
+      "domain": "vidphantom.online",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Vídeo sem reprodução/controlabilidade comprovada",
+        "Bloqueio pelo sandbox"
+      ]
+    },
+    {
+      "id": "vidphantom-site",
+      "name": "VidPhantom Site",
+      "domain": "vidphantom.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        }
+      ],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox"
+      ]
+    },
+    {
+      "id": "vidphantom-website",
+      "name": "VidPhantom Web",
+      "domain": "vidphantom.website",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        }
+      ],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "vidphantom-xyz",
+      "name": "VidPhantom XYZ",
+      "domain": "vidphantom.xyz",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        }
+      ],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "2embed-skin",
+      "name": "2Embed Skin",
+      "domain": "2embed.skin",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "2embed-cc",
+      "name": "2Embed CC",
+      "domain": "2embed.cc",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "nontongo",
+      "name": "Nontongo",
+      "domain": "nontongo.win",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "primesrc",
+      "name": "PrimeSrc",
+      "domain": "primesrc.me",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "vidlux",
+      "name": "VidLux",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "cinezo",
+      "name": "Cinezo",
+      "domain": "player.cinezo.live",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-top",
+      "name": "VidLux Top",
+      "domain": "vidlux.top",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-quilox",
+      "name": "VidLux Quilox",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-spider",
+      "name": "VidLux Spider",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-magic",
+      "name": "VidLux Magic",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-dubai",
+      "name": "VidLux Dubai",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-astra",
+      "name": "VidLux Astra",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "vidlux-vidrock",
+      "name": "VidLux VidRock",
+      "domain": "vidlux.site",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "primesrc-primevid",
+      "name": "PrimeSrc PrimeVid",
+      "domain": "primesrc.me",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "primesrc-voe",
+      "name": "PrimeSrc Voe",
+      "domain": "primesrc.me",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "primesrc-dood",
+      "name": "PrimeSrc Dood",
+      "domain": "primesrc.me",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "autoembed-co",
+      "name": "AutoEmbed",
+      "domain": "autoembed.co",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Bloqueio pelo sandbox"
+      ]
+    },
+    {
+      "id": "vidphantom",
+      "name": "VidPhantom",
+      "domain": "vidphantom.com",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [
+        {
+          "kind": "movie",
+          "mode": "protected",
+          "sample": "550"
+        }
+      ],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "vidcore",
+      "name": "VidCore",
+      "domain": "vidcore.org",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Vídeo sem reprodução/controlabilidade comprovada"
+      ]
+    },
+    {
+      "id": "embed-api",
+      "name": "Embed API",
+      "domain": "player.embed-api.stream",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    },
+    {
+      "id": "iembed",
+      "name": "iEmbed",
+      "domain": "iembed.codeera.dev",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Página/menu sem vídeo pronto"
+      ]
+    },
+    {
+      "id": "mapple",
+      "name": "Mapple",
+      "domain": "mapple.uk",
+      "supportsMovie": true,
+      "supportsTv": true,
+      "attempts": 2,
+      "extension": [],
+      "native": [],
+      "audioConfirmed": false,
+      "observations": [
+        "Erro HTTP na página/player"
+      ]
+    }
+  ],
+  "attempts": [
+    {
+      "batch": "full",
+      "id": "pipocacine",
+      "name": "PipocaCine",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:29:23.373Z",
+      "url": "https://pipocacine.lat/embed/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://pipocacine.lat/embed/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "pipocacine",
+      "name": "PipocaCine",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:29:23.373Z",
+      "url": "https://pipocacine.lat/embed/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://pipocacine.lat/embed/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:29:23.373Z",
+      "url": "https://myembed.biz/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/550",
+          "status": 502
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:29:31.519Z",
+      "url": "https://myembed.biz/serie/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/serie/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/serie/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "cdn-embed",
+      "name": "CDN Brasil",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:29:31.523Z",
+      "url": "https://cdn-embed.com/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://cdn-embed.com/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "pomfy",
+      "name": "Pomfy",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:29:58.580Z",
+      "url": "https://api.pomfy.stream/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://api.pomfy.stream/filme/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "46:Assistir"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "pomfy",
+      "name": "Pomfy",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:30:06.658Z",
+      "url": "https://api.pomfy.stream/serie/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://api.pomfy.stream/serie/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "49:Assistir"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "betterflix",
+      "name": "BetterFlix",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:30:06.690Z",
+      "url": "https://betterflix.lat/api/player?id=550&type=movie",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "mes online grátis, séries completas e animes dublados. Nosso catálogo é atualizado diariamente co"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://betterflix.lol/api/player",
+          "status": 404
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "betterflix",
+      "name": "BetterFlix",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:30:33.780Z",
+      "url": "https://betterflix.lat/api/player?id=1399&type=tv&season=1&episode=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "mes online grátis, séries completas e animes dublados. Nosso catálogo é atualizado diariamente co"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://betterflix.lol/api/player",
+          "status": 404
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "filmesyseries",
+      "name": "Filmes & Séries",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:30:41.846Z",
+      "url": "https://filmesyseries.epizy.com/embed-2/?type=movies&imdb=tt0137523",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://filmesyseries.epizy.com/embed-2/",
+          "status": 200
+        },
+        {
+          "url": "https://filmesyseries.epizy.com/embed-2/",
+          "status": 200
+        },
+        {
+          "url": "https://filmesyseries.epizy.com/embed-2/",
+          "status": 200
+        },
+        {
+          "url": "https://filmesyseries.epizy.com/embed-2/",
+          "status": 200
+        },
+        {
+          "url": "http://sv101.ifastnet.com/cookies.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidsrc-wiki",
+      "name": "VidSrc Wiki",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:30:41.922Z",
+      "url": "https://vidsrc.wiki/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidsrc.wiki/embed/movie/550/",
+          "title": "Fight Club — VidSrc – Movies and TV Seriees API no ADS",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidsrc.wiki/embed/movie/550/",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "56:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "vidsrc-wiki",
+      "name": "VidSrc Wiki",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:09.045Z",
+      "url": "https://vidsrc.wiki/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidsrc.wiki/embed/tv/1399/1/1/",
+          "title": "Game of Thrones — VidSrc – Movies and TV Seriees API no ADS",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidsrc.wiki/embed/tv/1399/1/1/",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "58:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "cinesrc",
+      "name": "CineSrc",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:17.028Z",
+      "url": "https://cinesrc.st/embed/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://cinesrc.st/embed/movie/550",
+          "title": "CineSrc - Free Video Streaming API | Embed Movies & TV Shows",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://cinesrc.st/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_FAILED"
+      ],
+      "clicks": [
+        "60:play"
+      ],
+      "extensionEvidence": {
+        "frame": "https://cinesrc.st/embed/movie/550",
+        "frameId": 60,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.703185,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.906858,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.908749,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.908767,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.908767,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.955443,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 17.159345,
+              "duration": 7984,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 18.177423,
+          "duration": 7984,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 18.180847,
+          "duration": 7984,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 7984,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "full",
+      "id": "cinesrc",
+      "name": "CineSrc",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:17.115Z",
+      "url": "https://cinesrc.st/embed/tv/1399?s=1&e=1",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://cinesrc.st/embed/tv/1399",
+          "title": "CineSrc - Free Video Streaming API | Embed Movies & TV Shows",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://cinesrc.st/embed/tv/1399",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_FAILED",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        "62:play"
+      ],
+      "extensionEvidence": {
+        "frame": "https://cinesrc.st/embed/tv/1399",
+        "frameId": 62,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.464521,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.667306,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.669624,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.669646,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.669646,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 3156.0332070000113,
+              "ready": 1,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 3156.0332070000113,
+              "ready": 1,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.459219,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.663204,
+              "duration": 3156.0332070000113,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 17.687258,
+          "duration": 3156.0332070000113,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.689092,
+          "duration": 3156.0332070000113,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 3156.0332070000113,
+          "ready": 1,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "full",
+      "id": "moviesapi",
+      "name": "MoviesAPI",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:33.517Z",
+      "url": "https://moviesapi.to/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "title": "MoviesAPI | Fight Club (1999)",
+          "videos": [
+            {
+              "paused": false,
+              "time": 1.464691,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://moviesapi.to/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        "64:Play"
+      ],
+      "extensionEvidence": {
+        "frame": "https://moviesapi.to/movie/550",
+        "frameId": 64,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": false,
+              "time": 2.501736,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 3.040438,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 4.241849,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 4.243642,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 4.243661,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 4.243661,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.469537,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.672266,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 17.68731,
+          "duration": 8348.375,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.689071,
+          "duration": 8348.375,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 8348.375,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "full",
+      "id": "moviesapi",
+      "name": "MoviesAPI",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:44.233Z",
+      "url": "https://moviesapi.to/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://moviesapi.to/tv/1399/1/1",
+          "title": "MoviesAPI | Game of Thrones S01E01",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://moviesapi.to/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED"
+      ],
+      "clicks": [
+        "66:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "vidzen",
+      "name": "VidZen",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:45.117Z",
+      "url": "https://vidzen.fun/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "commands_not_effective",
+      "nativeProtocol": "command-json-string",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "title": "Watch Movie — VidZen",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidzen.fun/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidzen.fun/movie/550",
+        "frameId": 68,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.626717,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.829184,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.831003,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.831024,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.831024,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.955283,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 17.157667,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": true,
+          "time": 17.159096,
+          "duration": 8348.3,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.159096,
+          "duration": 8348.3,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 17.159096,
+          "duration": 8348.3,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "full",
+      "id": "vidzen",
+      "name": "VidZen",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:49.432Z",
+      "url": "https://vidzen.fun/tv/1399/1/1",
+      "extensionControl": "confirmed",
+      "nativeControl": "commands_not_effective",
+      "nativeProtocol": "command-json-string",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidzen.fun/tv/1399/1/1",
+          "title": "Watch TV S1E1 — VidZen",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidzen.fun/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidzen.fun/tv/1399/1/1",
+        "frameId": 70,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.461859,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.663787,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.665382,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.6654,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.6654,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.458871,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.661484,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": true,
+          "time": 16.662953,
+          "duration": 3697.1,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 16.662953,
+          "duration": 3697.1,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 16.662953,
+          "duration": 3697.1,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "full",
+      "id": "videasy",
+      "name": "Videasy",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:32:02.995Z",
+      "url": "https://player.videasy.net/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.videasy.to/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FAILED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "videasy",
+      "name": "Videasy",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:32:05.992Z",
+      "url": "https://player.videasy.net/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.videasy.to/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FAILED",
+        "net::ERR_NAME_NOT_RESOLVED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "yapgrid",
+      "name": "YapGrid",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:32:19.424Z",
+      "url": "https://yapgrid.com/embed/movie/550?lang=pt",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://yapgrid.com/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/sandbox.php",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "yapgrid",
+      "name": "YapGrid",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:32:38.188Z",
+      "url": "https://yapgrid.com/embed/tv/1399/1/1?lang=pt",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://yapgrid.com/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/embed/tv/1399",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/sandbox.php",
+          "status": 403
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidbolt",
+      "name": "VidBolt",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:32:41.184Z",
+      "url": "https://vidbolt.pro/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidbolt.pro/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidbolt",
+      "name": "VidBolt",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:32:54.635Z",
+      "url": "https://vidbolt.pro/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidbolt.pro/embed/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "embos",
+      "name": "Embos",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:33:13.378Z",
+      "url": "https://embos.top/movie/?mid=550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://embos.top/movie/",
+          "status": 200
+        },
+        {
+          "url": "https://embos.top/movie/",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/sandbox.php",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "embos",
+      "name": "Embos",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:33:16.387Z",
+      "url": "https://embos.top/tv/?mid=1399&s=1&e=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://embos.top/tv/",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/embed/tv/1399/1-1",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/sandbox.php",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "unlimplay",
+      "name": "UnlimPlay",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:33:29.848Z",
+      "url": "https://unlimplay.com/f/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Carregamento sem vídeo acessível à extensão",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://unlimplay.com/f/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "unlimplay",
+      "name": "UnlimPlay",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:33:48.583Z",
+      "url": "https://unlimplay.com/f/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://unlimplay.com/f/embed/tv/1399/1/1",
+          "title": "UnLim Play",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://unlimplay.com/f/embed/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "screenscape",
+      "name": "ScreenScape",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:33:51.578Z",
+      "url": "https://screenscape.me/embed?tmdb=550&type=movie",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://screenscape.me/embed",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "screenscape",
+      "name": "ScreenScape",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:33:59.722Z",
+      "url": "https://screenscape.me/embed?tmdb=1399&type=tv&s=1&e=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://screenscape.me/embed",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "nsrplay",
+      "name": "NasriPlay",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:05.029Z",
+      "url": "https://nsrplay.space/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://nsrplay.space/api/v1/embed/hls-player",
+          "title": "Reproductor Directo",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        },
+        {
+          "frame": "https://nsrplay.space/embed/movie/550",
+          "title": "NasriPlay Player",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        },
+        {
+          "frame": "https://acceptable.a-ads.com/2446762/",
+          "title": "",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 2.834,
+              "ready": 4,
+              "network": 1,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 2.834,
+              "ready": 4,
+              "network": 1,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://nsrplay.space/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://nsrplay.space/api/v1/embed/hls-player",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        "108:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "nsrplay",
+      "name": "NasriPlay",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:07.879Z",
+      "url": "https://nsrplay.space/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://nsrplay.space/api/v1/embed/hls-player",
+          "title": "Reproductor Directo",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        },
+        {
+          "frame": "https://nsrplay.space/embed/tv/1399/1/1",
+          "title": "NasriPlay Player",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        },
+        {
+          "frame": "https://acceptable.a-ads.com/2446762/",
+          "title": "",
+          "videos": [
+            {
+              "paused": true,
+              "time": 2.110722,
+              "duration": 2.834,
+              "ready": 4,
+              "network": 1,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            {
+              "paused": true,
+              "time": 1.877137,
+              "duration": 2.834,
+              "ready": 4,
+              "network": 1,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://nsrplay.space/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://nsrplay.space/api/v1/embed/hls-player",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        "112:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "filesun",
+      "name": "FileSuN",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:23.835Z",
+      "url": "https://filesun.sbs/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://filesun.sbs/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://embedsun.cc/embed-y7ms7cb5hwm4.html",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.staticmoly.me/eblock.php",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_CERT_AUTHORITY_INVALID"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "filesun",
+      "name": "FileSuN",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:40.413Z",
+      "url": "https://filesun.sbs/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://filesun.sbs/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        },
+        {
+          "url": "https://embedsun.cc/embed-iidwm6etqoyx.html",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.staticmoly.me/eblock.php",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_CERT_AUTHORITY_INVALID"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-live",
+      "name": "VidPhantom Live",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:43.226Z",
+      "url": "https://vidphantom.live/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.live/movie/550",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": false,
+              "time": 1.949655,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.live/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FILE_NOT_FOUND"
+      ],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidphantom.live/movie/550",
+        "frameId": 127,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": false,
+              "time": 2.515439,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 3.015726,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 4.217681,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 4.220256,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 4.220291,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 4.220291,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.457976,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.660862,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      }
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-live",
+      "name": "VidPhantom Live",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:56.323Z",
+      "url": "https://vidphantom.live/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidphantom.live/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vidlink.pro/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "nulltext/html;charset=utf8,%3Chtml%3E%3Chead%3E%3Cscript%3Efunction%20success(data)%7Bwindow.parent.postMessage(%7Bid%3A%20'webrtc'%2C%20data%3A%20data%7D%2C%22*%22)%7Dfunction%20failure()%7Bwindow.parent.postMessage(%7Bid%3A%20'webrtc'%2Cdata%3A%20null%7D%2C%22*%22)%7Dtry%7BRTCPeerConnection.generateCertificate(%7Bname%3A%22ECDSA%22%2CnamedCurve%3A%22P-256%22%7D)%5B%22then%22%5D(success)%5B%22catch%22%5D(failure)%3B%7Dcatch(e)%7Bfailure()%7D%3C/script%3E%3C/head%3E%3C/html%3E",
+          "status": 200
+        },
+        {
+          "url": "nulltext/html;charset=utf8,%3Chtml%3E%3Chead%3E%3Cscript%3Efunction%20success(data)%7Bwindow.parent.postMessage(%7Bid%3A%20'audio'%2C%20data%3A%20data%7D%2C%22*%22)%7Dfunction%20failure()%7Bwindow.parent.postMessage(%7Bid%3A%20'audio'%2Cdata%3A%20null%7D%2C%22*%22)%7Dtry%7Bvar%20a%3Dnew%20AudioContext()%3B%20success(%5Ba%5B%22baseLatency%22%5D%2C%20a%5B%22outputLatency%22%5D%2C%20a%5B%22sampleRate%22%5D%2C%20a%5B%22state%22%5D%5D)%3B%7Dcatch(e)%7Bfailure()%7D%3C/script%3E%3C/head%3E%3C/html%3E",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FAILED",
+        "net::ERR_CERT_AUTHORITY_INVALID"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-online",
+      "name": "VidPhantom Online",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:34:59.070Z",
+      "url": "https://vidphantom.online/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.online/movie/550",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.online/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        "136:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-online",
+      "name": "VidPhantom Online",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:35:15.646Z",
+      "url": "https://vidphantom.online/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidphantom.online/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vidlink.pro/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_CERT_AUTHORITY_INVALID"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-site",
+      "name": "VidPhantom Site",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:35:31.639Z",
+      "url": "https://vidphantom.site/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.site/movie/550",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.site/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        "145:Play"
+      ],
+      "extensionEvidence": {
+        "frame": "https://vidphantom.site/movie/550",
+        "frameId": 145,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 1.100209,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 2.302884,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 2.305519,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 2.305539,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 2.305539,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.956519,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 17.158972,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      }
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-site",
+      "name": "VidPhantom Site",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:35:34.287Z",
+      "url": "https://vidphantom.site/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidphantom.site/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vidlink.pro/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://mc.yandex.ru/metrika/match.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_ABORTED",
+        "net::ERR_FAILED",
+        "net::ERR_CERT_AUTHORITY_INVALID"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-website",
+      "name": "VidPhantom Web",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:35:46.959Z",
+      "url": "https://vidphantom.website/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.website/movie/550",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": true,
+              "time": 2.474271,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.website/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FILE_NOT_FOUND"
+      ],
+      "clicks": [
+        "153:Play"
+      ],
+      "extensionEvidence": {
+        "frame": "https://vidphantom.website/movie/550",
+        "frameId": 153,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 2.474271,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 3.305962,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 4.508228,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 4.510141,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 4.510156,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 4.510156,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.956392,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 17.158433,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      }
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-website",
+      "name": "VidPhantom Web",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:35:50.945Z",
+      "url": "https://vidphantom.website/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidphantom.website/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        "156:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-xyz",
+      "name": "VidPhantom XYZ",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:36:01.958Z",
+      "url": "https://vidphantom.xyz/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.xyz/movie/550",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": false,
+              "time": 2.576739,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.xyz/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FILE_NOT_FOUND"
+      ],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidphantom.xyz/movie/550",
+        "frameId": 159,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 2.887028,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 3.717282,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": true,
+              "time": 4.664906,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": true,
+              "time": 4.664906,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 4.664906,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 4.664906,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.954056,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 17.15834,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      }
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom-xyz",
+      "name": "VidPhantom XYZ",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:36:09.581Z",
+      "url": "https://vidphantom.xyz/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidphantom.xyz/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        "162:Play"
+      ]
+    },
+    {
+      "batch": "full",
+      "id": "2embed-skin",
+      "name": "2Embed Skin",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:36:16.957Z",
+      "url": "https://www.2embed.skin/embed/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://www.2embed.skin/embed/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "2embed-skin",
+      "name": "2Embed Skin",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:36:26.140Z",
+      "url": "https://www.2embed.skin/embedtv/1399&s=1&e=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://www.2embed.skin/embedtv/1399&s=1&e=1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "2embed-cc",
+      "name": "2Embed CC",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:36:44.782Z",
+      "url": "https://www.2embed.cc/embed/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://www.2embed.cc/embed/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "2embed-cc",
+      "name": "2Embed CC",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:36:52.149Z",
+      "url": "https://www.2embed.cc/embedtv/1399&s=1&e=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://www.2embed.cc/embedtv/1399&s=1&e=1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "nontongo",
+      "name": "Nontongo",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:37:01.319Z",
+      "url": "https://www.nontongo.win/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://www.nontongo.win/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "nulltext/html;charset=utf8,%3Chtml%3E%3Chead%3E%3Cscript%3Efunction%20success(data)%7Bwindow.parent.postMessage(%7Bid%3A%20'webrtc'%2C%20data%3A%20data%7D%2C%22*%22)%7Dfunction%20failure()%7Bwindow.parent.postMessage(%7Bid%3A%20'webrtc'%2Cdata%3A%20null%7D%2C%22*%22)%7Dtry%7BRTCPeerConnection.generateCertificate(%7Bname%3A%22ECDSA%22%2CnamedCurve%3A%22P-256%22%7D)%5B%22then%22%5D(success)%5B%22catch%22%5D(failure)%3B%7Dcatch(e)%7Bfailure()%7D%3C/script%3E%3C/head%3E%3C/html%3E",
+          "status": 200
+        },
+        {
+          "url": "nulltext/html;charset=utf8,%3Chtml%3E%3Chead%3E%3Cscript%3Efunction%20success(data)%7Bwindow.parent.postMessage(%7Bid%3A%20'audio'%2C%20data%3A%20data%7D%2C%22*%22)%7Dfunction%20failure()%7Bwindow.parent.postMessage(%7Bid%3A%20'audio'%2Cdata%3A%20null%7D%2C%22*%22)%7Dtry%7Bvar%20a%3Dnew%20AudioContext()%3B%20success(%5Ba%5B%22baseLatency%22%5D%2C%20a%5B%22outputLatency%22%5D%2C%20a%5B%22sampleRate%22%5D%2C%20a%5B%22state%22%5D%5D)%3B%7Dcatch(e)%7Bfailure()%7D%3C/script%3E%3C/head%3E%3C/html%3E",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_FAILED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "nontongo",
+      "name": "Nontongo",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:37:19.972Z",
+      "url": "https://www.nontongo.win/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://nontongo.win/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "nulltext/html;charset=utf8,%3Chtml%3E%3Chead%3E%3Cscript%3Efunction%20success(data)%7Bwindow.parent.postMessage(%7Bid%3A%20'webrtc'%2C%20data%3A%20data%7D%2C%22*%22)%7Dfunction%20failure()%7Bwindow.parent.postMessage(%7Bid%3A%20'webrtc'%2Cdata%3A%20null%7D%2C%22*%22)%7Dtry%7BRTCPeerConnection.generateCertificate(%7Bname%3A%22ECDSA%22%2CnamedCurve%3A%22P-256%22%7D)%5B%22then%22%5D(success)%5B%22catch%22%5D(failure)%3B%7Dcatch(e)%7Bfailure()%7D%3C/script%3E%3C/head%3E%3C/html%3E",
+          "status": 200
+        },
+        {
+          "url": "nulltext/html;charset=utf8,%3Chtml%3E%3Chead%3E%3Cscript%3Efunction%20success(data)%7Bwindow.parent.postMessage(%7Bid%3A%20'audio'%2C%20data%3A%20data%7D%2C%22*%22)%7Dfunction%20failure()%7Bwindow.parent.postMessage(%7Bid%3A%20'audio'%2Cdata%3A%20null%7D%2C%22*%22)%7Dtry%7Bvar%20a%3Dnew%20AudioContext()%3B%20success(%5Ba%5B%22baseLatency%22%5D%2C%20a%5B%22outputLatency%22%5D%2C%20a%5B%22sampleRate%22%5D%2C%20a%5B%22state%22%5D%5D)%3B%7Dcatch(e)%7Bfailure()%7D%3C/script%3E%3C/head%3E%3C/html%3E",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_FAILED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc",
+      "name": "PrimeSrc",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:37:27.331Z",
+      "url": "https://primesrc.me/embed/movie?tmdb=550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/movie",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc",
+      "name": "PrimeSrc",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:37:36.532Z",
+      "url": "https://primesrc.me/embed/tv?tmdb=1399&season=1&episode=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/tv",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux",
+      "name": "VidLux",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:37:55.204Z",
+      "url": "https://vidlux.site/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux",
+      "name": "VidLux",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:02.542Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "cinezo",
+      "name": "Cinezo",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:03.355Z",
+      "url": "https://player.cinezo.live/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.cinezo.live/embed/movie/550",
+          "status": 403
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "cinezo",
+      "name": "Cinezo",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:10.684Z",
+      "url": "https://player.cinezo.live/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.cinezo.live/embed/tv/1399/1/1",
+          "status": 403
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-top",
+      "name": "VidLux Top",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:11.522Z",
+      "url": "https://vidlux.top/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.top/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-top",
+      "name": "VidLux Top",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:11.717Z",
+      "url": "https://vidlux.top/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.top/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-quilox",
+      "name": "VidLux Quilox",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:18.828Z",
+      "url": "https://vidlux.site/embed/movie/550?server=quilox",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-quilox",
+      "name": "VidLux Quilox",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:19.674Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1?server=quilox",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-spider",
+      "name": "VidLux Spider",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:19.875Z",
+      "url": "https://vidlux.site/embed/movie/550?server=spider",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-spider",
+      "name": "VidLux Spider",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:26.969Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1?server=spider",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-magic",
+      "name": "VidLux Magic",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:27.851Z",
+      "url": "https://vidlux.site/embed/movie/550?server=magic",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-magic",
+      "name": "VidLux Magic",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:28.019Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1?server=magic",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-dubai",
+      "name": "VidLux Dubai",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:35.112Z",
+      "url": "https://vidlux.site/embed/movie/550?server=dubai",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-dubai",
+      "name": "VidLux Dubai",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:35.999Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1?server=dubai",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-astra",
+      "name": "VidLux Astra",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:36.163Z",
+      "url": "https://vidlux.site/embed/movie/550?server=astra",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-astra",
+      "name": "VidLux Astra",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:43.262Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1?server=astra",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-vidrock",
+      "name": "VidLux VidRock",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:44.143Z",
+      "url": "https://vidlux.site/embed/movie/550?server=vidrock",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/movie/550",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidlux-vidrock",
+      "name": "VidLux VidRock",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:44.308Z",
+      "url": "https://vidlux.site/embed/tv/1399/1/1?server=vidrock",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidlux.site/embed/tv/1399/1/1",
+          "status": 404
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc-primevid",
+      "name": "PrimeSrc PrimeVid",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:51.406Z",
+      "url": "https://primesrc.me/embed/movie?tmdb=550&whitelistServers=PrimeVid",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/movie",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc-primevid",
+      "name": "PrimeSrc PrimeVid",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:52.306Z",
+      "url": "https://primesrc.me/embed/tv?tmdb=1399&season=1&episode=1&whitelistServers=PrimeVid",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/tv",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc-voe",
+      "name": "PrimeSrc Voe",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:38:52.453Z",
+      "url": "https://primesrc.me/embed/movie?tmdb=550&whitelistServers=Voe",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/movie",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc-voe",
+      "name": "PrimeSrc Voe",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:26.581Z",
+      "url": "https://primesrc.me/embed/tv?tmdb=1399&season=1&episode=1&whitelistServers=Voe",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/tv",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc-dood",
+      "name": "PrimeSrc Dood",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:27.503Z",
+      "url": "https://primesrc.me/embed/movie?tmdb=550&whitelistServers=Dood",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/movie",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "primesrc-dood",
+      "name": "PrimeSrc Dood",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:27.630Z",
+      "url": "https://primesrc.me/embed/tv?tmdb=1399&season=1&episode=1&whitelistServers=Dood",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://primesrc.me/embed/tv",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "autoembed-co",
+      "name": "AutoEmbed",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:01.683Z",
+      "url": "https://autoembed.co/movie/tmdb/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://autoembed.co/movie/tmdb/550",
+          "status": 200
+        },
+        {
+          "url": "https://player.autoembed.co/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://player.autoembed.co/asb.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "autoembed-co",
+      "name": "AutoEmbed",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:02.708Z",
+      "url": "https://autoembed.co/tv/tmdb/1399-1-1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Bloqueio pelo sandbox",
+      "sandboxBlock": true,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://autoembed.co/tv/tmdb/1399-1-1",
+          "status": 200
+        },
+        {
+          "url": "https://player.autoembed.co/embed/tv/1399/1-1/",
+          "status": 200
+        },
+        {
+          "url": "https://player.autoembed.co/asb.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom",
+      "name": "VidPhantom",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:02.804Z",
+      "url": "https://vidphantom.com/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.com/movie/550",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": false,
+              "time": 2.214902,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.com/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FILE_NOT_FOUND"
+      ],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidphantom.com/movie/550",
+        "frameId": 251,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": false,
+              "time": 2.892714,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 3.393088,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 4.596012,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 4.598646,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 4.598664,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 4.598664,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.45832,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.661391,
+              "duration": 8348.257004,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      }
+    },
+    {
+      "batch": "full",
+      "id": "vidphantom",
+      "name": "VidPhantom",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:15.887Z",
+      "url": "https://vidphantom.com/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidphantom.com/tv/1399/1/1",
+          "title": "Watch",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": 3697.0680000000343,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidphantom.com/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FILE_NOT_FOUND"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidcore",
+      "name": "VidCore",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:36.895Z",
+      "url": "https://www.vidcore.org/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidddt.alwaysdata.net/embed/movie/550",
+          "title": "VIDCORE",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://www.vidcore.org/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://vidddt.alwaysdata.net/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "vidcore",
+      "name": "VidCore",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:37.902Z",
+      "url": "https://www.vidcore.org/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidddt.alwaysdata.net/embed/tv/1399/1/1",
+          "title": "VIDCORE",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 3695.024999999972,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://www.vidcore.org/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vidddt.alwaysdata.net/embed/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_FAILED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "embed-api",
+      "name": "Embed API",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:51.087Z",
+      "url": "https://player.embed-api.stream/?id=550&type=movie",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.embed-api.stream/",
+          "status": 520
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "embed-api",
+      "name": "Embed API",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:40:59.231Z",
+      "url": "https://player.embed-api.stream/?id=1399&s=1&e=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.embed-api.stream/",
+          "status": 520
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "iembed",
+      "name": "iEmbed",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:41:07.379Z",
+      "url": "https://iembed.codeera.dev/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://iembed.codeera.dev/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_CONNECTION_REFUSED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "iembed",
+      "name": "iEmbed",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:41:12.093Z",
+      "url": "https://iembed.codeera.dev/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://iembed.codeera.dev/embed/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_CONNECTION_REFUSED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "mapple",
+      "name": "Mapple",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:41:13.093Z",
+      "url": "https://mapple.uk/watch/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://mapple.fun/watch/movie/550",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "full",
+      "id": "mapple",
+      "name": "Mapple",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:41:42.573Z",
+      "url": "https://mapple.uk/watch/tv/1399-1-1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://mapple.fun/watch/tv/1399-1-1",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "dubbed-550",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:58.962Z",
+      "url": "https://myembed.biz/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "29:WatchPlay Sem anúncios",
+        "29:Embed Play Sem anúncios"
+      ]
+    },
+    {
+      "batch": "dubbed-550",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:58.962Z",
+      "url": "https://myembed.biz/serie/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/serie/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/serie/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "30:WatchPlay Sem anúncios"
+      ]
+    },
+    {
+      "batch": "dubbed-550",
+      "id": "cdn-embed",
+      "name": "CDN Brasil",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:31:58.962Z",
+      "url": "https://cdn-embed.com/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://cdn-embed.com/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://embedplayabyss.top/player.html",
+          "status": 200
+        },
+        {
+          "url": "https://abysscdn.com/",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE",
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        "33:WatchPlay Sem anúncios",
+        "33:Embed Play Sem anúncios"
+      ]
+    },
+    {
+      "batch": "unprotected",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:33:12.764Z",
+      "url": "https://myembed.biz/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "50:WatchPlay Sem anúncios",
+        "50:Embed Play Sem anúncios"
+      ]
+    },
+    {
+      "batch": "unprotected",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:33:12.764Z",
+      "url": "https://myembed.biz/serie/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/serie/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/serie/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        "49:WatchPlay Sem anúncios"
+      ]
+    },
+    {
+      "batch": "unprotected",
+      "id": "cdn-embed",
+      "name": "CDN Brasil",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:33:12.764Z",
+      "url": "https://cdn-embed.com/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Erro HTTP na página/player",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://cdn-embed.com/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/550",
+          "status": 200
+        },
+        {
+          "url": "https://embedplayabyss.top/player.html",
+          "status": 200
+        },
+        {
+          "url": "https://abysscdn.com/",
+          "status": 403
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_RESPONSE",
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        "48:WatchPlay Sem anúncios",
+        "48:Embed Play Sem anúncios"
+      ]
+    },
+    {
+      "batch": "unprotected",
+      "id": "videasy",
+      "name": "Videasy",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:33:58.015Z",
+      "url": "https://player.videasy.net/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.videasy.to/movie/550",
+          "status": 200
+        },
+        {
+          "url": "nullapplication/pdf;base64,aG1t",
+          "status": 200
+        },
+        {
+          "url": "null/index.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FAILED",
+        "net::ERR_NAME_NOT_RESOLVED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "unprotected",
+      "id": "videasy",
+      "name": "Videasy",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:33:58.036Z",
+      "url": "https://player.videasy.net/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://player.videasy.to/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "nullapplication/pdf;base64,aG1t",
+          "status": 200
+        },
+        {
+          "url": "null/index.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FAILED"
+      ],
+      "clicks": []
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "vidsrc-wiki",
+      "name": "VidSrc Wiki",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:35:00.423Z",
+      "url": "https://vidsrc.wiki/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidsrc.wiki/embed/movie/550/",
+          "title": "Fight Club — VidSrc – Movies and TV Seriees API no ADS",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidsrc.wiki/embed/movie/550/",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        {
+          "control": "75:Play",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "vidsrc-wiki",
+      "name": "VidSrc Wiki",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:35:00.423Z",
+      "url": "https://vidsrc.wiki/embed/tv/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidsrc.wiki/embed/tv/1399/1/1/",
+          "title": "Game of Thrones — VidSrc – Movies and TV Seriees API no ADS",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 0,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidsrc.wiki/embed/tv/1399/1/1/",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        {
+          "control": "74:Play",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "yapgrid",
+      "name": "YapGrid",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:35:00.424Z",
+      "url": "https://yapgrid.com/embed/movie/550?lang=pt",
+      "extensionControl": "confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Portuguese · Variant #1",
+        "Portuguese — Português",
+        "Portuguese (BR) — Português (BR)"
+      ],
+      "media": [
+        {
+          "frame": "https://stellarconductornexus.com/embed/player/movie/550",
+          "title": "Fight Club 1999",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0.029104,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://yapgrid.com/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/player/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        {
+          "control": "78:Play",
+          "attempts": 1
+        },
+        {
+          "control": "79:Play",
+          "attempts": 1
+        }
+      ],
+      "extensionEvidence": {
+        "frame": "https://stellarconductornexus.com/embed/player/movie/550",
+        "frameId": 79,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": false,
+              "time": 0.777468,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 1.311092,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 2.515549,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 2.518527,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 2.518546,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 2.518546,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.460838,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.664351,
+              "duration": 8348.42300000013,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      }
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "yapgrid",
+      "name": "YapGrid",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:35:34.642Z",
+      "url": "https://yapgrid.com/embed/tv/1399/1/1?lang=pt",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://yapgrid.com/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/embed/tv/1399",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/player/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://vsembed.ru/embed/tv/1399",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        {
+          "control": "85:Play",
+          "attempts": 1
+        },
+        {
+          "control": "86:Play",
+          "attempts": 2
+        },
+        {
+          "control": "93:Play",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "vidbolt",
+      "name": "VidBolt",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:35:45.617Z",
+      "url": "https://vidbolt.pro/embed/movie/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://vidbolt.pro/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        {
+          "control": "90:Play",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "vidbolt",
+      "name": "VidBolt",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:35:45.637Z",
+      "url": "https://vidbolt.pro/embed/tv/1399/1/1",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidbolt.pro/embed/tv/1399/1/1",
+          "title": "Game of Thrones — VidBolt",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidbolt.pro/embed/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_FAILED"
+      ],
+      "clicks": [
+        {
+          "control": "91:Play",
+          "attempts": 1
+        }
+      ],
+      "extensionEvidence": {
+        "frame": "https://vidbolt.pro/embed/tv/1399/1/1",
+        "frameId": 91,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.466097,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.668727,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.67104,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.671067,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.671067,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.459314,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.661065,
+              "duration": 3543.68,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 17.665268,
+          "duration": 3543.68,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.667304,
+          "duration": 3543.68,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 3543.68,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "embos",
+      "name": "Embos",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:36:04.528Z",
+      "url": "https://embos.top/movie/?mid=550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://embos.top/movie/",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://embos.top/movie/",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/embed/movie/550",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED"
+      ],
+      "clicks": [
+        {
+          "control": "102:Play",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "unprotected-others",
+      "id": "embos",
+      "name": "Embos",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:36:20.137Z",
+      "url": "https://embos.top/tv/?mid=1399&s=1&e=1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Portuguese — Português",
+        "Portuguese (BR) — Português (BR)"
+      ],
+      "media": [
+        {
+          "frame": "https://stellarconductornexus.com/embed/player/tv/1399/1/1",
+          "title": "Game of Thrones 2011 · S01 E01",
+          "videos": [
+            {
+              "paused": false,
+              "time": 0,
+              "duration": null,
+              "ready": 0,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://embos.top/tv/",
+          "status": 200
+        },
+        {
+          "url": "https://vidsrc.sh/embed/tv/1399/1-1",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/tv/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://stellarconductornexus.com/embed/player/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_ABORTED",
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED"
+      ],
+      "clicks": [
+        {
+          "control": "108:Play",
+          "attempts": 2
+        },
+        {
+          "control": "109:Play",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "dubbed-808",
+      "id": "myembed",
+      "name": "MyEmbed",
+      "kind": "movie",
+      "sample": "808",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:37:57.646Z",
+      "url": "https://myembed.biz/filme/808",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://myembed.biz/filme/808",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/808",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        {
+          "control": "120:Embed Play Sem anúncios",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "dubbed-808",
+      "id": "cdn-embed",
+      "name": "CDN Brasil",
+      "kind": "movie",
+      "sample": "808",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:37:57.647Z",
+      "url": "https://cdn-embed.com/filme/808",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [
+        "Apenas dublado",
+        "Dublado"
+      ],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://cdn-embed.com/filme/808",
+          "status": 200
+        },
+        {
+          "url": "https://playerflix.ink/filme/808",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        {
+          "control": "122:Embed Play Sem anúncios",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "dubbed-808",
+      "id": "pomfy",
+      "name": "Pomfy",
+      "kind": "movie",
+      "sample": "808",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:37:57.647Z",
+      "url": "https://api.pomfy.stream/filme/808",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://api.pomfy.stream/filme/808",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        {
+          "control": "119:Assistir",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "observed-protocol",
+      "id": "moviesapi",
+      "name": "MoviesAPI",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:07.306Z",
+      "url": "https://moviesapi.to/movie/550",
+      "extensionControl": "partial",
+      "nativeControl": "confirmed",
+      "nativeProtocol": "action-object",
+      "status": "Vídeo sem reprodução/controlabilidade comprovada",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://moviesapi.to/movie/550",
+          "title": "MoviesAPI | Fight Club (1999)",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://moviesapi.to/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        {
+          "control": "127:Play",
+          "attempts": 3
+        }
+      ],
+      "extensionEvidence": {
+        "frame": "https://moviesapi.to/movie/550",
+        "frameId": 127,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.459434,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.661832,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.663808,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.663828,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.663828,
+              "duration": 8348.375,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.375,
+              "ready": 1,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.375,
+              "ready": 1,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15,
+              "duration": 8348.375,
+              "ready": 1,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "error": "Error: play_timeout",
+            "afterWait": {
+              "paused": false,
+              "time": 15,
+              "duration": 8348.375,
+              "ready": 1,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 15,
+          "duration": 8348.375,
+          "ready": 1,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 15,
+          "duration": 8348.375,
+          "ready": 1,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 8348.375,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "observed-protocol",
+      "id": "moviesapi",
+      "name": "MoviesAPI",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:07.306Z",
+      "url": "https://moviesapi.to/tv/1399/1/1",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "nativeProtocol": "action-object",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://moviesapi.to/tv/1399/1/1",
+          "title": "MoviesAPI | Game of Thrones S01E01",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://moviesapi.to/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB",
+        "net::ERR_NAME_NOT_RESOLVED",
+        "net::ERR_ABORTED"
+      ],
+      "clicks": [
+        {
+          "control": "128:Play",
+          "attempts": 3
+        }
+      ],
+      "extensionEvidence": {
+        "frame": "https://moviesapi.to/tv/1399/1/1",
+        "frameId": 128,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.461097,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.663737,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.665861,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.66588,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.66588,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.458659,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.664763,
+              "duration": 3697.243,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 17.686364,
+          "duration": 3697.243,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.688295,
+          "duration": 3697.243,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 3697.243,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "observed-protocol",
+      "id": "vidzen",
+      "name": "VidZen",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:07.306Z",
+      "url": "https://vidzen.fun/movie/550",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "nativeProtocol": "command-object",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidzen.fun/movie/550",
+          "title": "Watch Movie — VidZen",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidzen.fun/movie/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidzen.fun/movie/550",
+        "frameId": 129,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.462849,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.664895,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.667294,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.667316,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.667316,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.458526,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.660848,
+              "duration": 8348.3,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 17.665462,
+          "duration": 8348.3,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.667553,
+          "duration": 8348.3,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 8348.3,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "observed-protocol",
+      "id": "vidzen",
+      "name": "VidZen",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "protected",
+      "testedAt": "2026-10-13T17:39:23.211Z",
+      "url": "https://vidzen.fun/tv/1399/1/1",
+      "extensionControl": "confirmed",
+      "nativeControl": "confirmed",
+      "nativeProtocol": "command-object",
+      "status": "Controle por extensão comprovado",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [
+        {
+          "frame": "https://vidzen.fun/tv/1399/1/1",
+          "title": "Watch TV S1E1 — VidZen",
+          "videos": [
+            {
+              "paused": true,
+              "time": 0,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "url": "https://vidzen.fun/tv/1399/1/1",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [],
+      "extensionEvidence": {
+        "frame": "https://vidzen.fun/tv/1399/1/1",
+        "frameId": 131,
+        "controls": {
+          "play": {
+            "before": {
+              "paused": true,
+              "time": 0,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": false,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 0.461185,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 1.664667,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "pause": {
+            "before": {
+              "paused": false,
+              "time": 1.666688,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 1.666707,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "seek": {
+            "before": {
+              "paused": true,
+              "time": 1.666707,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": true,
+              "time": 15,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          },
+          "resume": {
+            "before": {
+              "paused": true,
+              "time": 15,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "after": {
+              "paused": false,
+              "time": 15.458986,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            },
+            "afterWait": {
+              "paused": false,
+              "time": 16.661302,
+              "duration": 3697.1,
+              "ready": 4,
+              "network": 2,
+              "error": null,
+              "muted": true,
+              "tracks": []
+            }
+          }
+        },
+        "seekTo": 15
+      },
+      "nativeEvidence": {
+        "play": {
+          "paused": false,
+          "time": 17.665693,
+          "duration": 3697.1,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "pause": {
+          "paused": true,
+          "time": 17.667678,
+          "duration": 3697.1,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        },
+        "seek": {
+          "paused": true,
+          "time": 25,
+          "duration": 3697.1,
+          "ready": 4,
+          "network": 2,
+          "error": null,
+          "muted": true,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "batch": "pomfy-selection",
+      "id": "pomfy",
+      "name": "Pomfy",
+      "kind": "movie",
+      "sample": "550",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:40:31.632Z",
+      "url": "https://api.pomfy.stream/filme/550",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://api.pomfy.stream/filme/550",
+          "status": 200
+        }
+      ],
+      "networkErrors": [],
+      "clicks": [
+        {
+          "control": "135:Assistir",
+          "attempts": 3
+        }
+      ]
+    },
+    {
+      "batch": "pomfy-selection",
+      "id": "pomfy",
+      "name": "Pomfy",
+      "kind": "tv",
+      "sample": "1399/1/1",
+      "mode": "unprotected",
+      "testedAt": "2026-10-13T17:40:31.632Z",
+      "url": "https://api.pomfy.stream/serie/1399/1/1",
+      "extensionControl": "not_confirmed",
+      "nativeControl": "not_confirmed",
+      "status": "Página/menu sem vídeo pronto",
+      "sandboxBlock": false,
+      "audioConfirmation": "not_verified",
+      "languageLabels": [],
+      "media": [],
+      "documents": [
+        {
+          "url": "https://api.pomfy.stream/serie/1399/1/1",
+          "status": 200
+        },
+        {
+          "url": "https://pomfy-cdn.shop/e/r0eykcs90o60",
+          "status": 200
+        },
+        {
+          "url": "https://n1mwq.org/igd/r0eykcs90o60",
+          "status": 200
+        },
+        {
+          "url": "nullapplication/pdf;base64,JVBERi0xLg0KdHJhaWxlcjw8L1Jvb3Q8PC9QYWdlczw8L0tpZHNbPDwvTWVkaWFCb3hbMCAwIDMgM10+Pl0+Pj4+Pj4=",
+          "status": 200
+        },
+        {
+          "url": "null/index.html",
+          "status": 200
+        }
+      ],
+      "networkErrors": [
+        "net::ERR_BLOCKED_BY_ORB"
+      ],
+      "clicks": [
+        {
+          "control": "134:Assistir",
+          "attempts": 3
+        },
+        {
+          "control": "134:Servidor 1Mais rápido e com boa qualidadeDisponível",
+          "attempts": 1
+        }
+      ]
+    }
+  ]
+}

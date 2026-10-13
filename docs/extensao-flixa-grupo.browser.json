@@ -1,0 +1,171 @@
+{
+  "providerId": "vidzen",
+  "source": "https://vidzen.fun/movie/550",
+  "browser": "Chrome/155.0.8059.39",
+  "extensionVersion": "1.0.0",
+  "realMedia": true,
+  "roomTransport": "Local test relay, not Ably",
+  "initialHost": {
+    "type": "flixa-group:extension",
+    "channel": "test-03ps6oh38h1w",
+    "sourceUrl": "https://vidzen.fun/movie/550",
+    "kind": "playback",
+    "event": "timeupdate",
+    "playback": {
+      "videoId": "1578d7c1-6f4d-4942-8ceb-ff54359fcb12",
+      "url": "https://vidzen.fun",
+      "currentTime": 0,
+      "duration": 8348.3,
+      "paused": true,
+      "ready": 4,
+      "buffering": false,
+      "error": ""
+    },
+    "receivedAt": 1791916103939
+  },
+  "initialGuest": {
+    "type": "flixa-group:extension",
+    "channel": "test-y7dr1gz2ei",
+    "sourceUrl": "https://vidzen.fun/movie/550",
+    "kind": "playback",
+    "event": "ready",
+    "playback": {
+      "videoId": "c5e21aa0-d9bb-4117-b3d5-839f338a6d36",
+      "url": "https://vidzen.fun",
+      "currentTime": 0,
+      "duration": 8348.3,
+      "paused": true,
+      "ready": 4,
+      "buffering": false,
+      "error": ""
+    },
+    "receivedAt": 1791916103928
+  },
+  "steps": [
+    {
+      "command": "pause",
+      "responses": [
+        {
+          "type": "flixa-group:extension",
+          "kind": "response",
+          "channel": "test-03ps6oh38h1w",
+          "requestId": "0.a6ki5iobmej",
+          "action": "command",
+          "ok": true
+        },
+        {
+          "type": "flixa-group:extension",
+          "kind": "response",
+          "channel": "test-y7dr1gz2ei",
+          "requestId": "0.ds219mcb0mb",
+          "action": "command",
+          "ok": true
+        }
+      ],
+      "host": {
+        "videoId": "1578d7c1-6f4d-4942-8ceb-ff54359fcb12",
+        "url": "https://vidzen.fun",
+        "currentTime": 0.018157,
+        "duration": 8348.3,
+        "paused": true,
+        "ready": 4,
+        "buffering": false,
+        "error": ""
+      },
+      "guest": {
+        "videoId": "c5e21aa0-d9bb-4117-b3d5-839f338a6d36",
+        "url": "https://vidzen.fun",
+        "currentTime": 0,
+        "duration": 8348.3,
+        "paused": true,
+        "ready": 4,
+        "buffering": false,
+        "error": ""
+      }
+    },
+    {
+      "command": "seek",
+      "time": 20,
+      "responses": [
+        {
+          "type": "flixa-group:extension",
+          "kind": "response",
+          "channel": "test-03ps6oh38h1w",
+          "requestId": "0.ot50ifi414",
+          "action": "command",
+          "ok": true
+        },
+        {
+          "type": "flixa-group:extension",
+          "kind": "response",
+          "channel": "test-y7dr1gz2ei",
+          "requestId": "0.4uy3epgs6tt",
+          "action": "command",
+          "ok": true
+        }
+      ],
+      "host": {
+        "videoId": "1578d7c1-6f4d-4942-8ceb-ff54359fcb12",
+        "url": "https://vidzen.fun",
+        "currentTime": 20,
+        "duration": 8348.3,
+        "paused": true,
+        "ready": 4,
+        "buffering": false,
+        "error": ""
+      },
+      "guest": {
+        "videoId": "c5e21aa0-d9bb-4117-b3d5-839f338a6d36",
+        "url": "https://vidzen.fun",
+        "currentTime": 20,
+        "duration": 8348.3,
+        "paused": true,
+        "ready": 4,
+        "buffering": false,
+        "error": ""
+      }
+    },
+    {
+      "command": "play",
+      "responses": [
+        {
+          "type": "flixa-group:extension",
+          "kind": "response",
+          "channel": "test-03ps6oh38h1w",
+          "requestId": "0.0k8rx61a2nri",
+          "action": "command",
+          "ok": true
+        },
+        {
+          "type": "flixa-group:extension",
+          "kind": "response",
+          "channel": "test-y7dr1gz2ei",
+          "requestId": "0.nsxc2cefcy",
+          "action": "command",
+          "ok": true
+        }
+      ],
+      "host": {
+        "videoId": "1578d7c1-6f4d-4942-8ceb-ff54359fcb12",
+        "url": "https://vidzen.fun",
+        "currentTime": 22.450202,
+        "duration": 8348.3,
+        "paused": false,
+        "ready": 4,
+        "buffering": false,
+        "error": ""
+      },
+      "guest": {
+        "videoId": "c5e21aa0-d9bb-4117-b3d5-839f338a6d36",
+        "url": "https://vidzen.fun",
+        "currentTime": 23.882214,
+        "duration": 8348.3,
+        "paused": false,
+        "ready": 4,
+        "buffering": false,
+        "error": ""
+      }
+    }
+  ],
+  "guestControlDenied": "Apenas o anfitrião controla a sala."
+}
