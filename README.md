@@ -44,13 +44,7 @@ As integrações externas são opcionais e devem ser configuradas no `.env` conf
 
 ## Assistir em grupo
 
-As salas sincronizam play, pause e posição pela extensão **Flixa Grupo**, usando o servidor selecionado no player. A opção **CineSrc sem extensão** permanece disponível. A página **Grupo** oferece o ZIP e o tutorial de instalação no Chrome. Configure `ABLY_API_KEY` e, preferencialmente, `WATCH_PARTY_SECRET` no servidor. A chave Ably deve permitir os recursos `watch-party:*`; os convidados recebem permissão de publicar apenas no canal de chat. Sem configuração, a interface informa a indisponibilidade e não cria salas.
-
-A [auditoria de todas as fontes](docs/auditoria-todas-fontes.md) registra os testes reais de controle interno e por extensão, incluindo filmes, séries e limitações de áudio dublado. A extensão controla os vídeos nos frames conhecidos quando a mídia está disponível; fontes sem vídeo pronto não podem criar uma sala.
-
-O criador compartilha o convite completo pelo player. Cada convidado precisa liberar a reprodução no vídeo uma vez quando o navegador bloquear autoplay. Consulte [configuração e validação](docs/assistir-junto-cinesrc.md) para os detalhes e testes pendentes.
-
-Consulte [extensão Flixa Grupo](docs/extensao-flixa-grupo.md) para instalação, arquitetura, geração do ZIP e limites dos testes.
+A página Grupo e as salas são restritas a administradores. A sincronização usa o player CineSrc. Configure `ABLY_API_KEY` e `WATCH_PARTY_SECRET` no servidor.
 
 ## Banco de dados
 

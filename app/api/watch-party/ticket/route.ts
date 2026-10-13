@@ -8,6 +8,9 @@ function ablyKey() { return (process.env.ABLY_API_KEY || "").trim(); }
 function signingSecret() { return (process.env.WATCH_PARTY_SECRET || ablyKey()).trim(); }
 
 export async function POST(request: Request) {
+  const usuario = await requireUsuario(request);
+  if (!usuario) return Response.json({ erro: "Não autenticado." }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  if (Number(usuario.administrador) !== 1) return Response.json({ erro: "Acesso restrito a administradores." }, { status: 403, headers: { "Cache-Control": "no-store" } });
   if (!WATCH_PARTY_ENABLED) {
     return Response.json(
       { erro: "O Assistir Junto está temporariamente desabilitado." },
@@ -17,8 +20,6 @@ export async function POST(request: Request) {
   if (!ablyKey() || !signingSecret()) {
     return Response.json({ erro: "Assistir em grupo não está configurado: o administrador precisa definir ABLY_API_KEY no servidor.", code: "not_configured" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-  const usuario = await requireUsuario(request);
-  if (!usuario) return Response.json({ erro: "Não autenticado." }, { status: 401 });
 
   let body: { action?: string; roomCode?: string; session?: string } = {};
   try {

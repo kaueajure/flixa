@@ -27,7 +27,6 @@ import PlayerServerMenu from "./player-server-menu";
 import { PlayerSandboxToggle, PlayerSandboxWarning, PlayerSandboxNotice } from "./player-sandbox-controls";
 import UsernameSetupModal from "./username-setup-modal";
 import WatchPartyControls from "./watch-party-controls";
-import GroupExtensionGuide from "./group-extension-guide";
 import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
 import { parsePlayerPlaybackEvent } from "../lib/player-events";
 import { useLivePresence } from "../lib/use-live-presence";
@@ -1062,6 +1061,7 @@ export default function Home() {
   }
 
   function goTo(hash: string) {
+    if (["assistir-em-grupo", "grupo"].includes(hash) && !authUser?.administrador) return;
     setProfileMenuOpen(false);
     const next = `#${hash}`;
     if (window.location.hash === next) return;
@@ -1187,6 +1187,7 @@ export default function Home() {
   }
 
   function createGroupSession(movie: Movie) {
+    if (!authUser?.administrador) return;
     if (!WATCH_PARTY_ENABLED) {
       showToast("O Assistir em grupo está temporariamente indisponível.");
       return;
@@ -1297,15 +1298,17 @@ export default function Home() {
           >
             Surpreenda-me
           </a>
-          <a
-            href="#assistir-em-grupo"
-            className={`nav-group-link ${view === "grupo" ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
-            onClick={() => goTo("assistir-em-grupo")}
-            aria-disabled={!WATCH_PARTY_ENABLED}
-          >
-            <span aria-hidden="true">◉</span>
-            Grupo
-          </a>
+          {authUser.administrador ? (
+            <a
+              href="#assistir-em-grupo"
+              className={`nav-group-link ${view === "grupo" ? "is-active" : ""} ${!WATCH_PARTY_ENABLED ? "is-disabled" : ""}`}
+              onClick={() => goTo("assistir-em-grupo")}
+              aria-disabled={!WATCH_PARTY_ENABLED}
+            >
+              <span aria-hidden="true">◉</span>
+              Grupo
+            </a>
+          ) : null}
         </nav>
 
         <div className="header-actions">
@@ -1347,6 +1350,7 @@ export default function Home() {
                   <Link role="menuitem" href="/configuracoes" onClick={() => setProfileMenuOpen(false)}>
                     Configurações da conta
                   </Link>
+                  {authUser.administrador ? (
                   <button
                     type="button"
                     role="menuitem"
@@ -1355,6 +1359,7 @@ export default function Home() {
                   >
                     Assistir em grupo {!WATCH_PARTY_ENABLED ? "· inativo" : ""}
                   </button>
+                  ) : null}
                   {authUser.administrador ? <a role="menuitem" href="/admin">Administração</a> : null}
                   <button className="profile-logout" type="button" role="menuitem" onClick={() => void logout()}>Sair</button>
                 </div>
@@ -1429,11 +1434,11 @@ export default function Home() {
         ) : view === "amigos" ? (
           <FriendsView username={authUser.username || ""} onOpenActivity={(activity) => void openFriendActivity(activity)} />
         ) : view === "grupo" ? (
-          <GroupWatchView
+          authUser.administrador ? <GroupWatchView
             movies={groupCandidates}
             onCreate={createGroupSession}
             onExplore={() => goTo("filmes")}
-          />
+          /> : <section className="list-view"><h1>Acesso restrito</h1><p>A página Grupo está disponível apenas para administradores.</p></section>
         ) : view === "lista" ? (
           <LibraryView
             items={listMovies}
@@ -1739,6 +1744,7 @@ export default function Home() {
           onClose={closePlayer}
           onProgress={handlePlayerProgress}
           onEpisodeChange={syncPlayerEpisode}
+          canUseGroup={authUser.administrador}
         />
       ) : null}
 
@@ -2604,8 +2610,6 @@ function GroupWatchView({
         <button className="secondary-action" type="button" onClick={onExplore}>Explorar catálogo</button>
       </div>
 
-      <GroupExtensionGuide />
-
       <div className="group-watch-guide" aria-label="Como criar uma sessão">
         <div className="group-watch-status"><span /> Salas em tempo real · até 12 pessoas</div>
         <ol>
@@ -3341,11 +3345,13 @@ function MoviePlayer({
   onClose,
   onProgress,
   onEpisodeChange,
+  canUseGroup = false,
 }: {
   movie: Movie;
   onClose: () => void;
   onProgress: (patch: PlaybackPatch) => void;
   onEpisodeChange?: (movie: Movie, season: number, episode: number) => void;
+  canUseGroup?: boolean;
 }) {
   const isTv = mediaKind(movie) === "tv";
   const localEpisodeControls = true;
@@ -3988,7 +3994,7 @@ function MoviePlayer({
           }}
         /> : null}
         {!sandboxEnabled ? <PlayerSandboxNotice onEnable={() => setSandboxEnabled(true)} /> : null}
-        <div className="watch-party-layer">
+        {canUseGroup ? <div className="watch-party-layer">
           <WatchPartyControls
             media={{
               id: titleId(movie),
@@ -4005,7 +4011,7 @@ function MoviePlayer({
             onSessionProviderChange={setPartyProviderId}
             providerFailure={partyFailure}
           />
-        </div>
+        </div> : null}
         {isFullscreen ? (
           <div className={`player-fs-dock ${fsDockVisible || menuPinned || episodePanelOpen ? "is-visible" : ""}`}>
             <div className="player-bar player-bar--dock">{playerChrome}</div>
@@ -4067,7 +4073,6 @@ function MoviePlayer({
           <iframe
             key={`${activeSource.src}:${sandboxEnabled ? "protected" : "unprotected"}`}
             ref={playerIframeRef}
-                data-flixa-group-player="true"
             className="video-stage"
             src={activeSource.src}
             onLoad={() => {

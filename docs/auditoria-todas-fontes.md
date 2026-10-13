@@ -101,21 +101,9 @@ Não foram validados áudio por escuta, todo o catálogo, navegadores móveis, e
 - npm test: build aprovado e 68 testes passaram, sem falhas. Esses testes automatizados não são prova de reprodução; a evidência real está nos estados do vídeo registrados pelo Chrome.
 - npx tsc --noEmit: aprovado.
 - ESLint dos novos scripts: aprovado.
-- Novos scripts: scripts/audit-player-controls.mjs e scripts/player-audit-extension/{manifest.json,background.js,probe.js}.
+- Os instrumentos de diagnóstico por extensão foram removidos do projeto.
 - Relatório e JSON nesta pasta; README recebeu o link da auditoria. Serviços, configurações e UI do site não foram alterados nesta tarefa.
 
 ## Repetir a auditoria
 
-Node 22 e Google Chrome com suporte a Extensions.loadUnpacked pelo protocolo local de depuração. Execute apenas em perfil temporário dedicado: a extensão de diagnóstico solicita acesso HTTP/HTTPS amplo para descobrir frames internos. Não a publique nem instale no perfil pessoal; uma extensão de produção precisará de permissões delimitadas e controle de origem/sala.
-
-```sh
-google-chrome --headless=new --disable-gpu --enable-unsafe-extension-debugging --remote-debugging-port=9226 --user-data-dir=/tmp/flixa-player-audit-profile about:blank
-```
-
-Em outro terminal, na raiz do projeto:
-
-```sh
-FLIXA_AUDIT_OUTPUT=/tmp/flixa-player-audit-results node --experimental-strip-types scripts/audit-player-controls.mjs
-```
-
-O script serve o wrapper apenas em 127.0.0.1:8190 e carrega/recarrega a extensão do diretório de diagnóstico. Use FLIXA_AUDIT_IDS para limitar fontes, FLIXA_AUDIT_KINDS=movie ou tv, FLIXA_AUDIT_LOAD_MS para ampliar a espera e FLIXA_AUDIT_MODE=unprotected para testar a opção sem sandbox. Ao terminar, encerre o Chrome temporário.
+O relatório é um registro histórico. A extensão e seus instrumentos de diagnóstico foram removidos; não há download nem integração com extensão no site.

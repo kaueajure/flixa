@@ -9,9 +9,7 @@ import {
   type TokenRequest,
 } from "ably";
 import { WATCH_PARTY_ENABLED } from "../lib/feature-flags";
-import GroupExtensionGuide from "./group-extension-guide";
-import { usePartyExtension } from "../lib/use-party-extension";
-import { getPlayerServer, playerServerIdForSource } from "../lib/player-servers";
+import { playerServerIdForSource } from "../lib/player-servers";
 
 import { PARTY_PLAYER_ORIGIN, cineSrcCommand, parseCineSrcEvent, parsePartyRoomState, partyTargetTime, samePartyMedia, samePartyDuration, type PartyProviderId, type PartyMedia, type PartyPlayback, type PartyRoomState } from "../lib/watch-party";
 
@@ -85,7 +83,7 @@ function currentTimestamp() {
   return Date.now();
 }
 
-function sendNativePlayerCommand(
+function sendPlayerCommand(
   iframe: HTMLIFrameElement | null,
   providerId: PartyProviderId,
   command: "play" | "pause" | "seek" | "getStatus",
@@ -125,24 +123,6 @@ function ActiveWatchPartyControls({
   const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [participantName, setParticipantName] = useState("");
-  const [preferredMode, setPreferredMode] = useState<"extension" | "native">("extension");
-  const [controlMode, setControlMode] = useState<"extension" | "native">("extension");
-  const [sessionSourceId, setSessionSourceId] = useState("");
-  const modeRef = useRef<"extension" | "native">("extension");
-  const sourceIdRef = useRef("");
-  const extension = usePartyExtension({ sourceUrl: activeSource?.src, providerId: activeSource ? playerServerIdForSource(activeSource.id) : "", role: controlMode === "extension" ? role || "preview" : "preview", roomCode: controlMode === "extension" ? roomCode : "" });
-  const extensionRef = useRef(extension);
-  useEffect(() => { extensionRef.current = extension; }, [extension]);
-  const sourceProvider = useCallback((source: PartySource | undefined, mode: "extension" | "native") => {
-    if (mode === "native") return providerFor(source);
-    if (!source) return null;
-    const id = playerServerIdForSource(source.id); const server = getPlayerServer(id);
-    try { return server && new URL(source.src).hostname.replace(/^www\./, "") === server.domain.replace(/^www\./, "") ? id : null; } catch { return null; }
-  }, []);
-  const sendPlayerCommand = useCallback((iframe: HTMLIFrameElement | null, provider: PartyProviderId, command: "play" | "pause" | "seek" | "getStatus", time?: number) => {
-    if (modeRef.current === "extension") extensionRef.current.command(command, time);
-    else sendNativePlayerCommand(iframe, provider, command, time);
-  }, []);
 
   const realtimeRef = useRef<Realtime | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -178,11 +158,8 @@ function ActiveWatchPartyControls({
   const mediaRef = useRef(media);
   const activeSourceRef = useRef(activeSource);
 
-  const compatibleSources = useMemo(() => sources.filter(source => sourceProvider(source, preferredMode)), [sources, preferredMode, sourceProvider]);
+  const compatibleSources = useMemo(() => sources.filter(source => providerFor(source)), [sources]);
 
-  useEffect(() => {
-    if (new URL(window.location.href).searchParams.get("partyMode") === "native") queueMicrotask(() => setPreferredMode("native"));
-  }, []);
 
   useEffect(() => { sourcesRef.current = sources; }, [sources]);
   useEffect(() => { mediaRef.current = media; }, [media]);
@@ -198,9 +175,7 @@ function ActiveWatchPartyControls({
     roomCodeRef.current = "";
     roleRef.current = "";
     providerRef.current = null;
-    sourceIdRef.current = "";
     hostStateStaleRef.current = false;
-    setSessionSourceId("");
     hostClientIdRef.current = "";
     sessionRef.current = "";
     pendingPlaybackRef.current = null;
@@ -221,7 +196,6 @@ function ActiveWatchPartyControls({
       const url = new URL(window.location.href);
       if (url.searchParams.has("party")) {
         url.searchParams.delete("party");
-        url.searchParams.delete("partyMode");
         window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
       }
     }
@@ -255,19 +229,14 @@ function ActiveWatchPartyControls({
     }
     sendPlayerCommand(playerRef.current, providerRef.current, playback.paused ? "pause" : "play");
     pausedRef.current = playback.paused;
-  }, [playerRef, sendPlayerCommand]);
+  }, [playerRef]);
 
-  const selectProvider = useCallback((nextProvider: PartyProviderId, playback?: PartyPlayback, sourceId?: string, mode: "native" | "extension" = modeRef.current) => {
-    if (mode === "extension" && !extensionRef.current.installed) { setError("Instale e conecte a extensão nesta aba para entrar nesta sala."); return false; }
-    const source = sourcesRef.current.find((item) => sourceProvider(item, mode) === nextProvider && (!sourceId || item.id === sourceId));
+  const selectProvider = useCallback((nextProvider: PartyProviderId, playback?: PartyPlayback) => {
+    const source = sourcesRef.current.find((item) => providerFor(item) === nextProvider);
     if (!source) {
       setError(`O servidor ${nextProvider} não está disponível para este título.`);
       return false;
     }
-    modeRef.current = mode;
-    setControlMode(mode);
-    setSessionSourceId(source.id);
-    sourceIdRef.current = source.id;
     providerRef.current = nextProvider;
     setProviderId(nextProvider);
     onSessionProviderChange?.(source.id);
@@ -280,7 +249,7 @@ function ActiveWatchPartyControls({
       }, 900);
     }
     return true;
-  }, [applyPlayback, onSelectSource, onSessionProviderChange, sourceProvider]);
+  }, [applyPlayback, onSelectSource, onSessionProviderChange]);
 
   const refreshParticipants = useCallback(async () => {
     const channel = channelRef.current;
@@ -312,8 +281,6 @@ function ActiveWatchPartyControls({
     const state: PartyRoomState = {
       media: mediaRef.current,
       providerId: selectedProvider,
-      controlMode: modeRef.current,
-      sourceId: sourceIdRef.current,
       playback: { ...playback, ...(durationRef.current > 0 ? { durationSeconds: durationRef.current } : {}) },
     };
     pendingPlaybackRef.current = state.playback;
@@ -339,10 +306,10 @@ function ActiveWatchPartyControls({
     lastHostStateAtRef.current = Date.now();
     if (hostStateStaleRef.current) { hostStateStaleRef.current = false; setError(""); }
     if (data.type === "sync") {
-      if (state.providerId !== providerRef.current || (state.sourceId && state.sourceId !== sourceIdRef.current) || (state.controlMode || "native") !== modeRef.current) return;
+      if (state.providerId !== providerRef.current) return;
       applyPlayback(state.playback, data.action === "seek");
     } else if (data.type === "provider") {
-      selectProvider(state.providerId, state.playback, state.sourceId, state.controlMode || "native");
+      selectProvider(state.providerId, state.playback);
       setError("O anfitrião trocou o servidor para todos.");
     }
   }, [applyPlayback, closeRealtime, resetSession, selectProvider]);
@@ -385,12 +352,9 @@ function ActiveWatchPartyControls({
   const connect = useCallback(async (mode: "create" | "join", requestedCode = "") => {
     if (connectPendingRef.current) return;
     const generation = ++connectGenerationRef.current;
-    modeRef.current = preferredMode;
-    if (preferredMode === "extension" && !extensionRef.current.installed) { setError("Instale e conecte a extensão ao Flixa antes de abrir a sala."); updateOpen(true); return; }
     const candidate = mode === "create"
-      ? preferredMode === "extension" ? activeSourceRef.current : sourcesRef.current.find(source => sourceProvider(source, "native"))
+      ? sourcesRef.current.find(source => providerFor(source))
       : null;
-    if (mode === "create" && preferredMode === "extension" && (!candidate || !sourceProvider(candidate, "extension") || !extensionRef.current.ready)) { setError("Escolha um servidor e inicie o vídeo antes de criar a sala."); updateOpen(true); return; }
     if (mode === "create" && !candidate) {
       setError("Nenhum player compatível com sessão compartilhada está disponível para este título.");
       updateOpen(true);
@@ -511,17 +475,16 @@ function ActiveWatchPartyControls({
 
       let roomState: PartyRoomState;
       if (mode === "create" && candidate) {
-        const nextProvider = sourceProvider(candidate, preferredMode);
+        const nextProvider = providerFor(candidate);
         if (!nextProvider) throw new Error("O player escolhido não permite sincronização.");
         onSelectSource(candidate.id);
         const playback: PartyPlayback = {
           paused: true,
-          currentTime: preferredMode === "extension" ? extensionRef.current.playback?.currentTime || 0 : 0,
-          ...(preferredMode === "extension" && extensionRef.current.playback?.duration ? { durationSeconds: extensionRef.current.playback.duration } : {}),
+          currentTime: 0,
           updatedAt: Date.now() + serverClockOffsetRef.current,
           sequence: 0,
         };
-        roomState = { media: mediaRef.current, providerId: nextProvider, playback, controlMode: preferredMode, sourceId: candidate.id };
+        roomState = { media: mediaRef.current, providerId: nextProvider, playback };
         hostClientIdRef.current = data.clientId;
         await channel.presence.enter({ name: participantNameRef.current, role: "host", state: roomState } satisfies PartyPresenceData);
         await channel.publish("party", { type: "sync", action: "state", ...roomState } satisfies PartyRealtimeMessage);
@@ -568,13 +531,12 @@ function ActiveWatchPartyControls({
       const canControl = data.role === "host";
       setUnlocked(canControl);
       unlockedRef.current = canControl;
-      if (!selectProvider(roomState.providerId, roomState.playback, roomState.sourceId, roomState.controlMode || "native")) throw new Error("O player da sala não está disponível neste título.");
+      if (!selectProvider(roomState.providerId, roomState.playback)) throw new Error("O player da sala não está disponível neste título.");
       await refreshParticipants();
       setConnecting(false);
       setError("");
       const url = new URL(window.location.href);
       url.searchParams.set("party", code);
-      url.searchParams.set("partyMode", roomState.controlMode || "native");
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     } catch (cause) {
       if (generation !== connectGenerationRef.current) return;
@@ -596,15 +558,12 @@ function ActiveWatchPartyControls({
     resetSession,
     selectProvider,
     updateOpen,
-    preferredMode,
-    sourceProvider,
   ]);
 
   useEffect(() => {
-    if (autoJoinAttemptedRef.current || compatibleSources.length === 0 || (preferredMode === "extension" && !extension.installed)) return;
+    if (autoJoinAttemptedRef.current || compatibleSources.length === 0) return;
     const partyValue = new URL(window.location.href).searchParams.get("party") || "";
     if (partyValue.toLowerCase() === "create") {
-      if (preferredMode === "extension" && !extension.ready) { queueMicrotask(() => updateOpen(true)); return; }
       autoJoinAttemptedRef.current = true;
       queueMicrotask(() => void connect("create"));
       return;
@@ -613,7 +572,7 @@ function ActiveWatchPartyControls({
     if (inviteCode.length !== 6) return;
     autoJoinAttemptedRef.current = true;
     queueMicrotask(() => void connect("join", inviteCode));
-  }, [compatibleSources.length, connect, preferredMode, extension.installed, extension.ready, updateOpen]);
+  }, [compatibleSources.length, connect]);
 
   useEffect(() => {
     if (!open) return;
@@ -632,27 +591,22 @@ function ActiveWatchPartyControls({
   }, [open, updateOpen]);
 
   useEffect(() => {
-    const nextProvider = sourceProvider(activeSource, modeRef.current);
+    const nextProvider = providerFor(activeSource);
     if (!nextProvider || nextProvider !== providerRef.current || !roomCodeRef.current) return;
     const timer = window.setTimeout(() => {
       sendPlayerCommand(playerRef.current, nextProvider, "getStatus");
       if (pendingPlaybackRef.current) applyPlayback(pendingPlaybackRef.current, true);
     }, 850);
     return () => window.clearTimeout(timer);
-  }, [activeSource, applyPlayback, playerRef, sendPlayerCommand, sourceProvider]);
+  }, [activeSource, applyPlayback, playerRef]);
 
   useEffect(() => {
     const onPlayerMessage = (event: MessageEvent) => {
       const currentProvider = providerRef.current;
       const iframe = playerRef.current;
       if (!currentProvider || !iframe?.contentWindow) return;
-      if (modeRef.current === "native" && (event.source !== iframe.contentWindow || event.origin !== PARTY_PLAYER_ORIGIN)) return;
-      const parsed = modeRef.current === "extension" ? extensionRef.current.parseEvent(event) : parsePlayerEvent(event, currentProvider);
-      if (parsed && "hostCommand" in parsed) {
-        if (roleRef.current === "host" && typeof parsed.hostCommand === "string" && ["play", "pause", "seek"].includes(parsed.hostCommand)) sendPlayerCommand(iframe, currentProvider, parsed.hostCommand as "play" | "pause" | "seek", parsed.time);
-        return;
-      }
-      const playerEvent = parsed;
+      if (event.source !== iframe.contentWindow || event.origin !== PARTY_PLAYER_ORIGIN) return;
+      const playerEvent = parsePlayerEvent(event, currentProvider);
       if (!playerEvent) return;
 
       if (playerEvent.name === "response") {
@@ -678,7 +632,7 @@ function ActiveWatchPartyControls({
         applyPlayback(pendingPlaybackRef.current, true);
       }
       if (roleRef.current === "guest" && pendingPlaybackRef.current) {
-        if ((playerEvent.name === "play" || (modeRef.current === "extension" && playerEvent.paused === false)) && !unlockedRef.current) {
+        if (playerEvent.name === "play" && !unlockedRef.current) {
           unlockedRef.current = true;
           setUnlocked(true);
           applyPlayback(pendingPlaybackRef.current, true);
@@ -710,7 +664,7 @@ function ActiveWatchPartyControls({
     };
     window.addEventListener("message", onPlayerMessage);
     return () => window.removeEventListener("message", onPlayerMessage);
-  }, [applyPlayback, playerRef, publishRoomState, sendPlayerCommand]);
+  }, [applyPlayback, playerRef, publishRoomState]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -723,7 +677,7 @@ function ActiveWatchPartyControls({
       }
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [playerRef, roomCode, sendPlayerCommand]);
+  }, [playerRef, roomCode]);
 
   useEffect(() => () => {
     ++connectGenerationRef.current;
@@ -775,7 +729,6 @@ function ActiveWatchPartyControls({
   async function copyInvite() {
     const url = new URL(window.location.href);
     url.searchParams.set("party", roomCodeRef.current);
-    url.searchParams.set("partyMode", modeRef.current);
     try {
       await navigator.clipboard.writeText(url.toString());
       setCopied(true);
@@ -812,7 +765,7 @@ function ActiveWatchPartyControls({
     void channel.publish("chat", message).catch(() => setError("Não foi possível enviar a mensagem."));
   }
 
-  const providerName = sources.find((source) => source.id === sessionSourceId)?.name || providerId;
+  const providerName = sources.find((source) => providerFor(source) === providerId)?.name || providerId;
 
   return (
     <div className={`watch-party ${open ? "is-open" : ""} ${roomCode ? "is-connected" : ""}`} ref={menuRef}>
@@ -838,9 +791,7 @@ function ActiveWatchPartyControls({
           {!roomCode ? (
             <div className="watch-party-join">
               <p>Play, pausa e avanço ficam sincronizados. O anfitrião controla o filme para todos.</p>
-              <div className="watch-party-mode" aria-label="Como sincronizar"><button type="button" aria-pressed={preferredMode === "extension"} disabled={connecting} onClick={() => setPreferredMode("extension")}>Extensão · servidor atual</button><button type="button" aria-pressed={preferredMode === "native"} disabled={connecting} onClick={() => setPreferredMode("native")}>CineSrc · sem extensão</button></div>
-              {preferredMode === "extension" ? <><p role="status">{extension.installed ? extension.status : "Conecte a extensão Flixa Grupo nesta aba."}</p>{!extension.installed ? <GroupExtensionGuide compact /> : null}</> : null}
-              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0 || (preferredMode === "extension" && (!extension.installed || !extension.ready))} onClick={() => void connect("create")}>
+              <button type="button" className="watch-party-primary" disabled={connecting || compatibleSources.length === 0} onClick={() => void connect("create")}>
                 {connecting ? "Conectando…" : "Criar uma sala"}
               </button>
               <div className="watch-party-code-row">
@@ -851,9 +802,9 @@ function ActiveWatchPartyControls({
                   aria-label="Código da sala"
                   maxLength={6}
                 />
-                <button type="button" disabled={connecting || codeInput.length !== 6 || (preferredMode === "extension" && !extension.installed)} onClick={() => void connect("join", codeInput)}>Entrar</button>
+                <button type="button" disabled={connecting || codeInput.length !== 6} onClick={() => void connect("join", codeInput)}>Entrar</button>
               </div>
-              <small>{preferredMode === "extension" ? "A sala mantém o servidor atual. Todos devem escolher a mesma versão e áudio dentro do player." : "CineSrc sincronizado pelo site, sem precisar da extensão."}</small>
+              <small>Sincronização pelo player CineSrc.</small>
             </div>
           ) : (
             <div className="watch-party-room">
@@ -868,9 +819,8 @@ function ActiveWatchPartyControls({
               <div className="watch-party-provider">
                 <span>Player sincronizado</span>
                 <strong>{providerName}</strong>
-                {providerId ? <small>{controlMode === "extension" ? "Controles pela extensão Flixa Grupo" : PARTY_PROVIDER_LABELS[providerId]}</small> : null}
+                {providerId ? <small>{PARTY_PROVIDER_LABELS[providerId]}</small> : null}
               </div>
-              {controlMode === "extension" ? <p className="watch-party-extension-status" role="status">{extension.installed ? extension.status : "Extensão desconectada. Reconecte para sincronizar."}</p> : null}
               {role === "guest" && !unlocked ? (
                 <button type="button" className="watch-party-primary" onClick={unlockAndSync}>Liberar reprodução e sincronizar</button>
               ) : null}

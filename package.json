@@ -18,9 +18,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db-migrate.mjs",
-    "db:seed": "node scripts/db-seed.mjs",
-    "extension:build": "node --experimental-strip-types scripts/build-group-extension.mjs",
-    "prebuild": "npm run extension:build"
+    "db:seed": "node scripts/db-seed.mjs"
   },
   "dependencies": {
     "ably": "^2.27.0",

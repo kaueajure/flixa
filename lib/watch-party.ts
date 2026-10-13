@@ -1,8 +1,7 @@
-import { getPlayerServer, playerServerIdForSource } from "./player-servers.ts";
-export type PartyProviderId = string;
+export type PartyProviderId = "cinesrc";
 export type PartyMedia = { id: string; title: string; kind: "movie" | "tv"; season?: number; episode?: number };
 export type PartyPlayback = { paused: boolean; currentTime: number; updatedAt: number; sequence: number; durationSeconds?: number };
-export type PartyRoomState = { media: PartyMedia; providerId: PartyProviderId; playback: PartyPlayback; controlMode?: "native" | "extension"; sourceId?: string };
+export type PartyRoomState = { media: PartyMedia; providerId: PartyProviderId; playback: PartyPlayback };
 export const PARTY_PLAYER_ORIGIN = "https://cinesrc.st";
 
 export function partyCapabilities(roomCode: string, role: "host" | "guest") {
@@ -19,12 +18,12 @@ export function samePartyMedia(left: PartyMedia, right: PartyMedia) {
 
 export function parsePartyRoomState(input: unknown): PartyRoomState | null {
   if (!input || typeof input !== "object") return null;
-  const { media, playback, providerId, controlMode, sourceId } = input as Partial<PartyRoomState>;
-  if (!validPartySource(providerId, controlMode, sourceId) || !media || !playback || typeof media.id !== "string" || !media.id || media.id.length > 120 || typeof media.title !== "string" || media.title.length > 300 || (media.kind !== "movie" && media.kind !== "tv")) return null;
+  const { media, playback, providerId } = input as Partial<PartyRoomState>;
+  if (providerId !== "cinesrc" || !media || !playback || typeof media.id !== "string" || !media.id || media.id.length > 120 || typeof media.title !== "string" || media.title.length > 300 || (media.kind !== "movie" && media.kind !== "tv")) return null;
   if (media.kind === "tv" && (!Number.isSafeInteger(media.season) || Number(media.season) < 1 || !Number.isSafeInteger(media.episode) || Number(media.episode) < 1)) return null;
   if (typeof playback.paused !== "boolean" || !Number.isFinite(playback.currentTime) || playback.currentTime < 0 || playback.currentTime > 604800 || !Number.isFinite(playback.updatedAt) || playback.updatedAt <= 0 || !Number.isSafeInteger(playback.sequence) || playback.sequence < 0) return null;
   if (playback.durationSeconds != null && (!Number.isFinite(playback.durationSeconds) || playback.durationSeconds <= 0 || playback.durationSeconds > 604800)) return null;
-  return { providerId: providerId!, media, playback, ...(controlMode ? { controlMode } : {}), ...(sourceId ? { sourceId } : {}) };
+  return { providerId: providerId!, media, playback };
 }
 
 export function partyTargetTime(playback: PartyPlayback, now = Date.now()) {
@@ -52,10 +51,4 @@ export function parseCineSrcEvent(input: unknown) {
     command: typeof data.command === "string" ? data.command : "",
     result: data.result,
   };
-}
-
-export function validPartySource(providerId: unknown, mode: unknown, sourceId: unknown) {
-  if (mode == null || mode === "native") return providerId === "cinesrc" && (sourceId == null || sourceId === "cinesrc");
-  if (mode !== "extension" || typeof providerId !== "string" || !getPlayerServer(providerId) || typeof sourceId !== "string" || !/^[a-z0-9-]{1,64}$/i.test(sourceId)) return false;
-  return playerServerIdForSource(sourceId) === providerId;
 }
