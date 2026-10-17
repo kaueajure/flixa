@@ -1,3 +1,4 @@
+import appSettings from "../config/app.json" with { type: "json" };
 import {
   SPORTS_LEAGUES,
   addSportsVideoSource,
@@ -61,19 +62,11 @@ function authorizedEmbedRecords(value: unknown): AuthorizedEmbed[] {
 
 async function authorizedEmbeds() {
   const entries: AuthorizedEmbed[] = [];
-  const inline = process.env.SPORTS_AUTHORIZED_EMBEDS_JSON?.trim();
-  if (inline) {
-    try {
-      entries.push(...authorizedEmbedRecords(JSON.parse(inline)));
-    } catch {
-      throw new Error("SPORTS_AUTHORIZED_EMBEDS_JSON contém JSON inválido");
-    }
-  }
-
-  const feed = process.env.SPORTS_AUTHORIZED_EMBEDS_URL?.trim();
+  entries.push(...authorizedEmbedRecords(appSettings.sports.authorizedEmbeds));
+  const feed = appSettings.sports.authorizedEmbedsUrl.trim();
   if (feed) {
     const url = new URL(feed);
-    if (url.protocol !== "https:") throw new Error("SPORTS_AUTHORIZED_EMBEDS_URL precisa usar HTTPS");
+    if (url.protocol !== "https:") throw new Error("sports.authorizedEmbedsUrl em config/app.json precisa usar HTTPS");
     entries.push(...authorizedEmbedRecords(await jsonRequest(url)));
   }
   return entries;
@@ -125,8 +118,7 @@ async function buildCatalog(): Promise<SportsCatalogResponse> {
     errors,
     updatedAt: new Date().toISOString(),
     liveSourceConfigured: Boolean(
-      process.env.SPORTS_AUTHORIZED_EMBEDS_JSON?.trim().replace(/^\[\s*\]$/, "")
-      || process.env.SPORTS_AUTHORIZED_EMBEDS_URL?.trim(),
+      appSettings.sports.authorizedEmbeds.length || appSettings.sports.authorizedEmbedsUrl.trim(),
     ),
   };
 }

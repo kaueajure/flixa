@@ -1,3 +1,4 @@
+import appSettings from "../config/app.json" with { type: "json" };
 import { createConnection, createPool, type ConnectionOptions, type Pool } from "mysql2/promise";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "./schema";
@@ -18,7 +19,7 @@ function requiredEnv(name: string) {
 function mysqlConnectionOptions(): ConnectionOptions {
   return {
     host: requiredEnv("MYSQL_HOST"),
-    port: Number(process.env.MYSQL_PORT || "3306"),
+    port: appSettings.mysql.port,
     user: requiredEnv("MYSQL_USER"),
     password: requiredEnv("MYSQL_PASSWORD"),
     database: requiredEnv("MYSQL_DATABASE"),
@@ -29,7 +30,7 @@ function mysqlConnectionOptions(): ConnectionOptions {
     timezone: "Z",
     dateStrings: true,
     // Na Hostinger, use MYSQL_HOST=localhost (não o hostname público srv….hstgr.io).
-    connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || "8000"),
+    connectTimeout: appSettings.mysql.connectTimeoutMs,
   };
 }
 

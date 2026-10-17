@@ -82,9 +82,6 @@ export function lerTokenCookie(cookieHeader: string | null) {
 }
 
 export function cookieDeveSerSecure(request?: Request) {
-  if (process.env.FLIXA_COOKIE_SECURE === "1") return true;
-  if (process.env.FLIXA_COOKIE_SECURE === "0") return false;
-
   const forwarded = request?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
   if (forwarded === "https") return true;
   if (forwarded === "http") return false;

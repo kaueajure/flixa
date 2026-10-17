@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-10-17T19:38:45.455Z",
+  "mockResponses": false,
+  "configuration": {
+    "sylnEnabled": true,
+    "hasToken": true,
+    "extraValidationVariablesRequired": false
+  },
+  "operations": {
+    "catalog": {
+      "imported": 24,
+      "hasMore": true,
+      "page": 1
+    },
+    "detail": {
+      "id": "moboreels:35631449",
+      "normalized": true,
+      "episodeCount": 60
+    },
+    "episodes": {
+      "count": 60,
+      "available": 42,
+      "normalized": true
+    },
+    "cachedRead": {
+      "visibleTitles": 24,
+      "additionalProviderRequests": 0
+    }
+  },
+  "requests": [
+    {
+      "path": "/v1/catalog",
+      "status": 200
+    },
+    {
+      "path": "/v1/titles/moboreels%3A35631449",
+      "status": 200
+    },
+    {
+      "path": "/v1/titles/moboreels%3A35631449/episodes",
+      "status": 200
+    }
+  ],
+  "playbackTested": false
+}

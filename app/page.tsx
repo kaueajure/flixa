@@ -22,6 +22,7 @@ import RetrospectiveView from "./retrospective-view";
 import SeriesRecapModal from "./series-recap-modal";
 import SiteIntro from "./site-intro";
 import SportsView from "./sports-view";
+import MiniseriesView from "./miniseries-view";
 import PageLoadingBoundary, { usePageReady } from "./page-loading-boundary";
 import PlayerServerMenu from "./player-server-menu";
 import { PlayerSandboxToggle, PlayerSandboxWarning, PlayerSandboxNotice } from "./player-sandbox-controls";
@@ -71,7 +72,7 @@ type Movie = {
 };
 
 type Genre = { id: number; name: string };
-type View = "home" | "filmes" | "series" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos" | "retrospectiva";
+type View = "home" | "filmes" | "series" | "minisseries" | "esportes" | "lista" | "surpreenda-me" | "grupo" | "amigos" | "retrospectiva";
 
 type AuthUser = {
   id: number;
@@ -422,6 +423,7 @@ function parseRoute(hash: string) {
   }
   if (raw === "minha-lista" || raw === "lista") return { view: "lista" as View };
   if (raw === "esportes" || raw === "sports") return { view: "esportes" as View };
+  if (/^minisseries(?:\/mini_[a-z0-9-]{36})?$/.test(raw)) return { view: "minisseries" as View };
   if (raw === "surpreenda-me" || raw === "roleta") return { view: "surpreenda-me" as View };
   if (raw === "assistir-em-grupo" || raw === "grupo") return { view: "grupo" as View };
   if (raw === "amigos" || raw === "amizades") return { view: "amigos" as View };
@@ -555,6 +557,7 @@ export default function Home() {
       home: "Flixa — Sua próxima história",
       filmes: "Filmes — Flixa",
       series: "Séries — Flixa",
+      minisseries: "Minisséries — Flixa",
       lista: "Minha Lista — Flixa",
       "surpreenda-me": "Surpreenda-me — Flixa",
       esportes: "Esportes ao vivo — Flixa",
@@ -818,6 +821,7 @@ export default function Home() {
       if (event && (
         route.view === "filmes" ||
         route.view === "series" ||
+        route.view === "minisseries" ||
         route.view === "esportes" ||
         route.view === "lista" ||
         route.view === "surpreenda-me" ||
@@ -1224,6 +1228,7 @@ export default function Home() {
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        if (view === "minisseries") { document.getElementById("miniseries-search")?.focus(); return; }
         setSearchOpen((value) => !value);
         setQuery("");
         return;
@@ -1231,6 +1236,7 @@ export default function Home() {
 
       if (event.key === "/" && !typing && !playerMovie) {
         event.preventDefault();
+        if (view === "minisseries") { document.getElementById("miniseries-search")?.focus(); return; }
         setSearchOpen(true);
         return;
       }
@@ -1245,7 +1251,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [playerMovie, selectedMovie, searchOpen, profileMenuOpen, closeDetails, closePlayer]);
+  }, [playerMovie, selectedMovie, searchOpen, profileMenuOpen, closeDetails, closePlayer, view]);
 
   if (!authChecking && !authUser) {
     if (loginOpen) return <LoginForm />;
@@ -1288,6 +1294,9 @@ export default function Home() {
           <a href="#series" className={view === "series" ? "is-active" : ""} onClick={() => goTo("series")}>
             Séries
           </a>
+          <a href="#minisseries" className={view === "minisseries" ? "is-active" : ""} onClick={() => goTo("minisseries")}>
+            Minisséries
+          </a>
           <a href="#esportes" className={view === "esportes" ? "is-active" : ""} onClick={() => goTo("esportes")}>
             Esportes
           </a>
@@ -1317,6 +1326,7 @@ export default function Home() {
             type="button"
             aria-label={searchOpen ? "Fechar busca" : "Abrir busca"}
             onClick={() => {
+              if (view === "minisseries") { document.getElementById("miniseries-search")?.focus(); return; }
               setSearchOpen((value) => !value);
               setQuery("");
             }}
@@ -1423,11 +1433,13 @@ export default function Home() {
       <PageLoadingBoundary
         key={`${view}:${catalogPage}:${genreId || "all"}`}
         pageKey={`${view}:${catalogPage}:${genreId || "all"}`}
-        label={`Carregando ${{ home: "Início", filmes: "Filmes", series: "Séries", esportes: "Esportes", lista: "Minha Lista", "surpreenda-me": "Surpreenda-me", grupo: "Grupo", amigos: "Amigos", retrospectiva: "Retrospectiva" }[view]}…`}
+        label={`Carregando ${{ home: "Início", filmes: "Filmes", series: "Séries", minisseries: "Minisséries", esportes: "Esportes", lista: "Minha Lista", "surpreenda-me": "Surpreenda-me", grupo: "Grupo", amigos: "Amigos", retrospectiva: "Retrospectiva" }[view]}…`}
         loading={(view === "filmes" || view === "series") && (browseReadyKey !== `${view}:${catalogPage}:${genreId || "all"}` || genresReadyView !== view || browseLoading)}
-        waitForReady={["esportes", "lista", "amigos", "retrospectiva", "surpreenda-me"].includes(view)}
+        waitForReady={["minisseries", "esportes", "lista", "amigos", "retrospectiva", "surpreenda-me"].includes(view)}
       >
-        {view === "esportes" ? (
+        {view === "minisseries" ? (
+          <MiniseriesView admin={authUser.administrador} />
+        ) : view === "esportes" ? (
           <SportsView />
         ) : view === "retrospectiva" ? (
           <RetrospectiveView name={authUser.nome} />
@@ -1774,6 +1786,9 @@ export default function Home() {
         </a>
         <a href="#filmes" className={view === "filmes" || view === "series" ? "is-active" : ""} onClick={() => goTo("filmes")}>
           <span aria-hidden="true">▦</span><small>Explorar</small>
+        </a>
+        <a href="#minisseries" className={view === "minisseries" ? "is-active" : ""} onClick={() => goTo("minisseries")}>
+          <span aria-hidden="true">▤</span><small>Minisséries</small>
         </a>
         <a className={`mobile-surprise ${view === "surpreenda-me" ? "is-active" : ""}`} href="#surpreenda-me" onClick={() => goTo("surpreenda-me")}>
           <span aria-hidden="true">✦</span><small>Surpreenda</small>

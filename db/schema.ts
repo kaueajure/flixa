@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   datetime,
+  bigint,
   decimal,
   index,
   int,
@@ -9,6 +10,7 @@ import {
   mysqlTable,
   text,
   tinyint,
+  timestamp,
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
@@ -383,3 +385,26 @@ export type RecuperacaoSenha = typeof recuperacoes_senha.$inferSelect;
 export type Amizade = typeof amizades.$inferSelect;
 export type RecomendacaoAmigo = typeof recomendacoes_amigos.$inferSelect;
 export type ServidorPlayer = typeof servidores_player.$inferSelect;
+
+/** Shared persistent miniseries catalog, cache and request coordination. */
+export const minisserie_titulos = mysqlTable("minisserie_titulos", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  payload: json("payload").notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+export const minisserie_aliases = mysqlTable("minisserie_aliases", {
+  alias_id: varchar("alias_id", { length: 64 }).primaryKey(),
+  title_id: varchar("title_id", { length: 64 }).notNull(),
+}, (t) => [index("minisserie_alias_title").on(t.title_id)]);
+export const minisserie_cache = mysqlTable("minisserie_cache", {
+  cache_key: varchar("cache_key", { length: 190 }).primaryKey(),
+  payload: json("payload").notNull(),
+  expires_at: bigint("expires_at", { mode: "number" }).notNull(),
+  stale_until: bigint("stale_until", { mode: "number" }).notNull(),
+}, (t) => [index("minisserie_cache_expiry").on(t.stale_until)]);
+export const minisserie_controle = mysqlTable("minisserie_controle", {
+  control_key: varchar("control_key", { length: 190 }).primaryKey(),
+  owner: varchar("owner", { length: 64 }).notNull().default(""),
+  expires_at: bigint("expires_at", { mode: "number" }).notNull().default(0),
+  units: int("units").notNull().default(0),
+}, (t) => [index("minisserie_control_expiry").on(t.expires_at)]);

@@ -40,11 +40,11 @@ cp .env.example .env
 npm run dev
 ```
 
-As integrações externas são opcionais e devem ser configuradas no `.env` conforme necessário.
+A `.env` contém somente credenciais e dados privados de conexão. Domínio, proxy, MySQL e opções públicas ficam em `config/app.json`; ativação dos provedores fica em `lib/miniseries/settings.ts`. Veja [configuração](docs/configuracao.md). Para Syln, basta `SYLN_TOKEN` com o IP do servidor autorizado.
 
 ## Assistir em grupo
 
-A página Grupo e as salas são restritas a administradores. A sincronização usa o player CineSrc. Configure `ABLY_API_KEY` e `WATCH_PARTY_SECRET` no servidor.
+A página Grupo e as salas são restritas a administradores. A sincronização usa o player CineSrc. Configure `ABLY_API_KEY` no servidor.
 
 ## Banco de dados
 
@@ -78,7 +78,23 @@ Os players esportivos compartilham com filmes e séries o menu pesquisável de s
 A interface esportiva segue uma composição de transmissão: faixas de esportes e ligas, player principal, agenda lateral e cards compactos de partidas. A busca por jogos, times ou ligas filtra agenda e cards em conjunto. Em telas pequenas, a agenda fica abaixo do player. Placar, local e demais detalhes aparecem apenas quando fornecidos; os escudos da Streamed são exibidos pela rota de imagens verificada, com monogramas quando ausentes ou quando o carregamento falha.
 
 
-## Vídeo
+## Minisséries
+
+A seção `/#minisseries` usa o mesmo catálogo visual e menu de servidores do streaming. A busca pública da MicroDramaList está validada e seus metadados têm atribuição CC BY 4.0. Não há catálogo fictício nem coleta em massa: o catálogo local começa vazio e é preenchido por buscas reais ou por atualizações controladas da Syln, quando habilitada.
+
+As quatro tabelas adicionais usam o MySQL existente (`npm run db:migrate`). Catálogo, buscas e episódios ficam persistidos, com deduplicação, travas e orçamentos compartilhados entre processos. Reprodução, imagens e metadados têm permissões separadas; vídeos permanecem bloqueados sem autorização específica. Syln está habilitada e validada com token; DramaBos foi removido. DramaBox via Syln exige autorização de distribuição por título para habilitar vídeo.
+
+Consulte [o relatório de implementação e validação](docs/minisseries.md) para endpoints testados, permissões, variáveis, TTLs e procedimentos de ativação. Os testes reais de HTTP ficam em [miniseries-smoke.json](docs/miniseries-smoke.json).
+
+O DramaBox usa `@zhadev/dramabox@0.0.2` no backend Node, com cache MySQL, normalização e deduplicação existentes. Categorias e títulos por categoria foram validados ao vivo; operações dependentes do bootstrap retornaram HTTP 403. DramaBox direto permanece desativado em `lib/miniseries/settings.ts`; o acesso pela Syln usa exclusivamente seu token. Consulte [integração direta](docs/dramabox.md) e [DramaBox via Syln](docs/dramabox-via-syln.md).
+
+```bash
+npm run miniseries:smoke          # poucas chamadas públicas; nunca solicita vídeo
+npm run miniseries:verify-storage # teste opt-in de cache/cota no MySQL configurado
+npm run miniseries:refresh        # uma página Syln; requer configuração e permissões
+```
+
+## Reprodução existente
 
 Embeds externos são carregados em `iframe` com restrições de segurança. Provedores que exigem pop-up, bloqueiam incorporação ou não são compatíveis ficam desativados.
 
@@ -96,3 +112,10 @@ Para iniciar o build gerado:
 ```bash
 npm start
 ```
+
+A Syln foi validada com autenticação real: catálogo, detalhes e episódios retornaram HTTP 200, e a primeira página de 24 títulos foi persistida no MySQL. Repetir atualização/leitura reutilizou o cache sem chamadas externas. Evidências: [syln-smoke.json](docs/syln-smoke.json). Reprodução não foi solicitada nesse teste.
+
+DramaBox via Syln: 46 títulos únicos importados, português priorizado, pesquisa/detalhes/episódios HTTP 200 e nenhuma nova chamada nas leituras repetidas. Use **Administração → Atualizar DramaBox via Syln**. [Evidência real](docs/syln-dramabox-smoke.json); reprodução aguarda o ID e a referência da autorização específica.
+
+
+ReelShort direto executa no backend Node, com catálogo, busca, episódios e player existentes. Veja [integração ReelShort](docs/reelshort.md).

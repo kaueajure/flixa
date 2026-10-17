@@ -1,3 +1,4 @@
+import appSettings from "../config/app.json" with { type: "json" };
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +22,7 @@ const files = readdirSync(drizzleDir)
 
 const connection = await createConnection({
   host: required("MYSQL_HOST"),
-  port: Number(process.env.MYSQL_PORT || "3306"),
+  port: appSettings.mysql.port,
   user: required("MYSQL_USER"),
   password: required("MYSQL_PASSWORD"),
   database: required("MYSQL_DATABASE"),

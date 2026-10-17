@@ -1,0 +1,130 @@
+{
+  "checkedAt": "2026-10-17T18:32:55.766Z",
+  "authenticated": false,
+  "playbackTested": false,
+  "note": "Live HTTP observations, never documentation examples. No credentials for Syln or DramaBos were available.",
+  "results": [
+    {
+      "url": "https://microdramalist.com/api/v1/search?q=love",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rateLimit": "30",
+      "remaining": "29",
+      "retryAfter": null,
+      "shape": "array",
+      "count": 20,
+      "firstKeys": [
+        "id",
+        "title",
+        "posterUrl",
+        "description"
+      ],
+      "normalizationValid": true
+    },
+    {
+      "url": "https://microdramalist.com/api/v1/dramas/mdid-4ztkqf8d",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rateLimit": "30",
+      "remaining": "29",
+      "retryAfter": null,
+      "shape": "object",
+      "keys": [
+        "id",
+        "title",
+        "alternativeTitles",
+        "genres",
+        "episodeCount",
+        "releaseYear",
+        "languages",
+        "upvotes",
+        "downvotes",
+        "description",
+        "posterUrl",
+        "availableOn"
+      ],
+      "id": "mdid-4ztkqf8d",
+      "episodeCount": null,
+      "languages": [],
+      "platforms": [
+        {
+          "platform": "Kalos TV",
+          "externalId": "4242",
+          "unverified": true
+        }
+      ],
+      "normalizationValid": true
+    },
+    {
+      "url": "https://api.syln.dev/v1/health",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rateLimit": null,
+      "remaining": null,
+      "retryAfter": null,
+      "shape": "object",
+      "keys": [
+        "data",
+        "success"
+      ]
+    },
+    {
+      "url": "https://api.syln.dev/v1/plans",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rateLimit": null,
+      "remaining": null,
+      "retryAfter": null,
+      "shape": "object",
+      "keys": [
+        "data",
+        "success"
+      ],
+      "freePlan": {
+        "code": "lite",
+        "name": "Lite",
+        "price_idr": 0,
+        "watch_per_hour": 60,
+        "max_tokens": 1,
+        "max_res": 480
+      }
+    },
+    {
+      "url": "https://api.syln.dev/v1/catalog?content_type=short_drama&limit=1",
+      "status": 401,
+      "contentType": "application/json; charset=utf-8",
+      "rateLimit": null,
+      "remaining": null,
+      "retryAfter": null,
+      "shape": "object",
+      "keys": [
+        "error",
+        "success"
+      ],
+      "error": "masuk dulu untuk menonton"
+    },
+    {
+      "url": "https://api.syln.dev/v1/search?q=love&limit=1",
+      "status": 401,
+      "contentType": "application/json; charset=utf-8",
+      "rateLimit": null,
+      "remaining": null,
+      "retryAfter": null,
+      "shape": "object",
+      "keys": [
+        "error",
+        "success"
+      ],
+      "error": "masuk dulu untuk menonton"
+    },
+    {
+      "url": "https://dramabos.live/api/status",
+      "status": 404,
+      "contentType": "text/html",
+      "rateLimit": null,
+      "remaining": null,
+      "retryAfter": null,
+      "shape": "non-json"
+    }
+  ]
+}

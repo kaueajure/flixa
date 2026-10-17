@@ -1,3 +1,4 @@
+import appSettings from "../config/app.json" with { type: "json" };
 type ResetRecipient = { nome: string; email: string };
 
 function escapeHtml(value: string) {
@@ -11,28 +12,26 @@ function escapeHtml(value: string) {
 }
 
 export function criarUrlRecuperacao(request: Request, token: string) {
-  const configured = process.env.FLIXA_PUBLIC_URL?.trim().replace(/\/$/, "");
+  const requestUrl = new URL(request.url);
+  if (process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1"].includes(requestUrl.hostname)) return `${requestUrl.origin}/login?reset=${encodeURIComponent(token)}`;
+  const configured = appSettings.publicUrl.trim().replace(/\/$/, "");
   if (configured) {
     const base = new URL(configured);
     if (base.protocol !== "https:" && base.hostname !== "localhost" && base.hostname !== "127.0.0.1") {
-      throw new Error("FLIXA_PUBLIC_URL precisa usar HTTPS.");
+      throw new Error("publicUrl em config/app.json precisa usar HTTPS.");
     }
     return `${base.origin}/login?reset=${encodeURIComponent(token)}`;
   }
 
-  const requestUrl = new URL(request.url);
-  if (process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1"].includes(requestUrl.hostname)) {
-    return `${requestUrl.origin}/login?reset=${encodeURIComponent(token)}`;
-  }
-  throw new Error("Configure FLIXA_PUBLIC_URL para enviar links de recuperação.");
+  throw new Error("Configure publicUrl em config/app.json para enviar links de recuperação.");
 }
 
 export async function enviarEmailRecuperacao(destinatario: ResetRecipient, resetUrl: string) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.PASSWORD_RESET_FROM_EMAIL?.trim();
+  const from = appSettings.passwordResetFromEmail.trim();
   if (!apiKey || !from) {
     if (process.env.NODE_ENV !== "production") return false;
-    throw new Error("Configure RESEND_API_KEY e PASSWORD_RESET_FROM_EMAIL.");
+    throw new Error("Configure RESEND_API_KEY e o remetente em config/app.json.");
   }
 
   const nome = escapeHtml(destinatario.nome);

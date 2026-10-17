@@ -12,6 +12,7 @@ test("keeps the desktop navigation in a coherent centered order", () => {
     "#home",
     "#filmes",
     "#series",
+    "#minisseries",
     "#esportes",
     "#surpreenda-me",
     "#assistir-em-grupo",
@@ -31,11 +32,11 @@ test("keeps the desktop navigation in a coherent centered order", () => {
   assert.match(profile, /assistir-em-grupo/);
 });
 
-test("keeps the mobile navigation focused on five primary destinations", () => {
+test("keeps the mobile navigation focused on six primary destinations", () => {
   const navStart = pageSource.indexOf('<nav className="mobile-nav"');
   const navEnd = pageSource.indexOf("</nav>", navStart);
   const nav = pageSource.slice(navStart, navEnd);
-  for (const route of ["#home", "#filmes", "#surpreenda-me", "#esportes"]) {
+  for (const route of ["#home", "#filmes", "#minisseries", "#surpreenda-me", "#esportes"]) {
     assert.match(nav, new RegExp(route));
   }
   assert.match(nav, /mobile-profile-trigger/);

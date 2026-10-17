@@ -1,0 +1,228 @@
+{
+  "checkedAt": "2026-10-17T19:54:59.937Z",
+  "supplier": "syln",
+  "origin": "dramabox",
+  "mockResponses": false,
+  "directSdkEnabled": false,
+  "directSdkExecuted": false,
+  "playbackTested": false,
+  "requests": [
+    {
+      "path": "/v1/catalog",
+      "query": "content_type=short_drama&limit=24&page=1&platform=dramabox&has_media=true&lang=pt",
+      "status": 200
+    },
+    {
+      "path": "/v1/titles/dramabox%3A42000010189",
+      "query": "lang=pt",
+      "status": 200
+    },
+    {
+      "path": "/v1/titles/dramabox%3A42000010189/episodes",
+      "query": "",
+      "status": 200
+    },
+    {
+      "path": "/v1/search",
+      "query": "content_type=short_drama&limit=24&page=1&platform=dramabox&has_media=true&q=a+invoca%C3%A7%C3%A3o+mais+fraca%2C+o+poder+mais+forte+%28dublado%29",
+      "status": 200
+    }
+  ],
+  "operations": {
+    "platforms": {
+      "dramabox": {
+        "platform": "dramabox",
+        "enabled": true,
+        "titles": 15221
+      }
+    },
+    "languages": {
+      "available": [
+        "ar",
+        "de",
+        "en",
+        "es",
+        "fil",
+        "fr",
+        "hi",
+        "id",
+        "ja",
+        "ko",
+        "ms",
+        "pt",
+        "th",
+        "tr",
+        "vi",
+        "zh"
+      ],
+      "portugueseAvailable": true
+    },
+    "catalog": {
+      "imported": 46,
+      "hasMore": true,
+      "page": 1,
+      "provider": "syln",
+      "platform": "dramabox",
+      "origin": "DramaBox",
+      "preferredLanguage": "pt",
+      "baseCount": 24,
+      "preferredCount": 24
+    },
+    "localCatalog": {
+      "countOnFirstPage": 24,
+      "hasMore": true,
+      "firstLanguages": [
+        [
+          "pt"
+        ],
+        [
+          "pt"
+        ],
+        [
+          "pt"
+        ],
+        [
+          "pt"
+        ],
+        [
+          "pt"
+        ]
+      ]
+    },
+    "details": {
+      "id": "dramabox:42000010189",
+      "title": "A Invocação Mais Fraca, o Poder Mais Forte (Dublado)",
+      "language": "pt",
+      "episodeCount": 60,
+      "posterPresent": true,
+      "synopsisPresent": true
+    },
+    "episodes": {
+      "id": "dramabox:42000010189",
+      "total": 60,
+      "withMedia": 60,
+      "withoutMedia": 0,
+      "availableEpisodeNumbers": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60
+      ],
+      "unavailableEpisodeNumbers": [],
+      "resolutions": [
+        540,
+        720,
+        1080
+      ]
+    },
+    "search": {
+      "query": "A Invocação Mais Fraca, o Poder Mais Forte (Dublado)",
+      "count": 1,
+      "containsKnownId": true
+    },
+    "sources": {
+      "labels": [
+        "DramaBox via Syln · pt"
+      ],
+      "episodesBrowsable": true,
+      "publicPlaybackAuthorized": false,
+      "signedUrlsRequested": false
+    },
+    "repeatedReads": {
+      "additionalProviderRequests": 0
+    }
+  },
+  "sampleTitles": [
+    {
+      "id": "dramabox:42000010189",
+      "title": "A Invocação Mais Fraca, o Poder Mais Forte (Dublado)",
+      "languages": [
+        "pt"
+      ]
+    },
+    {
+      "id": "dramabox:42000021054",
+      "title": "Só me Valorizaram Quando me Casei com Hades",
+      "languages": [
+        "pt"
+      ]
+    },
+    {
+      "id": "dramabox:42000020970",
+      "title": "A Noiva Substituta do Caipira Bilionário",
+      "languages": [
+        "pt"
+      ]
+    },
+    {
+      "id": "dramabox:42000018741",
+      "title": "O Lorde Serpente Mimou Demais (Dublado)",
+      "languages": [
+        "pt"
+      ]
+    },
+    {
+      "id": "dramabox:41000117780",
+      "title": "Amor dos Jogos: Despedida para Valer (Dublado)",
+      "languages": [
+        "pt"
+      ]
+    }
+  ]
+}

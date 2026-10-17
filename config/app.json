@@ -1,0 +1,8 @@
+{
+  "publicUrl": "https://flixa.run",
+  "trustedHosts": ["flixa.run"],
+  "trustProxy": true,
+  "passwordResetFromEmail": "Flixa <conta@flixa.run>",
+  "mysql": { "port": 3306, "connectTimeoutMs": 8000 },
+  "sports": { "authorizedEmbeds": [], "authorizedEmbedsUrl": "" }
+}

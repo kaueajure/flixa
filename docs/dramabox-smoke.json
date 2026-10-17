@@ -1,0 +1,300 @@
+{
+  "checkedAt": "2026-10-17T19:12:23.417Z",
+  "sdk": "@zhadev/dramabox@0.0.2",
+  "sdkExecuted": true,
+  "mockResponses": false,
+  "tlsVerification": true,
+  "metadataPersistenceAuthorized": false,
+  "mediaRequested": false,
+  "operations": [
+    {
+      "method": "getDramaList",
+      "args": [
+        1,
+        24
+      ],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": false,
+      "message": "Fonte respondeu HTTP 403.",
+      "requests": [
+        {
+          "method": "POST",
+          "host": "sapi.dramaboxdb.com",
+          "path": "/drama-box/ap001/bootstrap",
+          "status": 403
+        }
+      ]
+    },
+    {
+      "method": "searchDrama",
+      "args": [
+        "amor",
+        1,
+        24
+      ],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": true,
+      "message": "DramaBox em pausa após HTTP 403 neste host.",
+      "requests": []
+    },
+    {
+      "method": "getCategories",
+      "args": [
+        1,
+        30
+      ],
+      "success": true,
+      "categories": 50,
+      "requests": [
+        {
+          "method": "POST",
+          "host": "www.webfic.com",
+          "path": "/webfic/home/browse",
+          "status": 200,
+          "contract": {
+            "keys": [
+              "types",
+              "bookList",
+              "currentPage",
+              "total",
+              "pages",
+              "currentType",
+              "language"
+            ],
+            "categoryFields": [
+              "id",
+              "name",
+              "replaceName",
+              "checked"
+            ],
+            "bookFields": [
+              "bookId",
+              "originalBookId",
+              "bookName",
+              "cover",
+              "ratings",
+              "introduction",
+              "labels",
+              "tags",
+              "followCount",
+              "chapterCount",
+              "typeOneIds",
+              "typeTwoIds",
+              "typeTwoNames",
+              "typeTwoList",
+              "status",
+              "language",
+              "free",
+              "author",
+              "replacedBookName",
+              "bookNameLower",
+              "typeTwoName",
+              "simpleLanguage",
+              "bookNameEn",
+              "shelfTime",
+              "firstShelfTime",
+              "performerIdList",
+              "read",
+              "inLibrary",
+              "viewCountDisplay",
+              "lastUpdateTimeDisplay"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "method": "getBooksByCategory",
+      "args": [
+        "698",
+        1,
+        24
+      ],
+      "success": true,
+      "titles": 23,
+      "hasMore": false,
+      "requests": [
+        {
+          "method": "POST",
+          "host": "www.webfic.com",
+          "path": "/webfic/home/browse",
+          "status": 200,
+          "contract": {
+            "keys": [
+              "types",
+              "bookList",
+              "currentPage",
+              "total",
+              "pages",
+              "currentType",
+              "language"
+            ],
+            "categoryFields": [
+              "id",
+              "name",
+              "replaceName",
+              "checked"
+            ],
+            "bookFields": [
+              "bookId",
+              "originalBookId",
+              "bookName",
+              "cover",
+              "ratings",
+              "introduction",
+              "labels",
+              "tags",
+              "followCount",
+              "chapterCount",
+              "typeOneIds",
+              "typeTwoIds",
+              "typeTwoNames",
+              "typeTwoList",
+              "status",
+              "language",
+              "free",
+              "author",
+              "replacedBookName",
+              "bookNameLower",
+              "typeTwoName",
+              "simpleLanguage",
+              "bookNameEn",
+              "shelfTime",
+              "firstShelfTime",
+              "performerIdList",
+              "read",
+              "inLibrary",
+              "viewCountDisplay",
+              "lastUpdateTimeDisplay"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "host": "www.webfic.com",
+          "path": "/webfic/home/browse",
+          "status": 200,
+          "contract": {
+            "keys": [
+              "types",
+              "bookList",
+              "currentPage",
+              "total",
+              "pages",
+              "currentType",
+              "language"
+            ],
+            "categoryFields": [
+              "id",
+              "name",
+              "replaceName",
+              "checked"
+            ],
+            "bookFields": [
+              "bookId",
+              "originalBookId",
+              "bookName",
+              "cover",
+              "ratings",
+              "introduction",
+              "labels",
+              "tags",
+              "followCount",
+              "chapterCount",
+              "typeOneIds",
+              "typeTwoIds",
+              "typeTwoNames",
+              "typeTwoList",
+              "status",
+              "language",
+              "free",
+              "author",
+              "replacedBookName",
+              "bookNameLower",
+              "typeTwoName",
+              "simpleLanguage",
+              "bookNameEn",
+              "shelfTime",
+              "firstShelfTime",
+              "performerIdList",
+              "read",
+              "inLibrary",
+              "viewCountDisplay",
+              "lastUpdateTimeDisplay"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "method": "getDramaDetail",
+      "args": [
+        "42000029415"
+      ],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": true,
+      "message": "DramaBox em pausa após HTTP 403 neste host.",
+      "requests": []
+    },
+    {
+      "method": "getChapters",
+      "args": [
+        "42000029415"
+      ],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": true,
+      "message": "DramaBox em pausa após HTTP 403 neste host.",
+      "requests": []
+    },
+    {
+      "method": "getEpisodeDetails",
+      "skipped": "No real chapter/index returned"
+    },
+    {
+      "method": "getLatest",
+      "args": [
+        1
+      ],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": true,
+      "message": "DramaBox em pausa após HTTP 403 neste host.",
+      "requests": []
+    },
+    {
+      "method": "getRecommendedBooks",
+      "args": [],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": true,
+      "message": "DramaBox em pausa após HTTP 403 neste host.",
+      "requests": []
+    },
+    {
+      "method": "getTrending",
+      "args": [],
+      "success": false,
+      "status": 502,
+      "upstreamStatus": 403,
+      "suppressedBySharedCooldown": true,
+      "message": "DramaBox em pausa após HTTP 403 neste host.",
+      "requests": []
+    },
+    {
+      "method": "getStreamUrl",
+      "skipped": "No independently licensed title with validated playback supplied; no video request performed"
+    }
+  ],
+  "externalRequests": 4,
+  "otherProviderRequests": 0
+}

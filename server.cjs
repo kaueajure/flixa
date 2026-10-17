@@ -17,6 +17,10 @@ loadEnv({ path: ".env", override: false, quiet: true });
  * 1) Cria o server e chama listen() agora (lsnode captura o socket).
  * 2) Carrega o vinext depois e reaproveita o MESMO server (sem 2º listen).
  */
+const appSettings = require("./config/app.json");
+// Vinext consumes these process settings; the public values live in versioned code.
+process.env.VINEXT_TRUSTED_HOSTS ??= appSettings.trustedHosts.join(",");
+process.env.VINEXT_TRUST_PROXY ??= appSettings.trustProxy ? "1" : "0";
 const port = Number(process.env.PORT || 3000);
 const outDir = path.resolve(process.cwd(), "dist");
 

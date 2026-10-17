@@ -1,0 +1,74 @@
+{
+  "checkedAt": "2026-10-17T22:41:27.530Z",
+  "mockResponses": false,
+  "origin": "ReelShort",
+  "transport": "in-process Node; adapted upstream 95d04d0",
+  "requests": [
+    {
+      "host": "www.reelshort.com",
+      "path": "/_next/data/1792115511672/pt/episodes/episode-1-casei-me-com-o-mafioso-que-salvei-69eb2ff86df2b6f27b081cb3-p3a5e6mo2i.json",
+      "status": 200
+    }
+  ],
+  "operations": {
+    "newrelease": {
+      "provider": "reelshort",
+      "platform": "reelshort",
+      "page": 1,
+      "imported": 10,
+      "hasMore": false
+    },
+    "recommended": {
+      "provider": "reelshort",
+      "platform": "reelshort",
+      "page": 1,
+      "imported": 16,
+      "hasMore": false
+    },
+    "dramadub": {
+      "provider": "reelshort",
+      "platform": "reelshort",
+      "page": 1,
+      "imported": 10,
+      "hasMore": false
+    },
+    "search": {
+      "count": 12,
+      "matchedTitle": "Casei-me com o Mafioso que Salvei",
+      "id": "69eb2ff86df2b6f27b081cb3"
+    },
+    "episodes": {
+      "total": 54,
+      "available": 11,
+      "blocked": 43
+    },
+    "video": {
+      "episode": 1,
+      "format": "hls",
+      "host": "v-mps.crazymaplestudios.com",
+      "temporary": true
+    },
+    "player": {
+      "browser": "Chrome headless",
+      "sharedPlayer": true,
+      "scope": "existing episode selector and player, real adapter, local QA harness; no authenticated Flixa session",
+      "noPlaybackPrefetch": true,
+      "playRequests": 1,
+      "started": true,
+      "continued": true,
+      "firstTime": 1.653045,
+      "lastTime": 6.666395,
+      "readyState": 4,
+      "qualityOptions": [],
+      "videoWidth": 720,
+      "videoHeight": 1280,
+      "mediaError": null,
+      "notice": null
+    },
+    "repeatedReads": {
+      "additionalProviderRequests": 0
+    }
+  },
+  "videoTested": true,
+  "browserPlaybackTested": true
+}

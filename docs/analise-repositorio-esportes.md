@@ -43,7 +43,7 @@ Arquivos principais:
 - `app/esportes/page.tsx`: redirecionamento para `/#esportes`.
 - `tests/sports-catalog.test.mjs`: oito testes de catálogo e mapeamento.
 
-Já existe suporte a YouTube, ScoreBat, Twitch, Dailymotion e Vimeo como destinos de embed. Isso é suporte a formatos de URL; não são cinco serviços que descobrem automaticamente transmissões de uma partida. A associação adicional é manual ou vem de um feed configurado em `SPORTS_AUTHORIZED_EMBEDS_JSON`/`SPORTS_AUTHORIZED_EMBEDS_URL`.
+Já existe suporte a YouTube, ScoreBat, Twitch, Dailymotion e Vimeo como destinos de embed. Isso é suporte a formatos de URL; não são cinco serviços que descobrem automaticamente transmissões de uma partida. A associação adicional é manual ou vem de um feed configurado em `config/app.json` (`sports.authorizedEmbeds`/`sports.authorizedEmbedsUrl`).
 
 ### Verificação dos endpoints atuais
 

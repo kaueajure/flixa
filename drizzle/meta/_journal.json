@@ -92,6 +92,13 @@
       "when": 1787716980000,
       "tag": "0012_presenca_real_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792252800000,
+      "tag": "0013_minisseries",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-10-17T18:45:38.410Z",
+  "executed": false,
+  "package": {
+    "name": "@zhadev/dramabox",
+    "version": "0.0.2",
+    "integrity": "sha512-pp7BRgMHGWzX+tnFwsKSSSWtEjIZ7xTIjYTiC8VZevyrwTmLh1dq+txDJe1LjWxNn7BKT769tbWND1yymi9NcQ==",
+    "tlsValidationDisabled": true,
+    "embeddedSigningKey": true,
+    "deviceBootstrap": true,
+    "wafEvasionCommentPreservedInBundle": false,
+    "typesTargetIncludedInPackage": false,
+    "typesReference": "export * from '../src/types/index.d.ts';"
+  },
+  "repositories": {
+    "primary": {
+      "url": "https://github.com/zhadevv/dramabox",
+      "commit": "a9c844c33f74061d169b19c8b5ef15cc693da542",
+      "episodeListContainsVideoPaths": true,
+      "wafEvasionDocumentedInSource": true,
+      "streamCacheTtlSeconds": 600,
+      "streamRejectsLockedFlag": false
+    },
+    "alternative": {
+      "url": "https://github.com/hndko/dramabox-rest-api-node",
+      "commit": "6bdcb419db8e0382fcdc613a0a6b76fbcee8e42a",
+      "spoofsForwardedIp": true,
+      "generatesDeviceToken": true
+    }
+  },
+  "officialTerms": {
+    "url": "https://support.dramaboxdb.com/terms.html?language=en&apptheme=0",
+    "status": 200,
+    "clauses": [
+      "2.1",
+      "2.2",
+      "6.1",
+      "6.2"
+    ],
+    "independentRetransmissionGrantFound": false,
+    "automatedAccessPermissionFound": false
+  },
+  "publicWebsiteObservations": [
+    {
+      "url": "https://www.dramabox.com/",
+      "status": 200
+    },
+    {
+      "url": "https://www.dramaboxdb.com/",
+      "status": 200
+    },
+    {
+      "url": "https://www.dramabox.com/pt",
+      "status": 200
+    }
+  ],
+  "note": "Static code/package inspection and public page HTTP observations. SDK, token generation, private app endpoints and video URLs were not executed.",
+  "phase": "Historical static inspection before SDK implementation",
+  "supersededBy": "dramabox-smoke.json and dramabox.md"
+}
